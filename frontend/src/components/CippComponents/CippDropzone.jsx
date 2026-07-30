@@ -64,26 +64,17 @@ const CippDropzone = ({
     accept: accept,
     maxFiles: maxFiles,
   });
+  // Note: the former `returnCard` branch wrapped this in <CippContentCard>, a component
+  // that does not exist anywhere in the codebase (its import was commented out), so that
+  // path threw at render. Always render the plain dropzone; `returnCard` is retained as a
+  // no-op prop for backward compatibility with existing callers.
   return (
-    <>
-      {returnCard ? (
-        <CippContentCard title={title} {...props}>
-          <div className="container my-2">
-            <Container {...getRootProps({ isFocused, isDragAccept, isDragReject })}>
-              <input {...getInputProps()} />
-              <span>{dropMessage}</span>
-            </Container>
-          </div>
-        </CippContentCard>
-      ) : (
-        <div className="container my-2">
-          <Container {...getRootProps({ isFocused, isDragAccept, isDragReject })}>
-            <input {...getInputProps()} />
-            <span>{dropMessage}</span>
-          </Container>
-        </div>
-      )}
-    </>
+    <div className="container my-2">
+      <Container {...getRootProps({ isFocused, isDragAccept, isDragReject })}>
+        <input {...getInputProps()} />
+        <span>{dropMessage}</span>
+      </Container>
+    </div>
   );
 };
 

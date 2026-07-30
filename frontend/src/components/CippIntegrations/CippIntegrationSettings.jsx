@@ -15,16 +15,19 @@ const CippIntegrationSettings = ({ children }) => {
   const settings = useSettings();
   const preferredTheme = settings.currentTheme?.value;
 
+  // Always refetch on mount so the form can't get stuck on a stale/empty cache entry.
+  // We saw the shared "Integrations" cache occasionally hold `{}` for this codepath
+  // even though /api/ListExtensionsConfig returned the real config; forcing the fetch
+  // on every visit to a configure page guarantees the form sees current data.
   const integrations = ApiGetCall({
     url: "/api/ListExtensionsConfig",
     queryKey: "Integrations",
-    refetchOnMount: false,
+    refetchOnMount: "always",
     refetchOnReconnect: false,
   });
 
   const formControl = useForm({
     mode: "onChange",
-    defaultValues: integrations?.data,
   });
 
   const extension = extensions.find((extension) => extension.id === router.query.id);
@@ -35,14 +38,17 @@ const CippIntegrationSettings = ({ children }) => {
     logo = extension.logoDark;
   }
 
+  // Reset the form whenever the API data reference changes (covers the initial
+  // undefined -> real-data transition). Depending on `integrations.data` rather
+  // than `integrations.isSuccess` so a late-arriving payload still triggers the
+  // reset; depending only on `isSuccess` (the previous code) fired the effect
+  // once with `integrations.data` still undefined and the form stayed on its
+  // per-Controller defaults.
   useEffect(() => {
-    if (integrations.isSuccess) {
-      formControl.reset({
-        ...integrations.data,
-      });
-      formControl.trigger();
+    if (integrations.data && Object.keys(integrations.data).length > 0) {
+      formControl.reset(integrations.data);
     }
-  }, [integrations.isSuccess]);
+  }, [integrations.data]);
 
   return (
     <>

@@ -628,6 +628,22 @@
           "type": "Scope"
         },
         {
+          "id": "11776c0c-6138-4db3-a668-ee621bea2555",
+          "type": "Scope"
+        },
+        {
+          "id": "7dd1be58-6e76-4401-bf8d-31d1e8180d5b",
+          "type": "Role"
+        },
+        {
+          "id": "bb70e231-92dc-4729-aff5-697b3f04be95",
+          "type": "Role"
+        },
+        {
+          "id": "f6609722-4100-44eb-b747-e6ca0536989d",
+          "type": "Scope"
+        },
+        {
           "id": "3bc15058-7858-4141-b24f-ae43b4e80b52",
           "type": "Scope"
         }

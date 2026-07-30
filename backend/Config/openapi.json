@@ -674,6 +674,65 @@
         }
       }
     },
+    "/api/AddAutopatchRing": {
+      "post": {
+        "description": "Creates a Windows Autopatch deployment audience, adds devices as members, enrolls them, and creates update policies.",
+        "x-cipp-role": "Endpoint.MEM.ReadWrite",
+        "summary": "AddAutopatchRing",
+        "tags": [
+          "POST",
+          "Endpoint",
+          "Autopatch"
+        ],
+        "parameters": [
+          {
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "name": "tenantFilter",
+            "in": "body"
+          },
+          {
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "name": "ringName",
+            "in": "body"
+          },
+          {
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "name": "deviceIds",
+            "in": "body"
+          },
+          {
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "name": "categories",
+            "in": "body"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {},
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful operation"
+          }
+        }
+      }
+    },
     "/api/AddAutopilotConfig": {
       "post": {
         "summary": "AddAutopilotConfig",
@@ -7394,6 +7453,39 @@
         }
       }
     },
+    "/api/DomainAnalyser_List": {
+      "get": {
+        "description": "DomainAnalyser_List",
+        "x-cipp-role": "Tenant.DomainAnalyser.Read",
+        "summary": "DomainAnalyser_List",
+        "tags": [
+          "GET"
+        ],
+        "parameters": [
+          {
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "name": "tenantFilter",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {},
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful operation"
+          }
+        }
+      }
+    },
     "/api/EditAntiPhishingFilter": {
       "post": {
         "summary": "EditAntiPhishingFilter",
@@ -10679,6 +10771,57 @@
         }
       }
     },
+    "/api/EnrollAutopatchAsset": {
+      "post": {
+        "description": "Enrolls one or more Azure AD Windows device IDs into Windows Autopatch update management.",
+        "x-cipp-role": "Endpoint.MEM.ReadWrite",
+        "summary": "EnrollAutopatchAsset",
+        "tags": [
+          "POST",
+          "Endpoint",
+          "Autopatch"
+        ],
+        "parameters": [
+          {
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "name": "tenantFilter",
+            "in": "body"
+          },
+          {
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "name": "deviceIds",
+            "in": "body"
+          },
+          {
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "name": "categories",
+            "in": "body"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {},
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful operation"
+          }
+        }
+      }
+    },
     "/api/ExecAPIPermissionList": {
       "get": {
         "summary": "ExecAPIPermissionList",
@@ -12240,6 +12383,108 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/api/ExecAutopatchOnboard": {
+      "post": {
+        "description": "Buckets Windows managed devices into Autopatch deployment audiences and creates update policies.",
+        "x-cipp-role": "Endpoint.MEM.ReadWrite",
+        "summary": "ExecAutopatchOnboard",
+        "tags": [
+          "POST",
+          "Endpoint",
+          "Autopatch"
+        ],
+        "parameters": [
+          {
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "name": "tenantFilter",
+            "in": "body"
+          },
+          {
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "name": "categories",
+            "in": "body"
+          },
+          {
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "name": "force",
+            "in": "body"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {},
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful operation"
+          }
+        }
+      }
+    },
+    "/api/ExecAutopatchUnenroll": {
+      "post": {
+        "description": "Unenrolls one or more Azure AD Windows device IDs from Windows Autopatch update management.",
+        "x-cipp-role": "Endpoint.MEM.ReadWrite",
+        "summary": "ExecAutopatchUnenroll",
+        "tags": [
+          "POST",
+          "Endpoint",
+          "Autopatch"
+        ],
+        "parameters": [
+          {
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "name": "tenantFilter",
+            "in": "body"
+          },
+          {
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "name": "deviceIds",
+            "in": "body"
+          },
+          {
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "name": "categories",
+            "in": "body"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {},
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful operation"
           }
         }
       }
@@ -16857,6 +17102,69 @@
         }
       }
     },
+    "/api/ExecExoRequest": {
+      "post": {
+        "description": "Generic Exchange Online cmdlet passthrough. Runs an arbitrary EXO/Compliance cmdlet against a single tenant via New-ExoRequest.",
+        "x-cipp-role": "CIPP.Core.ReadWrite",
+        "summary": "ExecExoRequest",
+        "tags": [
+          "POST"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "TenantFilter",
+                  "Cmdlet"
+                ],
+                "properties": {
+                  "TenantFilter": {
+                    "type": "string"
+                  },
+                  "Cmdlet": {
+                    "type": "string",
+                    "description": "EXO cmdlet, e.g. Set-InboundConnector."
+                  },
+                  "CmdParams": {
+                    "type": "object",
+                    "description": "Cmdlet parameters, e.g. { Identity, EFSkipLastIP }."
+                  },
+                  "UseSystemMailbox": {
+                    "type": "boolean"
+                  },
+                  "Compliance": {
+                    "type": "boolean",
+                    "description": "Run against Security & Compliance PowerShell."
+                  },
+                  "Anchor": {
+                    "type": "string"
+                  },
+                  "Select": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {},
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful operation"
+          }
+        }
+      }
+    },
     "/api/ExecExtensionClearHIBPKey": {
       "get": {
         "summary": "ExecExtensionClearHIBPKey",
@@ -18142,6 +18450,160 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/api/ExecGraphRequest": {
+      "get": {
+        "description": "Read-capable generic Microsoft Graph passthrough (GET). Executes a Graph GET against a single tenant.",
+        "x-cipp-role": "CIPP.Core.ReadWrite",
+        "summary": "ExecGraphRequest",
+        "tags": [
+          "GET"
+        ],
+        "parameters": [
+          {
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "name": "TenantFilter",
+            "in": "query"
+          },
+          {
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "name": "Endpoint",
+            "in": "query"
+          },
+          {
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "beta",
+              "enum": [
+                "beta",
+                "v1.0"
+              ]
+            },
+            "name": "Version",
+            "in": "query"
+          },
+          {
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            },
+            "name": "AsApp",
+            "in": "query"
+          },
+          {
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "name": "DisablePagination",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {},
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful operation"
+          }
+        }
+      },
+      "post": {
+        "description": "Write-capable generic Microsoft Graph passthrough. Executes an arbitrary Graph request (GET/POST/PATCH/PUT/DELETE) against a single tenant. SuperAdmin only.",
+        "x-cipp-role": "CIPP.Core.ReadWrite",
+        "summary": "ExecGraphRequest",
+        "tags": [
+          "POST"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "TenantFilter",
+                  "Endpoint"
+                ],
+                "properties": {
+                  "TenantFilter": {
+                    "type": "string",
+                    "description": "Tenant default domain or customer id."
+                  },
+                  "Endpoint": {
+                    "type": "string",
+                    "description": "Relative Graph path (e.g. 'users/{id}') or a full Graph URL."
+                  },
+                  "Method": {
+                    "type": "string",
+                    "default": "GET",
+                    "enum": [
+                      "GET",
+                      "POST",
+                      "PATCH",
+                      "PUT",
+                      "DELETE"
+                    ]
+                  },
+                  "Version": {
+                    "type": "string",
+                    "default": "beta",
+                    "enum": [
+                      "beta",
+                      "v1.0"
+                    ],
+                    "description": "Ignored when Endpoint is a full URL."
+                  },
+                  "Body": {
+                    "description": "Request body for write methods. Object or JSON string.",
+                    "oneOf": [
+                      {
+                        "type": "object"
+                      },
+                      {
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "AsApp": {
+                    "type": "boolean",
+                    "description": "Force an application token instead of delegated."
+                  },
+                  "NoPagination": {
+                    "type": "boolean",
+                    "description": "Disable paging on GET."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {},
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful operation"
           }
         }
       }
@@ -28064,6 +28526,57 @@
             "$ref": "#/components/parameters/tenantFilter"
           }
         ]
+      }
+    },
+    "/api/ListAutopatchEnrollmentStatus": {
+      "get": {
+        "description": "Returns Windows Autopatch enrollment status joined to Intune managed device inventory.",
+        "x-cipp-role": "Endpoint.MEM.Read",
+        "summary": "ListAutopatchEnrollmentStatus",
+        "tags": [
+          "GET",
+          "Endpoint",
+          "Autopatch"
+        ],
+        "parameters": [
+          {
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "name": "tenantFilter",
+            "in": "query"
+          },
+          {
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "name": "includeUnenrolled",
+            "in": "query"
+          },
+          {
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "name": "deviceIds",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {},
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful operation"
+          }
+        }
       }
     },
     "/api/ListAutopilotconfig": {
@@ -38119,6 +38632,57 @@
         "x-cipp-role": "CIPP.Alert.Read"
       }
     },
+    "/api/ListWindowsAutopatch": {
+      "get": {
+        "description": "Returns Windows Autopatch update policies, deployment audiences, enrolled assets, and optional Intune managed device joins.",
+        "x-cipp-role": "Endpoint.MEM.Read",
+        "summary": "ListWindowsAutopatch",
+        "tags": [
+          "GET",
+          "Endpoint",
+          "Autopatch"
+        ],
+        "parameters": [
+          {
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "name": "tenantFilter",
+            "in": "query"
+          },
+          {
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "name": "includeManagedDevices",
+            "in": "query"
+          },
+          {
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "name": "includeAudienceMembers",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {},
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful operation"
+          }
+        }
+      }
+    },
     "/api/ListWorkerHealth": {
       "post": {
         "summary": "Retrieves health status and diagnostics for CIPP background worker processes.",
@@ -38899,6 +39463,49 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/api/RemoveAutopatchPolicy": {
+      "post": {
+        "description": "Deletes a Windows Autopatch update policy by ID.",
+        "x-cipp-role": "Endpoint.MEM.ReadWrite",
+        "summary": "RemoveAutopatchPolicy",
+        "tags": [
+          "POST",
+          "Endpoint",
+          "Autopatch"
+        ],
+        "parameters": [
+          {
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "name": "tenantFilter",
+            "in": "body"
+          },
+          {
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "name": "policyId",
+            "in": "body"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {},
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful operation"
           }
         }
       }

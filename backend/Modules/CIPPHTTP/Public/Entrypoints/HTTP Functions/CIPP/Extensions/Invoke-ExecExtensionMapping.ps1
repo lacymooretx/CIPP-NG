@@ -31,8 +31,17 @@ Function Invoke-ExecExtensionMapping {
       'HuduFields' {
         $Result = Get-HuduFieldMapping -CIPPMapping $Table
       }
+      'ITGlue' {
+        $Result = Get-ITGlueMapping -CIPPMapping $Table
+      }
+      'ITGlueFields' {
+        $Result = Get-ITGlueFieldMapping -CIPPMapping $Table
+      }
       'Sherweb' {
         $Result = Get-SherwebMapping -CIPPMapping $Table
+      }
+      'Pax8' {
+        $Result = Get-Pax8Mapping -CIPPMapping $Table
       }
       'HaloPSAFields' {
         $TicketTypes = Get-HaloTicketType
@@ -40,6 +49,16 @@ Function Invoke-ExecExtensionMapping {
         $Result = @{
           'TicketTypes' = $TicketTypes
           'Outcomes'    = $Outcomes
+        }
+      }
+      'ConnectWise' {
+        $Result = Get-ConnectWiseMapping -CIPPMapping $Table
+      }
+      'ConnectWiseFields' {
+        $Fields = Get-ConnectWiseBoards
+        $Result = @{
+          'Boards'     = $Fields.Boards
+          'Priorities' = $Fields.Priorities
         }
       }
       'PWPushFields' {
@@ -57,8 +76,14 @@ Function Invoke-ExecExtensionMapping {
         'Sherweb' {
           $Result = Set-SherwebMapping -CIPPMapping $Table -APIName $APIName -Request $Request
         }
+        'Pax8' {
+          $Result = Set-Pax8Mapping -CIPPMapping $Table -APIName $APIName -Request $Request
+        }
         'HaloPSA' {
           $Result = Set-HaloMapping -CIPPMapping $Table -APIName $APIName -Request $Request
+        }
+        'ConnectWise' {
+          $Result = Set-ConnectWiseMapping -CIPPMapping $Table -APIName $APIName -Request $Request
         }
         'NinjaOne' {
           $Result = Set-NinjaOneOrgMapping -CIPPMapping $Table -APIName $APIName -Request $Request
@@ -74,6 +99,14 @@ Function Invoke-ExecExtensionMapping {
         }
         'HuduFields' {
           $Result = Set-ExtensionFieldMapping -CIPPMapping $Table -APIName $APIName -Request $Request -Extension 'Hudu'
+          Register-CIPPExtensionScheduledTasks
+        }
+        'ITGlue' {
+          $Result = Set-ITGlueMapping -CIPPMapping $Table -APIName $APIName -Request $Request
+          Register-CIPPExtensionScheduledTasks
+        }
+        'ITGlueFields' {
+          $Result = Set-ExtensionFieldMapping -CIPPMapping $Table -APIName $APIName -Request $Request -Extension 'ITGlue'
           Register-CIPPExtensionScheduledTasks
         }
       }

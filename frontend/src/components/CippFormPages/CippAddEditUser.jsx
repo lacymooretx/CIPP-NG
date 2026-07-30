@@ -632,7 +632,8 @@ const CippAddEditUser = (props) => {
           showRefresh={true}
         />
       </Grid>
-      {integrationSettings?.data?.Sherweb?.Enabled === true && (
+      {(integrationSettings?.data?.Sherweb?.Enabled === true ||
+        integrationSettings?.data?.Pax8?.Enabled === true) && (
         <>
           <CippFormCondition
             formControl={formControl}
@@ -645,21 +646,21 @@ const CippAddEditUser = (props) => {
               <CippFormComponent
                 type="switch"
                 label="0 Licences available. Purchase new licence?"
-                name="sherweb"
+                name="cspPurchase"
                 formControl={formControl}
               />
             </Grid>
             <CippFormCondition
               formControl={formControl}
-              field="sherweb"
+              field="cspPurchase"
               compareType="is"
               compareValue={true}
             >
               <Grid size={{ xs: 12 }}>
                 <Alert severity="info">
-                  This will Purchase a new Sherweb License for the user, according to the terms and
-                  conditions with Sherweb. When the license becomes available, CIPP will assign the
-                  license to this user.
+                  This will order a new CSP license for the user from whichever provider
+                  (Pax8 or Sherweb) this tenant is mapped to. When the license becomes
+                  available, CIPP will assign it to the user automatically.
                 </Alert>
               </Grid>
               <Grid size={{ xs: 12 }}>
@@ -672,8 +673,8 @@ const CippAddEditUser = (props) => {
                     labelField: (option) => `${option?.productName} (${option?.sku})`,
                     valueField: 'sku',
                   }}
-                  label="Sherweb License"
-                  name="sherwebLicense"
+                  label="CSP License"
+                  name="cspLicense"
                   formControl={formControl}
                 />
               </Grid>

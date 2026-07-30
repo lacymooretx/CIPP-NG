@@ -584,6 +584,17 @@ export const nativeMenuItems = [
         ],
       },
       {
+        title: 'Autopatch',
+        permissions: ['Endpoint.MEM.*'],
+        items: [
+          {
+            title: 'Autopatch',
+            path: '/endpoint/autopatch',
+            permissions: ['Endpoint.MEM.*'],
+          },
+        ],
+      },
+      {
         title: 'Device Management',
         permissions: ['Endpoint.MEM.*', 'Endpoint.Device.*'],
         items: [
@@ -1090,6 +1101,13 @@ export const nativeMenuItems = [
       {
         title: 'Report Builder',
         path: '/tools/report-builder/generated',
+        roles: ['admin', 'superadmin'],
+        permissions: ['CIPP.Core.*'],
+        scope: 'global',
+      },
+      {
+        title: 'Reports',
+        path: '/tools/security-report',
         roles: ['admin', 'superadmin'],
         permissions: ['CIPP.Core.*'],
         scope: 'global',

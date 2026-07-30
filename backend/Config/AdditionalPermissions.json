@@ -1,5 +1,22 @@
 [
   {
+    "resourceAppId": "00000003-0000-0000-c000-000000000000",
+    "resourceAccess": [
+      {
+        "id": "19b94e34-907c-4f43-bde9-38b1909ed408",
+        "type": "Role"
+      },
+      {
+        "id": "e2a3a72e-5f79-4c64-b1b1-878b674786c9",
+        "type": "Role"
+      },
+      {
+        "id": "dd98c7f5-2d42-42d3-a0e4-633161547251",
+        "type": "Role"
+      }
+    ]
+  },
+  {
     "resourceAppId": "00000006-0000-0ff1-ce00-000000000000",
     "resourceAccess": [
       {

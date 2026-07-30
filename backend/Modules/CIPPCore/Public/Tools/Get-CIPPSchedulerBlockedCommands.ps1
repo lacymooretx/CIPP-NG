@@ -49,6 +49,7 @@ function Get-CIPPSchedulerBlockedCommands {
         'Get-HaloToken'
         'Get-NinjaOneToken'
         'Get-SherwebAuthentication'
+        'Get-Pax8Authentication'
         'Get-HIBPAuth'
 
         # Secret & key material

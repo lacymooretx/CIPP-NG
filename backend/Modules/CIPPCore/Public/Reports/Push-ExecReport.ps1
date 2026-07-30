@@ -1,0 +1,120 @@
+function Push-ExecReport {
+    <#
+    .SYNOPSIS
+        Generate a CIPP report of the given type for a tenant and return it as an
+        email-ready attachment (generic schedulable command).
+    .DESCRIPTION
+        The generic scheduler entry point for the Aspendora / CIPP report suite. Gathers
+        the report model (Get-CIPPReportData -ReportType), renders branded HTML
+        (Write-CippReportHtml), and returns Results + a base64 HTML TaskAttachments entry
+        so the CIPP scheduler emails it when PostExecution includes Email. Schedule via
+        POST /api/AddScheduledItem with command 'Push-ExecReport' and parameters
+        { TenantFilter, ReportType }.
+    .FUNCTIONALITY
+        Entrypoint
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$TenantFilter,
+        [string]$ReportType = 'Security',
+        [bool]$ConnectWiseTicket = $false
+    )
+
+    $Model = Get-CIPPReportData -TenantFilter $TenantFilter -ReportType $ReportType
+
+    # ---- history + trend (best-effort; never blocks report generation) ------------
+    $Score = Get-CippReportScore -Findings $Model.Findings
+    $CurFailTitles = @(@($Model.Findings) | Where-Object { "$($_.Status)".ToLower() -eq 'fail' } | ForEach-Object { $_.Title })
+    try {
+        $HistTable = Get-CIPPTable -TableName 'CippReportHistory'
+        $Prev = Get-CIPPAzDataTableEntity @HistTable -Filter "PartitionKey eq '$TenantFilter' and ReportType eq '$ReportType'" |
+            Sort-Object { [int64]$_.DateUnix } -Descending | Select-Object -First 1
+        if ($Prev -and $Score.Scored) {
+            $PrevFail = @()
+            if ($Prev.FailTitles) { $PrevFail = @("$($Prev.FailTitles)" -split '; ' | Where-Object { $_ }) }
+            $Model.Trend = @{
+                PrevScore    = [int]$Prev.Score
+                PrevDate     = ([datetime]$Prev.Date).ToString('dd MMM yyyy')
+                NewFail      = @($CurFailTitles | Where-Object { $_ -notin $PrevFail }).Count
+                ResolvedFail = @($PrevFail | Where-Object { $_ -notin $CurFailTitles }).Count
+            }
+        }
+    } catch { Write-LogMessage -API 'ReportHistory' -message "history read: $($_.Exception.Message)" -Sev 'Error' }
+
+    $Html = Write-CippReportHtml -Report $Model
+
+    # persist this run
+    try {
+        $HistTable = Get-CIPPTable -TableName 'CippReportHistory'
+        $Now = Get-Date
+        $Entity = @{
+            PartitionKey = [string]"$TenantFilter"
+            RowKey       = [string]("$ReportType-" + [guid]::NewGuid().ToString())
+            Tenant       = [string]"$TenantFilter"
+            TenantName   = [string]"$($Model.TenantName)"
+            ReportType   = [string]"$ReportType"
+            Title        = [string]"$($Model.Title)"
+            Score        = [int]$Score.Score
+            Grade        = [string]"$($Score.Grade)"
+            Fail         = [int]$Score.Fail
+            Warn         = [int]$Score.Warn
+            Pass         = [int]$Score.Pass
+            FailTitles   = [string](@($CurFailTitles) -join '; ')
+            Date         = [string]$Now.ToString('o')
+            DateUnix     = [int64]($Now.ToUniversalTime() - [datetime]'1970-01-01').TotalSeconds
+        }
+        # coerce any stray non-primitive to string so AzBobbyTables never sees a PSObject
+        foreach ($k in @($Entity.Keys)) {
+            $v = $Entity[$k]
+            if ($null -eq $v) { $Entity.Remove($k) }
+            elseif ($v -isnot [string] -and $v -isnot [int] -and $v -isnot [int64] -and $v -isnot [bool] -and $v -isnot [double]) {
+                $Entity[$k] = [string]$v
+            }
+        }
+        Add-CIPPAzDataTableEntity @HistTable -Entity $Entity -Force | Out-Null
+    } catch { Write-LogMessage -API 'ReportHistory' -message "history write: $($_.Exception.Message)" -Sev 'Error' }
+
+    $Bytes = [System.Text.Encoding]::UTF8.GetBytes($Html)
+    $Base64 = [Convert]::ToBase64String($Bytes)
+    $SafeDomain = ($Model.TenantDomain -replace '[^a-zA-Z0-9_\-\.]', '_')
+    $SafeType = ($ReportType -replace '[^a-zA-Z0-9]', '')
+    $FileName = "Aspendora-$SafeType-Report-$SafeDomain-$((Get-Date).ToString('yyyy-MM-dd')).html"
+
+    $FailCount = @($Model.Findings | Where-Object { $_.Status -eq 'fail' }).Count
+    $WarnCount = @($Model.Findings | Where-Object { $_.Status -eq 'warn' }).Count
+    $ResultMessage = "$($Model.Title) generated for $($Model.TenantName) ($($Model.TenantDomain)) - $(@($Model.Sections).Count) sections, $FailCount action item(s), $WarnCount to review."
+
+    # ---- optional ConnectWise ticket (plain-text summary; full report goes by email) ----
+    if ($ConnectWiseTicket) {
+        try {
+            $Tenant = Get-Tenants -IncludeErrors | Where-Object { $_.defaultDomainName -eq $TenantFilter -or $_.customerId -eq $TenantFilter } | Select-Object -First 1
+            $MappingFile = Get-ExtensionMapping -Extension 'ConnectWise'
+            $MappedId = ($MappingFile | Where-Object { $_.RowKey -eq $Tenant.customerId }).IntegrationId
+            if ($MappedId) {
+                $Sum = "<b>$($Model.Title)</b> for $($Model.TenantName) ($($Model.TenantDomain))<br>"
+                $Sum += "Posture grade: $($Score.Grade) ($($Score.Score)/100) - $($Score.Fail) action item(s), $($Score.Warn) to review, $($Score.Pass) passing.<br><br>"
+                foreach ($f in @($Model.Findings | Where-Object { "$($_.Status)".ToLower() -in @('fail', 'warn') })) {
+                    $Sum += "$("$($f.Status)".ToUpper()): $($f.Title) - $($f.Detail)<br>"
+                }
+                $Sum += "<br>The full branded report was delivered by email."
+                $CwResult = New-ConnectWiseTicket -Title "$($Model.Title) - $($Model.TenantName) - Grade $($Score.Grade)" -Description $Sum -Client $MappedId
+                $ResultMessage += " | ConnectWise: $CwResult"
+            } else {
+                $ResultMessage += ' | ConnectWise: no company mapping for this tenant (map it under Extensions).'
+            }
+        } catch {
+            Write-LogMessage -API 'ReportConnectWise' -message "CW ticket failed: $($_.Exception.Message)" -Sev 'Error'
+            $ResultMessage += " | ConnectWise ticket failed: $($_.Exception.Message)"
+        }
+    }
+
+    return @{
+        Results         = $ResultMessage
+        TaskAttachments = @(
+            @{ Name = $FileName; ContentType = 'text/html'; ContentBytes = $Base64 }
+        )
+        ReportName      = $FileName
+        ReportHtml      = $Html
+    }
+}

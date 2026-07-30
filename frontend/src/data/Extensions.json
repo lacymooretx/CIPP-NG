@@ -18,6 +18,79 @@
     "mappingRequired": false
   },
   {
+    "name": "Pax8",
+    "id": "Pax8",
+    "type": "Pax8",
+    "cat": "CSP",
+    "logo": "/assets/integrations/pax8.png",
+    "logoDark": "/assets/integrations/pax8_dark.png",
+    "description": "Enable the Pax8 integration to manage your CSP licensing and view customer + subscription data from CIPP.",
+    "helpText": "This integration connects CIPP to your Pax8 partner account using OAuth2 (client credentials). It maps your CIPP tenants to Pax8 companies so future features (license counts, ordering, billing checks) can resolve the right Pax8 customer automatically. Create a Pax8 API client at https://app.pax8.com (Settings -> Integrations).",
+    "mappingRequired": true,
+    "links": [
+      {
+        "name": "Pax8 API Overview",
+        "url": "https://docs.pax8.com/space/PXAPIH/2491777156/Pax8+API+Documentation"
+      },
+      {
+        "name": "Generate Pax8 API Credentials",
+        "url": "https://docs.pax8.com/space/PXAPIH/2491777244/Authentication"
+      }
+    ],
+    "SettingOptions": [
+      {
+        "type": "switch",
+        "name": "Pax8.Enabled",
+        "label": "Enable Integration"
+      },
+      {
+        "type": "textField",
+        "name": "Pax8.clientId",
+        "label": "Pax8 Client ID",
+        "placeholder": "Enter your Pax8 API Client ID",
+        "required": true,
+        "condition": {
+          "field": "Pax8.Enabled",
+          "compareType": "is",
+          "compareValue": true,
+          "action": "disable"
+        }
+      },
+      {
+        "type": "password",
+        "name": "Pax8.APIKey",
+        "label": "Pax8 Client Secret",
+        "placeholder": "Enter your Pax8 API Client Secret. Leave blank to keep your current secret.",
+        "required": true,
+        "condition": {
+          "field": "Pax8.Enabled",
+          "compareType": "is",
+          "compareValue": true,
+          "action": "disable"
+        }
+      },
+      {
+        "type": "autoComplete",
+        "name": "Pax8.AllowedCustomRoles",
+        "label": "Select CIPP roles that are allowed to purchase licenses",
+        "helperText": "If left blank, anyone with API access can buy or cancel Pax8 licenses. Pick one or more CIPP custom roles to require role membership.",
+        "api": {
+          "url": "/api/ListCustomRole",
+          "queryKey": "CustomRoles",
+          "labelField": "RoleName",
+          "valueField": "RoleName"
+        },
+        "multiple": true,
+        "condition": {
+          "field": "Pax8.Enabled",
+          "compareType": "is",
+          "compareValue": true,
+          "action": "disable"
+        }
+      }
+    ]
+  },
+  {
     "name": "Sherweb",
     "id": "Sherweb",
     "type": "Sherweb",
@@ -428,6 +501,156 @@
     "mappingRequired": true
   },
   {
+    "name": "ConnectWise Manage",
+    "id": "ConnectWise",
+    "type": "ConnectWise",
+    "cat": "Ticketing",
+    "logo": "/assets/integrations/connectwise.png",
+    "logoDark": "/assets/integrations/connectwise_dark.png",
+    "forceSyncButton": false,
+    "description": "Enable the ConnectWise Manage integration to send alerts to your ticketing system.",
+    "helpText": "This integration allows you to create service tickets in ConnectWise Manage from CIPP alerts.",
+    "links": [
+      {
+        "name": "ConnectWise Developer Portal",
+        "url": "https://developer.connectwise.com"
+      }
+    ],
+    "SettingOptions": [
+      {
+        "type": "switch",
+        "name": "ConnectWise.Enabled",
+        "label": "Enable Integration"
+      },
+      {
+        "type": "switch",
+        "name": "ConnectWise.ConsolidateTickets",
+        "label": "Consolidate Tickets",
+        "placeholder": "Consolidate tickets for the same alert into one ticket.",
+        "condition": {
+          "field": "ConnectWise.Enabled",
+          "compareType": "is",
+          "compareValue": true,
+          "action": "disable"
+        }
+      },
+      {
+        "type": "textField",
+        "name": "ConnectWise.BaseURL",
+        "label": "ConnectWise API Base URL",
+        "placeholder": "e.g. https://api-na.myconnectwise.net",
+        "required": true,
+        "condition": {
+          "field": "ConnectWise.Enabled",
+          "compareType": "is",
+          "compareValue": true,
+          "action": "disable"
+        }
+      },
+      {
+        "type": "textField",
+        "name": "ConnectWise.CompanyID",
+        "label": "ConnectWise Company ID",
+        "placeholder": "Your ConnectWise company identifier",
+        "required": true,
+        "condition": {
+          "field": "ConnectWise.Enabled",
+          "compareType": "is",
+          "compareValue": true,
+          "action": "disable"
+        }
+      },
+      {
+        "type": "textField",
+        "name": "ConnectWise.ClientID",
+        "label": "ConnectWise Client ID",
+        "placeholder": "Your developer Client ID (GUID from developer.connectwise.com)",
+        "required": true,
+        "condition": {
+          "field": "ConnectWise.Enabled",
+          "compareType": "is",
+          "compareValue": true,
+          "action": "disable"
+        }
+      },
+      {
+        "type": "textField",
+        "name": "ConnectWise.PublicKey",
+        "label": "API Member Public Key",
+        "placeholder": "Enter your API member public key",
+        "required": true,
+        "condition": {
+          "field": "ConnectWise.Enabled",
+          "compareType": "is",
+          "compareValue": true,
+          "action": "disable"
+        }
+      },
+      {
+        "type": "password",
+        "name": "ConnectWise.APIKey",
+        "label": "API Member Private Key",
+        "placeholder": "Enter your API member private key. Leave blank to keep current key.",
+        "required": true,
+        "condition": {
+          "field": "ConnectWise.Enabled",
+          "compareType": "is",
+          "compareValue": true,
+          "action": "disable"
+        }
+      },
+      {
+        "type": "autoComplete",
+        "name": "ConnectWise.Board",
+        "label": "Service Board",
+        "placeholder": "Select a service board, leave blank for default",
+        "multiple": false,
+        "api": {
+          "url": "/api/ExecExtensionMapping",
+          "data": {
+            "List": "ConnectWiseFields"
+          },
+          "queryKey": "ConnectWiseBoards",
+          "dataKey": "Boards",
+          "labelField": "name",
+          "valueField": "id",
+          "showRefresh": true
+        },
+        "condition": {
+          "field": "ConnectWise.Enabled",
+          "compareType": "is",
+          "compareValue": true,
+          "action": "disable"
+        }
+      },
+      {
+        "type": "autoComplete",
+        "name": "ConnectWise.Priority",
+        "label": "Ticket Priority",
+        "placeholder": "Select a priority, leave blank for default",
+        "multiple": false,
+        "api": {
+          "url": "/api/ExecExtensionMapping",
+          "data": {
+            "List": "ConnectWiseFields"
+          },
+          "queryKey": "ConnectWisePriorities",
+          "dataKey": "Priorities",
+          "labelField": "name",
+          "valueField": "id",
+          "showRefresh": true
+        },
+        "condition": {
+          "field": "ConnectWise.Enabled",
+          "compareType": "is",
+          "compareValue": true,
+          "action": "disable"
+        }
+      }
+    ],
+    "mappingRequired": true
+  },
+  {
     "name": "NinjaOne",
     "id": "NinjaOne",
     "type": "NinjaOne",
@@ -715,6 +938,147 @@
         "helperText": "Set a future date to delay the next scheduled sync. Leave blank to sync during the next scheduled sync.",
         "condition": {
           "field": "Hudu.Enabled",
+          "compareType": "is",
+          "compareValue": true,
+          "action": "disable"
+        }
+      }
+    ],
+    "mappingRequired": true,
+    "fieldMapping": true,
+    "showSyncButton": true
+  },
+  {
+    "name": "IT Glue",
+    "id": "ITGlue",
+    "type": "ITGlue",
+    "cat": "Documentation",
+    "logo": "/assets/integrations/itglue.png",
+    "logoDark": "/assets/integrations/itglue_dark.png",
+    "forceSyncButton": true,
+    "description": "Enable the IT Glue integration to sync documentation.",
+    "helpText": "This integration syncs Microsoft 365 users, devices, and (optionally) domains into IT Glue. Users are upserted as Contacts plus a Flexible Asset row with M365 metadata. Devices are upserted as Configurations of the configuration type you map. Requires an IT Glue API key with Password Access enabled if you later want to manage passwords. Keys are revoked after 90 days of inactivity.",
+    "links": [
+      {
+        "name": "IT Glue API Documentation",
+        "url": "https://api.itglue.com/developer/"
+      },
+      {
+        "name": "Generating API Keys",
+        "url": "https://helpdesk.kaseya.com/hc/en-gb/articles/4407535760913-Getting-started-with-the-IT-Glue-API"
+      }
+    ],
+    "SettingOptions": [
+      {
+        "type": "switch",
+        "name": "ITGlue.Enabled",
+        "label": "Enable Integration"
+      },
+      {
+        "type": "autoComplete",
+        "name": "ITGlue.Region",
+        "label": "IT Glue Region",
+        "placeholder": "Select your IT Glue region",
+        "multiple": false,
+        "creatable": false,
+        "options": [
+          { "label": "US (api.itglue.com)", "value": "US" },
+          { "label": "EU (api.eu.itglue.com)", "value": "EU" },
+          { "label": "Australia (api.au.itglue.com)", "value": "AU" }
+        ],
+        "required": true,
+        "condition": {
+          "field": "ITGlue.Enabled",
+          "compareType": "is",
+          "compareValue": true,
+          "action": "disable"
+        }
+      },
+      {
+        "type": "password",
+        "name": "ITGlue.APIKey",
+        "label": "IT Glue API Key",
+        "placeholder": "Enter your IT Glue API Key. Leave blank to keep your current key.",
+        "required": true,
+        "condition": {
+          "field": "ITGlue.Enabled",
+          "compareType": "is",
+          "compareValue": true,
+          "action": "disable"
+        }
+      },
+      {
+        "type": "switch",
+        "name": "ITGlue.CreateMissingUsers",
+        "label": "Create missing users in IT Glue",
+        "condition": {
+          "field": "ITGlue.Enabled",
+          "compareType": "is",
+          "compareValue": true,
+          "action": "disable"
+        }
+      },
+      {
+        "type": "switch",
+        "name": "ITGlue.CreateMissingDevices",
+        "label": "Create missing devices in IT Glue",
+        "condition": {
+          "field": "ITGlue.Enabled",
+          "compareType": "is",
+          "compareValue": true,
+          "action": "disable"
+        }
+      },
+      {
+        "type": "textField",
+        "name": "ITGlue.ExcludeSerials",
+        "label": "Exclude device serials (comma separated)",
+        "condition": {
+          "field": "ITGlue.Enabled",
+          "compareType": "is",
+          "compareValue": true,
+          "action": "disable"
+        }
+      },
+      {
+        "type": "switch",
+        "name": "ITGlue.ImportDomains",
+        "label": "Import domains from M365",
+        "condition": {
+          "field": "ITGlue.Enabled",
+          "compareType": "is",
+          "compareValue": true,
+          "action": "disable"
+        }
+      },
+      {
+        "type": "switch",
+        "name": "ITGlue.MonitorDomains",
+        "label": "Monitor domains in IT Glue",
+        "condition": {
+          "field": "ITGlue.Enabled",
+          "compareType": "is",
+          "compareValue": true,
+          "action": "disable"
+        }
+      },
+      {
+        "type": "switch",
+        "name": "ITGlue.CFEnabled",
+        "label": "Connect to IT Glue through a CloudFlare ZTNA Tunnel with the Service Account credentials.",
+        "condition": {
+          "field": "CFZTNA.Enabled",
+          "compareType": "is",
+          "compareValue": true
+        }
+      },
+      {
+        "type": "datePicker",
+        "name": "ITGlue.NextSync",
+        "label": "Reschedule next sync date",
+        "helperText": "Set a future date to delay the next scheduled sync. Leave blank to sync during the next scheduled sync.",
+        "condition": {
+          "field": "ITGlue.Enabled",
           "compareType": "is",
           "compareValue": true,
           "action": "disable"

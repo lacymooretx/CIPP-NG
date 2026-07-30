@@ -65,12 +65,43 @@ Function Invoke-ExecExtensionTest {
                     $Results = [pscustomobject]@{'Results' = 'Failed to connect to Hudu, check your API credentials and try again.' }
                 }
             }
+            'ConnectWise' {
+                $CWConfig = $Configuration.ConnectWise
+                $Headers = Get-ConnectWiseHeaders -Configuration $CWConfig
+                $SystemInfo = Invoke-RestMethod -Uri "$($CWConfig.BaseURL)/v4_6_release/apis/3.0/system/info" -Method GET -Headers $Headers -ErrorAction Stop
+                if ($SystemInfo.version) {
+                    $Results = [pscustomobject]@{'Results' = ('Successfully Connected to ConnectWise Manage, version: {0} ({1})' -f $SystemInfo.version, $SystemInfo.serverTimeZone) }
+                } else {
+                    $Results = [pscustomobject]@{'Results' = 'Failed to connect to ConnectWise Manage, check your API credentials and base URL.' }
+                }
+            }
+            'ITGlue' {
+                Connect-ITGlueAPI -configuration $Configuration
+                $Probe = Invoke-ITGlueRequest -Path '/organizations' -PageSize 1 -Raw
+                if ($null -ne $Probe.data) {
+                    $Total = if ($Probe.meta -and $Probe.meta.'total-count') { $Probe.meta.'total-count' } else { ($Probe.data | Measure-Object).Count }
+                    $Region = if ($Configuration.ITGlue.Region.value) { $Configuration.ITGlue.Region.value } elseif ($Configuration.ITGlue.Region) { "$($Configuration.ITGlue.Region)" } else { 'US' }
+                    $Results = [pscustomobject]@{'Results' = ('Successfully Connected to IT Glue ({0} region). {1} organizations visible.' -f $Region, $Total) }
+                } else {
+                    $Results = [pscustomobject]@{'Results' = 'Failed to connect to IT Glue, check your API key, region, and that the key has access enabled.' }
+                }
+            }
             'Sherweb' {
                 $token = Get-SherwebAuthentication
                 if ($token) {
                     $Results = [pscustomobject]@{'Results' = 'Successfully Connected to Sherweb' }
                 } else {
                     $Results = [pscustomobject]@{'Results' = 'Failed to connect to Sherweb, check your API credentials and try again.' }
+                }
+            }
+            'Pax8' {
+                $Headers = Get-Pax8Authentication
+                $Probe = Invoke-RestMethod -Uri 'https://api.pax8.com/v1/companies?page=0&size=1' -Method GET -Headers $Headers -ErrorAction Stop
+                $TotalCompanies = if ($Probe.page.totalElements) { $Probe.page.totalElements } else { ($Probe.content | Measure-Object).Count }
+                if ($null -ne $Probe) {
+                    $Results = [pscustomobject]@{'Results' = ('Successfully Connected to Pax8. {0} companies visible.' -f $TotalCompanies) }
+                } else {
+                    $Results = [pscustomobject]@{'Results' = 'Failed to connect to Pax8, check your API credentials and try again.' }
                 }
             }
             'HIBP' {

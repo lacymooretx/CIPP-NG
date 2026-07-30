@@ -35,6 +35,13 @@ function Invoke-ExecExtensionsConfig {
             $Body.Hudu.NextSync = ''
         }
 
+        if ($Body.ITGlue.NextSync) {
+            $Timestamp = [datetime]::UnixEpoch.AddSeconds([int]$Body.ITGlue.NextSync).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+            Register-CIPPExtensionScheduledTasks -Reschedule -NextSync $Body.ITGlue.NextSync -Extensions 'ITGlue'
+            $AddedText = "$AddedText Next IT Glue sync will be at $Timestamp."
+            $Body.ITGlue.NextSync = ''
+        }
+
         $Table = Get-CIPPTable -TableName Extensionsconfig
         foreach ($APIKey in $Body.PSObject.Properties.Name) {
             Write-Information "Working on $apikey"
@@ -54,6 +61,27 @@ function Invoke-ExecExtensionsConfig {
             }
             $Body.$APIKey = $Body.$APIKey | Select-Object * -ExcludeProperty ResetPassword
         }
+        # Merge-by-default: callers that POST only `{ITGlue: {...}}` should not wipe
+        # the `ConnectWise`, `Pax8`, `Sherweb`, etc. blocks in the saved config.
+        # Pass ?replace=true on the query string for the old full-replace behavior.
+        $Replace = ($Request.Query.replace -eq 'true' -or $Request.Query.replace -eq $true)
+        if (-not $Replace) {
+            try {
+                $Existing = (Get-CIPPAzDataTableEntity @Table).config | ConvertFrom-Json -ErrorAction Stop
+            } catch { $Existing = $null }
+            if ($Existing) {
+                # For each top-level extension already saved, copy it onto $Body
+                # unless $Body already has its own version (incoming wins).
+                $IncomingKeys = @($Body.PSObject.Properties.Name)
+                foreach ($Prop in $Existing.PSObject.Properties) {
+                    if ($IncomingKeys -notcontains $Prop.Name) {
+                        $Body | Add-Member -NotePropertyName $Prop.Name -NotePropertyValue $Prop.Value -Force
+                    }
+                }
+                Write-Information ("ExecExtensionsConfig: merge mode kept {0} existing extension block(s)" -f ($Existing.PSObject.Properties.Name.Count - $IncomingKeys.Count))
+            }
+        }
+
         $Body = $Body | Select-Object * -ExcludeProperty APIKey, Enabled | ConvertTo-Json -Depth 10 -Compress
         $Config = @{
             'PartitionKey' = 'CippExtensions'
