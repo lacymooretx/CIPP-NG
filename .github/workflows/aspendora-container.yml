@@ -1,0 +1,117 @@
+name: "Aspendora: Build Container"
+
+# Builds the Aspendora CIPP image (upstream CIPP + our fork customizations) and
+# publishes it to ghcr.io/lacymooretx/cipp-ng.
+#
+# Why this exists instead of upstream's release-container.yml: that workflow only
+# fires on `release: published`, which we don't use. This one fires on pushes to
+# our `aspendora` branch and on demand.
+#
+# The App Service pulls this image directly (linuxFxVersion = DOCKER|<image>:latest).
+# CIPP's own Container Management page (Advanced -> SuperAdmin -> Container) reads
+# the running image from ARM and queries GHCR for the digest plus the
+# org.opencontainers.image.version / .created labels — so those labels MUST be set
+# or update checking silently reports "unknown". Tag must stay `latest` for the
+# release-channel logic (it swaps only the tag, preserving the image base).
+
+on:
+  push:
+    branches: [aspendora]
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set lower case image name
+        run: echo "IMAGE_NAME_LC=${REPO,,}" >> $GITHUB_ENV
+        env:
+          REPO: ${{ github.repository }}
+
+      - name: Resolve version
+        id: version
+        run: |
+          # Upstream release workflow takes this from the git tag; we have no tags,
+          # so read the version CIPP itself reports.
+          APP_VERSION="$(tr -d ' \t\n\r' < backend/version_latest.txt)"
+          echo "app_version=${APP_VERSION}" >> $GITHUB_OUTPUT
+          echo "build_date=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
+          echo "Building Aspendora CIPP ${APP_VERSION}"
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        id: buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Restore frontend build caches
+        id: build-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            yarn-cache
+            next-cache
+          key: aspendora-frontend-cache-${{ github.run_id }}
+          restore-keys: |
+            aspendora-frontend-cache-
+
+      - name: Inject build caches into BuildKit
+        uses: reproducible-containers/buildkit-cache-dance@v3.4.0
+        with:
+          builder: ${{ steps.buildx.outputs.name }}
+          cache-map: |
+            {
+              "yarn-cache": "/usr/local/share/.cache/yarn",
+              "next-cache": "/build/.next/cache"
+            }
+          skip-extraction: ${{ steps.build-cache.outputs.cache-hit }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: build/Dockerfile.release
+          push: true
+          pull: true
+          cache-from: type=gha,scope=aspendora
+          cache-to: type=gha,mode=max,scope=aspendora
+          build-args: |
+            APP_VERSION=${{ steps.version.outputs.app_version }}
+            COMMIT_SHA=${{ github.sha }}
+            IMAGE_TAG=latest
+            BUILD_DATE=${{ steps.version.outputs.build_date }}
+            DOTNET_REGISTRY=${{ vars.DOTNET_REGISTRY || 'ghcr.io/cyberdrain' }}
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LC }}:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LC }}:${{ steps.version.outputs.app_version }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.description=CIPP (Aspendora build - upstream CIPP plus Aspendora customizations)
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ steps.version.outputs.app_version }}
+            org.opencontainers.image.created=${{ steps.version.outputs.build_date }}
+
+      - name: Summary
+        run: |
+          {
+            echo "### Aspendora CIPP image published"
+            echo ""
+            echo "- \`${REGISTRY}/${IMAGE_NAME_LC}:latest\`"
+            echo "- \`${REGISTRY}/${IMAGE_NAME_LC}:${{ steps.version.outputs.app_version }}\`"
+            echo ""
+            echo "App Service setting: \`linuxFxVersion = DOCKER|${REGISTRY}/${IMAGE_NAME_LC}:latest\`"
+          } >> $GITHUB_STEP_SUMMARY
