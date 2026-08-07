@@ -33,7 +33,13 @@ function Invoke-ExecGraphRequest {
     $Method = ($Request.Body.Method ?? $Request.Query.Method ?? 'GET').ToString().ToUpper()
     $Version = $Request.Body.Version ?? $Request.Query.Version ?? 'beta'
     $AsAppRaw = $Request.Body.AsApp ?? $Request.Query.AsApp
-    $NoPaginationRaw = $Request.Body.NoPagination ?? $Request.Query.NoPagination ?? $Request.Query.DisablePagination
+    # DisablePagination is the name the MCP gateway/openapi spec uses; NoPagination
+    # is the native one. Accept either from either transport - previously
+    # Body.DisablePagination was never read, so a POST-style caller asking to
+    # disable paging was silently paginated through the entire result set (on
+    # auditLogs/signIns that is every sign-in in the tenant, i.e. a guaranteed timeout).
+    $NoPaginationRaw = $Request.Body.NoPagination ?? $Request.Body.DisablePagination ??
+        $Request.Query.NoPagination ?? $Request.Query.DisablePagination
     $GraphBody = $Request.Body.GraphRequestBody ?? $Request.Body.Body
 
     # Coerce loosely-typed flags (query values arrive as strings) without throwing.
