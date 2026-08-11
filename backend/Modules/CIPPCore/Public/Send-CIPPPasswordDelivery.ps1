@@ -201,7 +201,19 @@ function Send-CIPPPasswordDelivery {
     # --- document it --------------------------------------------------------------
     $ITGlue = $null
     if ($DocumentInITGlue) {
-        $Actor = if ($Headers.'x-ms-client-principal-name') { $Headers.'x-ms-client-principal-name' } else { 'CIPP' }
+        # A direct API client authenticates as a bare app id, which is useless in a
+        # documentation note. Resolve it to the client's name, the same way access
+        # checks distinguish an interactive user from an API client.
+        $Actor = $Headers.'x-ms-client-principal-name'
+        if ($Headers.'x-ms-client-principal-idp' -eq 'aad' -and $Actor -match '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$') {
+            try {
+                $Client = Get-CippApiClient -AppId $Actor
+                $Actor = if ($Client.AppName) { "$($Client.AppName) (API client)" } else { "API client $Actor" }
+            } catch {
+                $Actor = "API client $Actor"
+            }
+        }
+        if ([string]::IsNullOrWhiteSpace($Actor)) { $Actor = 'CIPP' }
         $Note = @(
             "Managed by CIPP - do not edit by hand; the next reset overwrites this record."
             "$Reason on $(Get-Date -Format 'yyyy-MM-dd HH:mm') UTC by $Actor."
