@@ -19,9 +19,11 @@ Function Invoke-ExecResetPass {
     $DisplayName = $Request.Query.displayName ?? $Request.Body.displayName ?? $ID
     $MustChange = $Request.Query.MustChange ?? $Request.Body.MustChange
     $MustChange = [System.Convert]::ToBoolean($MustChange)
+    # Aspendora fork: per-run secret delivery options (email/SMS/supervisor/IT Glue).
+    $Delivery = $Request.Body.Delivery
 
     try {
-        $Result = Set-CIPPResetPassword -UserID $ID -tenantFilter $TenantFilter -APIName $APIName -Headers $Headers -forceChangePasswordNextSignIn $MustChange -DisplayName $DisplayName
+        $Result = Set-CIPPResetPassword -UserID $ID -tenantFilter $TenantFilter -APIName $APIName -Headers $Headers -forceChangePasswordNextSignIn $MustChange -DisplayName $DisplayName -Delivery $Delivery
         $StatusCode = [HttpStatusCode]::OK
     } catch {
         $Result = $_.Exception.Message

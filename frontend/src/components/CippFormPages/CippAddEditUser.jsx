@@ -610,6 +610,70 @@ const CippAddEditUser = (props) => {
           formControl={formControl}
         />
       </Grid>
+      {formType === 'add' && (
+        <>
+          <Grid size={{ xs: 12 }}>
+            <Typography variant="h6">Password Delivery</Typography>
+            <Typography variant="body2" color="text.secondary">
+              The password is pushed to Password Pusher as a self-expiring link. A new user has no
+              manager in Entra yet, so a supervisor must be entered here.
+            </Typography>
+          </Grid>
+          <Grid size={{ xs: 6 }}>
+            <CippFormComponent
+              type="switch"
+              label="Email the secret link to the user"
+              name="Delivery.EmailUser"
+              formControl={formControl}
+            />
+            <CippFormComponent
+              type="switch"
+              label="Text the secret link to the user's mobile"
+              name="Delivery.TextUser"
+              formControl={formControl}
+            />
+            <CippFormComponent
+              type="switch"
+              label="Save the password to IT Glue"
+              name="Delivery.DocumentInITGlue"
+              formControl={formControl}
+            />
+          </Grid>
+          <Grid size={{ xs: 6 }}>
+            <CippFormComponent
+              type="switch"
+              label="Send the same link to a supervisor"
+              name="Delivery.NotifySupervisor"
+              formControl={formControl}
+            />
+            <CippFormCondition
+              formControl={formControl}
+              field="Delivery.NotifySupervisor"
+              compareType="is"
+              compareValue={true}
+            >
+              <Grid size={{ xs: 12 }}>
+                <CippFormComponent
+                  type="textField"
+                  fullWidth
+                  label="Supervisor email"
+                  name="Delivery.SupervisorEmail"
+                  formControl={formControl}
+                />
+              </Grid>
+              <Grid size={{ xs: 12 }}>
+                <CippFormComponent
+                  type="textField"
+                  fullWidth
+                  label="Supervisor mobile"
+                  name="Delivery.SupervisorPhone"
+                  formControl={formControl}
+                />
+              </Grid>
+            </CippFormCondition>
+          </Grid>
+        </>
+      )}
       <Grid size={{ xs: 12 }}>
         <CippFormComponent
           type="autoComplete"

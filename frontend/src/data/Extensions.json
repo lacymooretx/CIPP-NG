@@ -1230,6 +1230,50 @@
       },
       {
         "type": "switch",
+        "name": "PWPush.DispatchEmailUser",
+        "label": "Default: email the secret link to the user (primary + alternate addresses)",
+        "condition": {
+          "field": "PWPush.Enabled",
+          "compareType": "is",
+          "compareValue": true,
+          "action": "disable"
+        }
+      },
+      {
+        "type": "switch",
+        "name": "PWPush.DispatchTextUser",
+        "label": "Default: text the secret link to the user's mobile number",
+        "condition": {
+          "field": "PWPush.Enabled",
+          "compareType": "is",
+          "compareValue": true,
+          "action": "disable"
+        }
+      },
+      {
+        "type": "switch",
+        "name": "PWPush.DispatchSupervisor",
+        "label": "Default: copy the user's supervisor on the same link (their view counts)",
+        "condition": {
+          "field": "PWPush.Enabled",
+          "compareType": "is",
+          "compareValue": true,
+          "action": "disable"
+        }
+      },
+      {
+        "type": "switch",
+        "name": "PWPush.DocumentInITGlue",
+        "label": "Default: save the password to the tenant's IT Glue organization",
+        "condition": {
+          "field": "PWPush.Enabled",
+          "compareType": "is",
+          "compareValue": true,
+          "action": "disable"
+        }
+      },
+      {
+        "type": "switch",
         "name": "PWPush.DeletableByViewer",
         "label": "Allow deletion of passwords",
         "condition": {

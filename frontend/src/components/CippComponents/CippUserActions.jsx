@@ -889,6 +889,14 @@ export const useCippUserActions = () => {
         ID: 'userPrincipalName',
         displayName: 'displayName',
       },
+      defaultvalues: {
+        Delivery: {
+          EmailUser: true,
+          TextUser: true,
+          NotifySupervisor: false,
+          DocumentInITGlue: true,
+        },
+      },
       fields: [
         {
           type: 'switch',
@@ -896,6 +904,65 @@ export const useCippUserActions = () => {
           label: 'Must Change Password at Next Logon',
           helperText:
             'Not supported for directory-synced (on-premises AD) accounts. Those resets go through password writeback, which always requires a change at next logon.',
+        },
+        {
+          type: 'switch',
+          name: 'Delivery.EmailUser',
+          label: 'Email the secret link to the user',
+          helperText:
+            "Sent to the user's primary address and every alternate address on the Entra account. The alternates are what make this work for a user who cannot sign in to read the primary mailbox.",
+        },
+        {
+          type: 'textField',
+          name: 'Delivery.RecipientEmail',
+          label: 'Send only to this address instead (optional)',
+          placeholder: 'personal@example.com',
+          condition: {
+            field: 'Delivery.EmailUser',
+            compareType: 'is',
+            compareValue: true,
+          },
+        },
+        {
+          type: 'switch',
+          name: 'Delivery.TextUser',
+          label: "Text the secret link to the user's mobile",
+          helperText:
+            'Uses the mobile number on the Entra account. Skipped with a warning when no number is on file.',
+        },
+        {
+          type: 'switch',
+          name: 'Delivery.NotifySupervisor',
+          label: 'Copy the supervisor on the same link',
+          helperText:
+            'Resolved from the Entra manager relationship. The supervisor receives the SAME secret link, and opening it consumes one of its views.',
+        },
+        {
+          type: 'textField',
+          name: 'Delivery.SupervisorEmail',
+          label: 'Supervisor email (overrides the Entra manager)',
+          condition: {
+            field: 'Delivery.NotifySupervisor',
+            compareType: 'is',
+            compareValue: true,
+          },
+        },
+        {
+          type: 'textField',
+          name: 'Delivery.SupervisorPhone',
+          label: 'Supervisor mobile (overrides the Entra manager)',
+          condition: {
+            field: 'Delivery.NotifySupervisor',
+            compareType: 'is',
+            compareValue: true,
+          },
+        },
+        {
+          type: 'switch',
+          name: 'Delivery.DocumentInITGlue',
+          label: "Save the password to the tenant's IT Glue organization",
+          helperText:
+            'Updates the one M365 record for this user in place. Skipped with a warning when the tenant is not mapped to an IT Glue organization.',
         },
       ],
       confirmText: 'Are you sure you want to reset the password for [userPrincipalName]?',

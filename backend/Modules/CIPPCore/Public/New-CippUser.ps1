@@ -74,19 +74,52 @@ function New-CIPPUser {
         $GraphRequest = New-GraphPostRequest -uri 'https://graph.microsoft.com/beta/users' -tenantId $UserObj.tenantFilter -type POST -body $BodyToship -verbose
         Write-LogMessage -headers $Headers -API $APIName -tenant $($UserObj.tenantFilter) -message "Created user $($UserObj.displayName) with id $($GraphRequest.id)" -Sev 'Info'
 
+        # Aspendora fork: deliver the password to the user and their supervisor, and document it.
+        $DeliveryResult = $null
         try {
-            $PasswordLink = New-PwPushLink -Payload $password
-            if ($PasswordLink) {
-                $password = $PasswordLink
+            $Options = Get-CIPPPasswordDeliveryOptions -Delivery $UserObj.Delivery
+            if ($Options.Enabled) {
+                # Graph may not have the new mailbox addresses yet, so build the recipient
+                # list from what was just submitted: primary UPN plus any alternates.
+                $NewUserEmails = if (@($Options.RecipientEmail).Count -gt 0) {
+                    @($Options.RecipientEmail)
+                } else {
+                    @(@($UserPrincipalName) + @($normalizedOtherMails) | Where-Object { ![string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique)
+                }
+                # A brand new user has no manager relationship in Entra yet, so the
+                # supervisor can only come from the form.
+                $DeliveryResult = Send-CIPPPasswordDelivery -TenantFilter $UserObj.tenantFilter `
+                    -UserPrincipalName $UserPrincipalName `
+                    -Password $password `
+                    -UserId $GraphRequest.id `
+                    -DisplayName $UserObj.displayName `
+                    -RecipientEmail $NewUserEmails `
+                    -RecipientPhone ($Options.RecipientPhone ?? $UserObj.mobilePhone) `
+                    -SupervisorEmail $Options.SupervisorEmail `
+                    -SupervisorPhone $Options.SupervisorPhone `
+                    -EmailUser $Options.EmailUser `
+                    -TextUser $Options.TextUser `
+                    -NotifySupervisor $Options.NotifySupervisor `
+                    -DocumentInITGlue $Options.DocumentInITGlue `
+                    -Reason 'New user created' `
+                    -Headers $Headers
+
+                if ($DeliveryResult.Link) { $password = $DeliveryResult.Link }
+            } else {
+                $PasswordLink = New-PwPushLink -Payload $password
+                if ($PasswordLink) {
+                    $password = $PasswordLink
+                }
             }
         } catch {
-
+            Write-LogMessage -headers $Headers -API $APIName -tenant $($UserObj.tenantFilter) -message "Created the user but could not deliver the password: $($_.Exception.Message)" -Sev 'Warning'
         }
         $Results = @{
-            Results  = ('Created New User.')
+            Results  = if ($DeliveryResult.Summary) { "Created New User. $($DeliveryResult.Summary)" } else { 'Created New User.' }
             Username = $UserPrincipalName
             Password = $password
             User     = $GraphRequest
+            Delivery = $DeliveryResult
         }
     } catch {
         $ErrorMessage = Get-CippException -Exception $_
