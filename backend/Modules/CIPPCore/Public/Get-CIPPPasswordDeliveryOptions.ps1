@@ -47,7 +47,12 @@ function Get-CIPPPasswordDeliveryOptions {
     if ($Delivery) {
         foreach ($Property in @('EmailUser', 'TextUser', 'NotifySupervisor', 'DocumentInITGlue')) {
             $Value = $Delivery.$Property
-            if ($null -ne $Value -and $Value -ne '') { $Resolved.$Property = [bool]$Value }
+            # Cast to string before the empty check. PowerShell coerces the right
+            # operand to the left operand's type, so a literal $false compared with
+            # '' becomes $false -ne $false -> False, and an explicitly disabled
+            # switch was silently discarded in favour of the configured default.
+            # That made it impossible to turn a config-enabled channel off per run.
+            if ($null -ne $Value -and "$Value" -ne '') { $Resolved.$Property = [bool]$Value }
         }
         # RecipientEmail may arrive as a single override from the dialog or as a list from
         # the API, so normalise to an array either way.
