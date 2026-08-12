@@ -98,6 +98,11 @@ export const CippAddUserDrawer = ({
 
   const handleCloseDrawer = () => {
     setDrawerVisible(false);
+    // Resetting the form is not enough: CippApiResults renders straight off the
+    // mutation, and react-query keeps isSuccess/data alive after the drawer closes.
+    // Without this the next open replays the previous run's results panel, which
+    // reads as "Add User is broken" even though nothing was submitted.
+    createUser.reset();
     const resetValues = {
       tenantFilter: userSettingsDefaults.currentTenant,
       usageLocation: userSettingsDefaults.usageLocation,
@@ -113,6 +118,9 @@ export const CippAddUserDrawer = ({
   };
 
   const handleOpenDrawer = () => {
+    // Also clear on open, so a drawer dismissed by any path other than the Close
+    // button (Escape, backdrop click) still opens onto a clean form.
+    createUser.reset();
     const resetValues = {
       tenantFilter: userSettingsDefaults.currentTenant,
       usageLocation: userSettingsDefaults.usageLocation,
