@@ -69,7 +69,10 @@ Function Invoke-ExecWelcomePacket {
             support      = $Branding.support
             apps         = $Branding.apps
             signInUrl    = $Branding.signInUrl
-            preparedDate = (Get-Date).ToString('d MMMM yyyy')
+            # US Central, not the container's UTC. The container runs in UTC, so
+            # after 19:00 CDT Get-Date rolls to tomorrow and the sheet handed to
+            # someone on a Thursday afternoon is dated Friday.
+            preparedDate = (Get-CIPPWelcomePacketDate).ToString('d MMMM yyyy')
 
             # Everything below is for the operator, not the sheet.
             source       = 'none'

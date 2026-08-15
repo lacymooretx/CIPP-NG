@@ -45,8 +45,13 @@ function Get-CIPPWelcomePacketBranding {
     # the contract; this is one implementation of it.
     $Defaults = [ordered]@{
         brand   = [ordered]@{
-            name    = 'Aspendora Technologies'
-            logoUrl = $null
+            name = 'Aspendora Technologies'
+            # Same-origin path, shipped in the frontend's public/ folder. A client
+            # override must be a data URI because it could point anywhere; this one
+            # is served by the container rendering the page, so it resolves both on
+            # screen and in print. Without it the default sheet falls back to the
+            # name set as a wordmark, which is not the Aspendora lockup.
+            logoUrl = '/aspendora-logo.svg'
         }
         support = [ordered]@{
             email       = 'help@aspendora.com'
