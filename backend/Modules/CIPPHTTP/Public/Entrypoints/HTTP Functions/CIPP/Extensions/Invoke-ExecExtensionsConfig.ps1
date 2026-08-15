@@ -64,7 +64,9 @@ function Invoke-ExecExtensionsConfig {
         # Merge-by-default: callers that POST only `{ITGlue: {...}}` should not wipe
         # the `ConnectWise`, `Pax8`, `Sherweb`, etc. blocks in the saved config.
         # Pass ?replace=true on the query string for the old full-replace behavior.
-        $Replace = ($Request.Query.replace -eq 'true' -or $Request.Query.replace -eq $true)
+        # -eq $true also matches the string 'true' off the query string, and it is what
+        # types the parameter as a boolean in the generated spec (see EntrypointBooleanFlags).
+        $Replace = ($Request.Query.replace -eq $true)
         if (-not $Replace) {
             try {
                 $Existing = (Get-CIPPAzDataTableEntity @Table).config | ConvertFrom-Json -ErrorAction Stop
