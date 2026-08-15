@@ -79,6 +79,53 @@ COPY build/tools/build-function-parameters.ps1 /build/build-function-parameters.
 COPY backend/Modules/CIPPCore /gen/CIPPCore
 RUN pwsh -File /build/build-function-parameters.ps1 -ModulePath /gen/CIPPCore -OutputPath /gen/function-parameters.json
 
+# ── Published docs page list ──
+# Config/DocsPublishedPages.txt tells the SearchDocs MCP tool which pages are actually live on
+# docs.cipp.app, so a result never carries a URL that 404s. A page can sit in docs/ unpublished,
+# and only llms.txt knows which, so this is refreshed from the live site at build time — an image
+# then reflects what was published when it was built rather than whenever someone last ran the
+# script by hand. The committed copy is the fallback and is what ships if the fetch fails.
+#
+# ARG BUILD_DATE is here purely to bust the layer cache: the inputs are otherwise just the script
+# and the committed list, so without it Docker would reuse a cached layer and ship a stale list
+# from an earlier build despite this stage existing. It sits in its own tiny stage, so unlike the
+# version args near the frontend build it invalidates nothing expensive.
+FROM ps-base AS build-docspages
+COPY build/tools/Update-DocsPublishedPages.ps1 /build/Update-DocsPublishedPages.ps1
+COPY backend/Config/DocsPublishedPages.txt /gen/DocsPublishedPages.txt
+ARG BUILD_DATE=unknown
+RUN echo "Refreshing published docs list (build ${BUILD_DATE})" && \
+    pwsh -File /build/Update-DocsPublishedPages.ps1 -OutputPath /gen/DocsPublishedPages.txt -AllowFallback
+
+# ── OpenAPI spec ──
+# Config/openapi.json, derived from the CIPPHTTP entrypoint sources via AST parse.
+# Not documentation-only: Get-CippMcpSpec loads it at runtime and Get-CippMcpToolList
+# projects every read-only operation in it into an MCP tool, so a stale spec ships a
+# stale tool contract. Regenerated here so it can never drift from the source.
+FROM ps-base AS build-openapi
+COPY build/tools/build-openapi.ps1 /build/build-openapi.ps1
+# CIPPCore and friends are needed, not just CIPPHTTP: entrypoints hand the request
+# body to shared helpers and the generator follows those calls to recover the fields
+# they read. Without them the image would ship a thinner spec than the committed one.
+COPY backend/Modules/CIPPHTTP       /gen/Modules/CIPPHTTP
+COPY backend/Modules/CIPPCore       /gen/Modules/CIPPCore
+COPY backend/Modules/CIPPStandards  /gen/Modules/CIPPStandards
+COPY backend/Modules/CippExtensions /gen/Modules/CippExtensions
+COPY backend/Config/openapi-overrides /gen/openapi-overrides
+# Vendored Graph CSDL. Endpoints that fetch a Graph collection and return it untouched
+# name no field in their own source, so without this their responses ship undescribed.
+COPY backend/Config/graph-metadata /gen/graph-metadata
+# The UI's simpleColumns declarations are the only static description of a list
+# response; without them every list endpoint documents an untyped object.
+COPY frontend/src /gen/frontend/src
+RUN pwsh -File /build/build-openapi.ps1 \
+    -EntrypointPath "/gen/Modules/CIPPHTTP/Public/Entrypoints/HTTP Functions" \
+    -ModulesPath /gen/Modules \
+    -FrontendPath /gen/frontend/src \
+    -OverridePath /gen/openapi-overrides \
+    -GraphMetadataPath /gen/graph-metadata \
+    -OutputPath /gen/openapi.json
+
 # ── Frontend build ──
 FROM node:22-slim AS frontend-deps
 WORKDIR /build
@@ -98,6 +145,14 @@ ENV NEXT_TELEMETRY_DISABLED=1
 # here would invalidate the expensive `yarn build` even on backend-only pushes.
 RUN --mount=type=cache,target=/build/.next/cache \
     yarn build
+
+# The OpenAPI spec, served as a static asset at /openapi.json. Injected after the
+# compile for the same reason as version.json below: it is generated from backend
+# sources, so copying it in before `yarn build` would invalidate the compile on every
+# backend change. Landing it in out/ before the precompress step below gets it Brotli
+# q11 + gzip 9 - the runtime compressor only manages ~460KB on this file against
+# ~130KB for plain gzip -9, so precompressing is worth several hundred KB per fetch.
+COPY --from=build-openapi /gen/openapi.json out/openapi.json
 
 # Inject build metadata into version.json AFTER the compile. The frontend reads
 # this only at runtime via fetch('/version.json') — it doesn't need to be present
@@ -147,6 +202,10 @@ COPY --from=build-cippsharp /out/CIPPSharp.dll /app/API/Shared/CIPPSharp/bin/CIP
 COPY backend/AddChocoApp            /app/API/AddChocoApp/
 COPY backend/AddMSPApp              /app/API/AddMSPApp/
 COPY backend/ExecMaintenanceScripts /app/API/ExecMaintenanceScripts/
+# GitBook source for docs.cipp.app, indexed at runtime by the SearchDocs MCP tool
+# (Get-CippDocsIndex reads $env:CIPPRootPath/Docs). Markdown only — Dockerfile.dockerignore
+# keeps the .gitbook image tree out. ~2 MB, and it version-matches the docs to this build.
+COPY docs                           /app/API/Docs/
 
 # Compiled modules — ordered by change frequency (least → most)
 COPY --from=build-cippextensions       /src/CippExtensions/       /app/API/Modules/CippExtensions/
@@ -159,12 +218,18 @@ COPY --from=build-cipphttp             /src/CIPPHTTP/             /app/API/Modul
 COPY --from=build-cippcore             /src/CIPPCore/             /app/API/Modules/CIPPCore/
 # generated from CIPPCore, changes whenever it does — keep adjacent in the layer order
 COPY --chown=app:app --from=build-functionparams /gen/function-parameters.json /app/API/Config/function-parameters.json
+# generated from CIPPHTTP; overwrites the committed copy so the image always ships
+# a spec that matches the entrypoints beside it
+COPY --chown=app:app --from=build-openapi /gen/openapi.json /app/API/Config/openapi.json
+# refreshed from docs.cipp.app at build time; overwrites the committed fallback so the
+# SearchDocs tool links against what was actually published when this image was built
+COPY --chown=app:app --from=build-docspages /gen/DocsPublishedPages.txt /app/API/Config/DocsPublishedPages.txt
 
 # Frontend — changes most frequently, placed last
 COPY --from=frontend-build /build/out/ /app/Frontend/
 
-# Memory tuning 2.35GB
-ENV DOTNET_GCHeapHardLimit=0x95E00000
+# Memory tuning 3GB
+ENV DOTNET_GCHeapHardLimit=0xC0000000
 
 # Runtime environment — CIPP-NG-specific only. .NET GC tuning, mimalloc preload
 # and PowerShell telemetry opt-outs are inherited from the CRAFT base image.

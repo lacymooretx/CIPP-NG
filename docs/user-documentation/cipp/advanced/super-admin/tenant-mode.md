@@ -3,7 +3,7 @@
 Super admins should use this page to determine which mode CIPP operates in.
 
 {% hint style="danger" %}
-For further information on the limitations of each mode, please review "[I want to manage my own tenant](../../../../setup/installation/owntenant.md)"
+For further information on the limitations of each mode, please review [owntenant.md](../../../../setup/installation/owntenant.md "mention").
 {% endhint %}
 
 | Mode                              | Description                                                                                                                                                                                                                                                                                                                                        |
@@ -15,7 +15,5 @@ For further information on the limitations of each mode, please review "[I want 
 {% hint style="warning" %}
 After changing the tenant mode, clear your tenant cache by clicking Force Refresh on the [tenants.md](../../settings/tenants.md "mention") settings page.
 {% endhint %}
-
-***
 
 {% include "../../../../../.gitbook/includes/feature-request.md" %}

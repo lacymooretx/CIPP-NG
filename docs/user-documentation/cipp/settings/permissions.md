@@ -20,7 +20,7 @@ While an imported report is being viewed, each affected check is marked with an 
 Checks the permissions granted to CIPP's application registration and reports anything missing. Select **Refresh** to run the check again without using cached results, or **Details** to open a flyout with the full breakdown. The time of the last run is shown beside the buttons.
 
 {% hint style="info" %}
-When this check flags missing permissions or CPV refreshes required, opening the Details flyout will have buttons to easiy handle these tasks.
+When this check flags missing permissions or required CPV refreshes, the Details flyout provides buttons to handle these tasks easily.
 {% endhint %}
 
 ## GDAP Check
@@ -51,7 +51,5 @@ Selecting a row opens a flyout with further detail, including the tenant ID, def
 ### Table Actions
 
 <table><thead><tr><th>Action</th><th>Description</th><th data-type="checkbox">Bulk Action Available</th></tr></thead><tbody><tr><td>Check Tenant</td><td>Re-runs the access check for the selected tenant.</td><td>true</td></tr><tr><td>Repair Exchange Roles</td><td>Restores the Exchange roles CIPP requires in the selected tenant. Available only where the check has found that a repair is needed.</td><td>true</td></tr><tr><td>More Info</td><td>Opens the Extended Info flyout with the full details for the selected row.</td><td>false</td></tr></tbody></table>
-
-***
 
 {% include "../../../../.gitbook/includes/feature-request.md" %}

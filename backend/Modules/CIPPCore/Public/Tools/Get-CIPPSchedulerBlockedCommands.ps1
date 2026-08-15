@@ -70,6 +70,7 @@ function Get-CIPPSchedulerBlockedCommands {
         'Get-CIPPBitlockerKey'
         'Search-CIPPBitlockerKeys'
         'Get-CIPPFileVaultKey'
+        'Get-CIPPBiosPassword'
 
         # SAM/CPV & app registration configuration - privilege escalation / token theft vectors
         'Set-CIPPCPVConsent'
