@@ -98,6 +98,17 @@ function Invoke-ITGlueExtensionSync {
         }
 
         # ============================================================
+        # INTUNE CONFIGURATION DOCUMENT (optional)
+        # ============================================================
+        if ($ITGConfig.ImportIntuneConfig -eq $true) {
+            try {
+                Sync-ITGlueIntuneConfig -OrgId $OrgId -Tenant $Tenant -CompanyResult $CompanyResult
+            } catch {
+                $CompanyResult.Errors.Add("Intune configuration: $($_.Exception.Message)")
+            }
+        }
+
+        # ============================================================
         # Log results
         # ============================================================
         $LogMessage = "IT Glue sync complete for $($Tenant.displayName): $($CompanyResult.Users) users, $($CompanyResult.Devices) devices, $($CompanyResult.Errors.Count) errors"
@@ -610,6 +621,180 @@ function Get-ITGlueDomainsFlexAssetTypeId {
         if ($Created.data.id) {
             $script:ITGlueDomainsFlexAssetTypeId = [int]$Created.data.id
             return $script:ITGlueDomainsFlexAssetTypeId
+        }
+    } catch {
+        Write-Warning ("Failed to create '{0}' flex asset type: {1}" -f $TypeName, $_.Exception.Message)
+    }
+    return $null
+}
+
+# ---------- INTUNE CONFIGURATION ----------
+
+function Sync-ITGlueIntuneConfig {
+    <#
+        .SYNOPSIS
+        Write one tenant's Intune configuration into a single IT Glue flexible asset.
+        .DESCRIPTION
+        Builds the Intune Configuration Document model (the same model the CIPP report
+        suite renders) and maps each section onto a rich-text trait of the
+        'CIPP Intune Configuration' flexible asset type - one record per client, updated
+        in place on every run.
+
+        Each section is rendered through ConvertTo-ITGlueSectionHtml, which enforces IT
+        Glue's 64KB-per-trait limit and reports anything it had to withhold. Those
+        reports, plus any section that failed to collect, are written into the asset's
+        Collection Notes so the record always states its own completeness.
+    #>
+    param($OrgId, $Tenant, $CompanyResult)
+
+    $TypeId = Get-ITGlueIntuneConfigFlexAssetTypeId
+    if (-not $TypeId) {
+        $CompanyResult.Errors.Add('Intune configuration: could not resolve or create the CIPP Intune Configuration flex asset type.')
+        return
+    }
+
+    $Model = Get-CIPPIntuneConfigReportData -TenantFilter $Tenant.defaultDomainName
+    if (-not $Model) {
+        $CompanyResult.Errors.Add('Intune configuration: report model came back empty.')
+        return
+    }
+
+    # Report section Key -> IT Glue trait name-key.
+    $TraitMap = @{
+        'ConfigurationProfiles' = 'configuration-profiles'
+        'SettingsCatalog'       = 'settings-catalog'
+        'CompliancePolicies'    = 'compliance-policies'
+        'SecurityBaselines'     = 'security-baselines-and-app-protection'
+        'UpdateRings'           = 'update-rings'
+        'AppsAndScripts'        = 'apps-and-scripts'
+        'Enrollment'            = 'enrollment-and-autopilot'
+    }
+
+    $TruncationNotes = [System.Collections.Generic.List[object]]::new()
+
+    # Central time, per the house standard - the operator reads this, not a UTC log.
+    $CentralZone = try { [System.TimeZoneInfo]::FindSystemTimeZoneById('America/Chicago') } catch {
+        try { [System.TimeZoneInfo]::FindSystemTimeZoneById('Central Standard Time') } catch { $null }
+    }
+    $NowCentral = if ($CentralZone) {
+        [System.TimeZoneInfo]::ConvertTimeFromUtc([datetime]::UtcNow, $CentralZone)
+    } else { [datetime]::UtcNow }
+    $Abbrev = if (-not $CentralZone) { 'UTC' } elseif ($CentralZone.IsDaylightSavingTime($NowCentral)) { 'CDT' } else { 'CST' }
+
+    $Traits = @{
+        'tenant'        = [string]$Model.TenantName
+        'tenant-domain' = [string]$Model.TenantDomain
+        'last-synced'   = ('{0} {1}' -f $NowCentral.ToString('yyyy-MM-dd HH:mm'), $Abbrev)
+        'policy-count'  = [int]$Model.ObjectCount
+    }
+
+    foreach ($Section in @($Model.Sections)) {
+        $Key = [string]$Section.Key
+        if (-not $Key -or -not $TraitMap.ContainsKey($Key)) { continue }
+        $Traits[$TraitMap[$Key]] = ConvertTo-ITGlueSectionHtml -Section $Section -Truncated $TruncationNotes
+    }
+
+    # Collection Notes: the record states its own completeness, every time.
+    $NoteRows = [System.Collections.Generic.List[string]]::new()
+    foreach ($N in @($Model.CollectionNotes)) {
+        $NoteRows.Add((Get-ITGlueFormattedField -Title "$($N.Section) (not collected)" -Value "$($N.Detail)"))
+    }
+    foreach ($N in $TruncationNotes) {
+        $NoteRows.Add((Get-ITGlueFormattedField -Title "$($N.Section) (truncated)" -Value "$($N.Detail)"))
+    }
+    $NoteRows.Add((Get-ITGlueFormattedField -Title 'RBAC and Scope Tags' -Value 'Not yet collected. Intune role definitions, role assignments and scope tags are planned for the next phase.'))
+    $NoteRows.Add((Get-ITGlueFormattedField -Title 'Source' -Value "Generated by CIPP from live Microsoft Graph data for $($Model.TenantDomain). Edit configuration in Intune, not here - this record is overwritten on every sync."))
+    $Traits['collection-notes'] = Get-ITGlueFormattedBlock -Heading 'Collection Notes' -Body ($NoteRows -join "`n")
+
+    $Existing = Invoke-ITGlueRequest -Path "/flexible_assets?filter[organization-id]=$OrgId&filter[flexible-asset-type-id]=$TypeId" -AllPages
+    $ExistingAsset = $Existing | Select-Object -First 1
+
+    $Payload = @{
+        data = @{
+            type       = 'flexible-assets'
+            attributes = @{
+                'organization-id'        = [int]$OrgId
+                'flexible-asset-type-id' = [int]$TypeId
+                traits                   = $Traits
+            }
+        }
+    }
+
+    try {
+        if ($ExistingAsset) {
+            $null = Invoke-ITGlueRequest -Path "/flexible_assets/$($ExistingAsset.id)" -Method PATCH -Body $Payload -Raw
+            $CompanyResult.Logs.Add("Intune configuration: updated asset $($ExistingAsset.id) ($($Model.ObjectCount) objects).")
+        } else {
+            $Created = Invoke-ITGlueRequest -Path '/flexible_assets' -Method POST -Body $Payload -Raw
+            $CompanyResult.Logs.Add("Intune configuration: created asset $($Created.data.id) ($($Model.ObjectCount) objects).")
+        }
+        if ($TruncationNotes.Count -gt 0) {
+            $CompanyResult.Logs.Add("Intune configuration: $($TruncationNotes.Count) section(s) truncated to fit IT Glue field limits.")
+        }
+    } catch {
+        $Msg = $_.Exception.Message
+        $Detail = ''
+        try {
+            if ($_.ErrorDetails -and $_.ErrorDetails.Message) {
+                $Parsed = $_.ErrorDetails.Message | ConvertFrom-Json -ErrorAction Stop
+                if ($Parsed.errors) { $Detail = ' | ' + (($Parsed.errors | ForEach-Object { "$($_.title): $($_.detail)" }) -join '; ') }
+            }
+        } catch {}
+        $Full = "Intune configuration: ${Msg}${Detail}"
+        $CompanyResult.Errors.Add($Full)
+        Write-LogMessage -API 'ITGlueSync' -tenant $Tenant.defaultDomainName -message $Full -sev Warning
+    }
+}
+
+function Get-ITGlueIntuneConfigFlexAssetTypeId {
+    if ($script:ITGlueIntuneConfigFlexAssetTypeId) { return $script:ITGlueIntuneConfigFlexAssetTypeId }
+
+    $TypeName = 'CIPP Intune Configuration'
+
+    $AllTypes = Invoke-ITGlueRequest -Path '/flexible_asset_types' -AllPages
+    $Match = $AllTypes | Where-Object { $_.attributes.name -eq $TypeName } | Select-Object -First 1
+    if ($Match) {
+        $script:ITGlueIntuneConfigFlexAssetTypeId = [int]$Match.id
+        return $script:ITGlueIntuneConfigFlexAssetTypeId
+    }
+
+    $CreatePayload = @{
+        data = @{
+            type          = 'flexible_asset_types'
+            attributes    = @{
+                name           = $TypeName
+                description    = 'Intune/endpoint configuration for a Microsoft 365 tenant, synced by CIPP. One record per client.'
+                icon           = 'mobile'
+                enabled        = $true
+                'show-in-menu' = $true
+            }
+            relationships = @{
+                'flexible-asset-fields' = @{
+                    data = @(
+                        @{ type = 'flexible_asset_fields'; attributes = @{ order = 1; name = 'Tenant'; kind = 'Text'; required = $true; 'show-in-list' = $true; 'use-for-title' = $true } }
+                        @{ type = 'flexible_asset_fields'; attributes = @{ order = 2; name = 'Tenant Domain'; kind = 'Text'; required = $false; 'show-in-list' = $true } }
+                        @{ type = 'flexible_asset_fields'; attributes = @{ order = 3; name = 'Last Synced'; kind = 'Text'; required = $false; 'show-in-list' = $true } }
+                        @{ type = 'flexible_asset_fields'; attributes = @{ order = 4; name = 'Policy Count'; kind = 'Number'; required = $false; 'show-in-list' = $true } }
+                        @{ type = 'flexible_asset_fields'; attributes = @{ order = 5; name = 'Configuration Profiles'; kind = 'Textbox'; required = $false } }
+                        @{ type = 'flexible_asset_fields'; attributes = @{ order = 6; name = 'Settings Catalog'; kind = 'Textbox'; required = $false } }
+                        @{ type = 'flexible_asset_fields'; attributes = @{ order = 7; name = 'Compliance Policies'; kind = 'Textbox'; required = $false } }
+                        @{ type = 'flexible_asset_fields'; attributes = @{ order = 8; name = 'Security Baselines and App Protection'; kind = 'Textbox'; required = $false } }
+                        @{ type = 'flexible_asset_fields'; attributes = @{ order = 9; name = 'Update Rings'; kind = 'Textbox'; required = $false } }
+                        @{ type = 'flexible_asset_fields'; attributes = @{ order = 10; name = 'Apps and Scripts'; kind = 'Textbox'; required = $false } }
+                        @{ type = 'flexible_asset_fields'; attributes = @{ order = 11; name = 'Enrollment and Autopilot'; kind = 'Textbox'; required = $false } }
+                        @{ type = 'flexible_asset_fields'; attributes = @{ order = 12; name = 'RBAC and Scope Tags'; kind = 'Textbox'; required = $false } }
+                        @{ type = 'flexible_asset_fields'; attributes = @{ order = 13; name = 'Collection Notes'; kind = 'Textbox'; required = $false } }
+                    )
+                }
+            }
+        }
+    }
+
+    try {
+        $Created = Invoke-ITGlueRequest -Path '/flexible_asset_types' -Method POST -Body $CreatePayload -Raw
+        if ($Created.data.id) {
+            $script:ITGlueIntuneConfigFlexAssetTypeId = [int]$Created.data.id
+            return $script:ITGlueIntuneConfigFlexAssetTypeId
         }
     } catch {
         Write-Warning ("Failed to create '{0}' flex asset type: {1}" -f $TypeName, $_.Exception.Message)

@@ -43,6 +43,7 @@ const REPORT_TYPES = [
   { label: "External Forwarding Report", value: "Forwarding" },
   { label: "Registered Applications Report", value: "Applications" },
   { label: "Intune Compliance Report", value: "IntuneCompliance" },
+  { label: "Intune Configuration Document", value: "IntuneConfig" },
   { label: "License Report", value: "Licenses" },
   { label: "Administrator Report", value: "AdminTracker" },
   { label: "Domain Health Report", value: "DomainInfo" },
