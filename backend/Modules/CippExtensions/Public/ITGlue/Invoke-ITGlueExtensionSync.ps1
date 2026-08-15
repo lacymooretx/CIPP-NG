@@ -697,21 +697,9 @@ function Sync-ITGlueIntuneConfig {
         'policy-count'  = [string][int]$Model.ObjectCount
     }
 
-    foreach ($Section in @($Model.Sections)) {
-        $Key = [string]$Section.Key
-        if (-not $Key -or -not $TraitMap.ContainsKey($Key)) { continue }
-
-        $ContinuationFields = @($OverflowMap[$Key])
-        $Overflow = [System.Collections.Generic.List[string]]::new()
-        $Traits[$TraitMap[$Key]] = ConvertTo-ITGlueSectionHtml -Section $Section `
-            -Truncated $TruncationNotes -Overflow $Overflow -MaxParts (1 + $ContinuationFields.Count)
-
-        for ($i = 0; $i -lt $ContinuationFields.Count; $i++) {
-            # Blank unused continuation fields rather than leaving last run's content in
-            # place - a tenant that shrinks must not keep stale rows in a trailing field.
-            $Traits[$ContinuationFields[$i]] = if ($i -lt $Overflow.Count) { $Overflow[$i] } else { '' }
-        }
-    }
+    $SectionTraits = ConvertTo-ITGlueIntuneTraits -Sections $Model.Sections `
+        -TraitMap $TraitMap -OverflowMap $OverflowMap -Truncated $TruncationNotes
+    foreach ($Name in $SectionTraits.Keys) { $Traits[$Name] = $SectionTraits[$Name] }
 
     # Collection Notes: the record states its own completeness, every time.
     $NoteRows = [System.Collections.Generic.List[string]]::new()
