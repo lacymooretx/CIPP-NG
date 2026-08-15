@@ -23,5 +23,10 @@
     "label": "Conditional Access",
     "path": "/identity/administration/users/user/conditional-access",
     "icon": "Lock"
+  },
+  {
+    "label": "Welcome Packet",
+    "path": "/identity/administration/users/user/welcome-packet",
+    "icon": "Description"
   }
 ]

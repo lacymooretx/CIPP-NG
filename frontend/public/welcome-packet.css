@@ -1,0 +1,492 @@
+/* =============================================================================
+   COPY -- do not edit here.
+
+   Master: ~/code/aspendora-branding/templates/welcome-packet.css
+   Contract and design notes: ~/code/aspendora-branding/docs/welcome-packet.md
+
+   Served from /public and linked by the welcome packet page rather than
+   imported, because Next's pages router only allows global CSS imports from
+   _app.js -- and routing it through _app.js would mean editing an upstream
+   file to ship a one-page stylesheet. A CSS module was the other option and
+   was rejected: it hashes the .pk-* class names, which are exactly what keeps
+   this page and the brand template legible as the same object.
+
+   Re-copy from the master after any change there.
+   ============================================================================= */
+
+/* =============================================================================
+   Aspendora Technologies — new-hire welcome packet
+   A two-sided US Letter sheet: credential card on the front, getting-started
+   guide on the back. Handed to a new employee on their first day.
+
+   Consumers: CIPP (cloud-only tenants), per-client admin apps (hybrid), and
+   any HTML -> PDF pipeline. See docs/welcome-packet.md for the data contract.
+
+   COLOR SYSTEM — this sheet uses the *interface* palette (navy + blue on
+   slate), not the identity crimson and not the burgundy of document.css.
+   Two reasons: the identity gradient is logo-only (brand rule 1), and the
+   sheet's job is to walk someone into the same blue Microsoft/portal UI they
+   are about to sign in to. A red-accented "here is your password" page reads
+   as an alarm. document.css stays burgundy for proposals and reports.
+
+   TYPE — Plus Jakarta Sans throughout, per the brand. Titles are 800 weight
+   at -0.02em, the same treatment as web headlines. Every token below carries
+   a literal fallback, so this file also works standalone without tokens.css.
+
+   SIZING — the sheet is laid out at its true physical size (8.5in x 11in,
+   with the margins baked in as padding), so the on-screen preview and the
+   printed page are the same object rather than an approximation. @page
+   therefore takes a zero margin.
+   ============================================================================= */
+
+@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap");
+
+/* Scoped reset. The sheet is sized in absolute inches with the page margins
+   carried as padding, so a content-box .packet-page renders 1.6in wider than
+   the paper and the right-hand edge is clipped off the print. Do not rely on
+   the host application's global reset — this file has to be correct on its
+   own, including in a bare HTML -> PDF pipeline. */
+.packet-preview,
+.packet-preview *,
+.packet-preview *::before,
+.packet-preview *::after {
+    box-sizing: border-box;
+}
+
+.packet-preview {
+    background: var(--asp-slate-200, #e2e8f0);
+    padding: 1.5rem;
+    overflow-x: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.5rem;
+}
+
+.packet {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.packet-page {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    width: 8.5in;
+    min-height: 11in;
+    padding: 0.6in 0.8in;
+    background: var(--asp-white, #ffffff);
+    color: var(--asp-text, #0f1729);
+    font-family: var(--asp-font, "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif);
+    font-size: 11.5pt;
+    line-height: 1.5;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+}
+
+/* Full-bleed blue rule across the head of every sheet. */
+.pk-rule {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 0.16in;
+    background: var(--asp-grad-cta, linear-gradient(90deg, #2563eb 0%, #1d4ed8 50%, #2563eb 100%));
+}
+
+.pk-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-bottom: 0.18in;
+    border-bottom: 1px solid var(--asp-border, #e2e8f0);
+}
+
+/* Sized by height so any lockup aspect ratio drops in cleanly. Prefer the SVG
+   master (assets/logo/svg/aspendora-logo.svg) — this sheet gets printed, and
+   the raster lockups soften at 0.55in. */
+.pk-logo {
+    height: 0.55in;
+    width: auto;
+}
+
+/* Fallback when a client has no logo on file: the company name set as a
+   wordmark. Never rebuild the Aspendora lockup from live type — this is only
+   ever used for a client's own name. */
+.pk-wordmark {
+    font-size: 15pt;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: var(--asp-navy-hero, #0f172a);
+}
+
+.pk-eyebrow {
+    font-size: 9pt;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--asp-action, #2563eb);
+}
+
+.pk-title {
+    font-size: 30pt;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    line-height: 1.05;
+    color: var(--asp-navy-hero, #0f172a);
+    margin: 0.32in 0 0.1in;
+}
+
+.pk-title-sm {
+    font-size: 25pt;
+}
+
+.pk-lede {
+    font-size: 12pt;
+    line-height: 1.55;
+    color: var(--asp-text-muted, #475569);
+    margin: 0 0 0.28in;
+    max-width: 5.9in;
+}
+
+/* --- Account details card --- */
+
+.pk-card {
+    border: 1px solid var(--asp-border, #e2e8f0);
+    border-radius: var(--asp-r-sm, 8px);
+    overflow: hidden;
+    margin-bottom: 0.26in;
+}
+
+.pk-card-head {
+    background: var(--asp-navy-hero, #0f172a);
+    color: var(--asp-white, #ffffff);
+    font-size: 9pt;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    padding: 0.09in 0.18in;
+}
+
+.pk-details {
+    display: grid;
+    grid-template-columns: 1.5in 1fr;
+    gap: 0;
+    margin: 0;
+    padding: 0.06in 0.18in 0.12in;
+}
+
+.pk-details dt {
+    font-size: 10pt;
+    color: var(--asp-text-muted, #475569);
+    padding: 0.06in 0 0.02in;
+}
+
+.pk-details dd {
+    margin: 0;
+    padding: 0.06in 0 0.02in;
+    font-size: 11.5pt;
+    font-weight: 600;
+    color: var(--asp-navy-hero, #0f172a);
+    word-break: break-word;
+}
+
+/* --- The password itself --- */
+
+.pk-password {
+    border: 2px solid var(--asp-action, #2563eb);
+    border-radius: var(--asp-r-sm, 8px);
+    background: #eff6ff; /* blue-50 — a wash of the action color, not a token */
+    padding: 0.2in 0.22in;
+    text-align: center;
+    margin-bottom: 0.24in;
+}
+
+.pk-password-label {
+    font-size: 9pt;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--asp-action-hover, #1d4ed8);
+}
+
+.pk-password-value {
+    font-family: Consolas, "SF Mono", Menlo, "Courier New", monospace;
+    font-size: 21pt;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    color: var(--asp-navy-hero, #0f172a);
+    margin: 0.09in 0 0.07in;
+    /* Prefer the hyphens as break points — a mid-word break reads as though
+       the password contains a space or a line-ending character. */
+    overflow-wrap: anywhere;
+}
+
+.pk-password-hint {
+    font-size: 9.5pt;
+    line-height: 1.45;
+    color: var(--asp-slate-700, #334155);
+    max-width: 4.6in;
+    margin: 0 auto;
+}
+
+/* --- Notices --- */
+
+.pk-notice {
+    border-left: 4px solid var(--asp-action, #2563eb);
+    background: var(--asp-slate-100, #f1f5f9);
+    padding: 0.13in 0.18in;
+    font-size: 10pt;
+    line-height: 1.5;
+    color: var(--asp-slate-700, #334155);
+    margin-bottom: 0.24in;
+}
+
+.pk-notice strong {
+    color: var(--asp-navy-hero, #0f172a);
+}
+
+.pk-notice-quiet {
+    border-left-color: var(--asp-navy-hero, #0f172a);
+    margin-top: 0.1in;
+}
+
+/* --- Sign-in callout --- */
+
+.pk-signin {
+    display: flex;
+    align-items: baseline;
+    gap: 0.14in;
+    padding: 0.14in 0.18in;
+    background: var(--asp-navy-hero, #0f172a);
+    border-radius: var(--asp-r-sm, 8px);
+    color: var(--asp-white, #ffffff);
+}
+
+.pk-signin-label {
+    font-size: 9pt;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--asp-blue-light, #60a5fa);
+}
+
+.pk-signin-url {
+    font-size: 16pt;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+}
+
+/* --- Numbered steps (page 2) --- */
+
+.pk-steps {
+    list-style: none;
+    counter-reset: pk-step;
+    margin: 0 0 0.2in;
+    padding: 0;
+}
+
+.pk-steps > li {
+    counter-increment: pk-step;
+    position: relative;
+    padding-left: 0.52in;
+    margin-bottom: 0.19in;
+}
+
+.pk-steps > li::before {
+    content: counter(pk-step);
+    position: absolute;
+    left: 0;
+    top: 0.01in;
+    width: 0.34in;
+    height: 0.34in;
+    border-radius: 50%;
+    background: var(--asp-action, #2563eb);
+    color: var(--asp-white, #ffffff);
+    font-size: 13pt;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.pk-steps h2 {
+    font-size: 14pt;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    color: var(--asp-navy-hero, #0f172a);
+    margin: 0 0 0.04in;
+}
+
+.pk-steps p {
+    margin: 0;
+    font-size: 10.5pt;
+    line-height: 1.5;
+    color: var(--asp-slate-700, #334155);
+}
+
+/* Emphasis badge, deliberately navy and not red: in this brand red means
+   risk, and "required" here is emphasis on a routine setup step. */
+.pk-req {
+    display: inline-block;
+    vertical-align: 2px;
+    margin-left: 0.08in;
+    padding: 0.02in 0.09in;
+    border-radius: var(--asp-r-pill, 9999px);
+    background: var(--asp-navy-hero, #0f172a);
+    color: var(--asp-white, #ffffff);
+    font-size: 7.5pt;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+}
+
+.pk-substeps {
+    margin: 0.07in 0 0;
+    padding-left: 0.2in;
+    font-size: 10.5pt;
+    line-height: 1.55;
+    color: var(--asp-slate-700, #334155);
+}
+
+.pk-substeps li::marker {
+    color: var(--asp-action, #2563eb);
+}
+
+.pk-apps {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.07in 0.16in;
+    margin-top: 0.09in;
+}
+
+.pk-apps > div {
+    border-left: 3px solid var(--asp-blue-light, #60a5fa);
+    padding-left: 0.11in;
+    font-size: 10pt;
+    line-height: 1.35;
+}
+
+.pk-apps strong {
+    display: block;
+    color: var(--asp-navy-hero, #0f172a);
+}
+
+.pk-apps span {
+    color: var(--asp-text-muted, #475569);
+}
+
+/* The guide page carries five steps plus a closing notice, which is more
+   content than the credential sheet. Tighten its vertical rhythm so the whole
+   guide — footer included — stays on one sheet. */
+
+.pk-guide .pk-title {
+    font-size: 21pt;
+    margin-top: 0.14in;
+    margin-bottom: 0.07in;
+}
+
+.pk-guide .pk-lede {
+    font-size: 11pt;
+    margin-bottom: 0.12in;
+}
+
+.pk-guide .pk-steps {
+    margin-bottom: 0.08in;
+}
+
+.pk-guide .pk-steps > li {
+    margin-bottom: 0.1in;
+}
+
+.pk-guide .pk-steps p,
+.pk-guide .pk-substeps,
+.pk-guide .pk-apps > div {
+    line-height: 1.42;
+}
+
+.pk-guide .pk-notice-quiet {
+    margin-top: 0.04in;
+    margin-bottom: 0.08in;
+    padding: 0.1in 0.16in;
+}
+
+/* --- Footer, pinned to the foot of the sheet --- */
+
+.pk-foot {
+    margin-top: auto;
+    padding-top: 0.14in;
+    border-top: 1px solid var(--asp-border, #e2e8f0);
+    display: flex;
+    justify-content: space-between;
+    gap: 0.2in;
+    font-size: 8.5pt;
+    color: var(--asp-text-muted, #475569);
+}
+
+/* =============================================================================
+   Print rules
+   ============================================================================= */
+
+@media print {
+    @page {
+        size: letter;
+        /* Margins live in .packet-page padding so preview == printout. */
+        margin: 0;
+    }
+
+    html, body {
+        background: var(--asp-white, #ffffff);
+        margin: 0;
+        padding: 0;
+    }
+
+    /* Hide every on-screen-only control. Host applications should add their
+       own shell selectors (header, nav, overlays) to this list. */
+    .no-print {
+        display: none !important;
+    }
+
+    .packet-preview {
+        display: block;
+        background: none;
+        padding: 0;
+        overflow: visible;
+    }
+
+    .packet {
+        display: block;
+        gap: 0;
+    }
+
+    .packet-page {
+        width: 100%;
+        /* Just under 11in: an element exactly as tall as the page box can
+           round up and emit a trailing blank sheet. */
+        min-height: 10.9in;
+        margin: 0;
+        box-shadow: none;
+    }
+
+    /* Break *before* each subsequent sheet rather than after every sheet —
+       break-after on the last page is what produces a stray blank page. */
+    .packet-page + .packet-page {
+        break-before: page;
+        page-break-before: always;
+    }
+
+    /* Browsers drop background colours when printing unless told otherwise;
+       this packet is meant to be printed in colour. */
+    .packet-page,
+    .packet-page * {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+
+    /* Keep a step and its heading together across a break. */
+    .pk-steps > li,
+    .pk-password,
+    .pk-card {
+        break-inside: avoid;
+        page-break-inside: avoid;
+    }
+}
