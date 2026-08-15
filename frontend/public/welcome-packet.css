@@ -498,10 +498,28 @@
         margin: 0;
     }
 
+    /* Clamp the document to the paper.
+
+       A host that hides its app shell with `visibility: hidden` (the usual
+       trick, because it does not disturb the packet's own layout) leaves the
+       shell OCCUPYING ITS FULL WIDTH — visibility hides pixels, not boxes. The
+       printed document is then as wide as the application, Chrome scales the
+       whole page down to make it fit, and the sheet arrives shrunk with a band
+       of dead paper at the foot. The scale factor is whatever the operator's
+       window happened to be, so the same packet prints differently every time.
+
+       Observed in the wild before this rule existed: a sheet scaled to 0.90,
+       with 1.76in of blank paper below the footer instead of 0.74in.
+
+       Clamping here rather than in the host because every consumer with a
+       sidebar hits it, and a narrow test fixture will not reveal it. */
     html, body {
         background: #ffffff;
         margin: 0;
         padding: 0;
+        width: 8.5in !important;
+        max-width: 8.5in !important;
+        overflow: hidden !important;
     }
 
     /* Hide every on-screen-only control. Host applications should add their
