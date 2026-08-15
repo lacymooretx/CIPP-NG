@@ -22,21 +22,29 @@
    Consumers: CIPP (cloud-only tenants), per-client admin apps (hybrid), and
    any HTML -> PDF pipeline. See docs/welcome-packet.md for the data contract.
 
-   COLOR SYSTEM — this sheet uses the *interface* palette (navy + blue on
-   slate), not the identity crimson and not the burgundy of document.css.
-   Two reasons: the identity gradient is logo-only (brand rule 1), and the
-   sheet's job is to walk someone into the same blue Microsoft/portal UI they
-   are about to sign in to. A red-accented "here is your password" page reads
-   as an alarm. document.css stays burgundy for proposals and reports.
+   THEMING — every colour and typeface in this file comes from a --pk-* custom
+   property declared on .packet-preview. The defaults below are Aspendora. A
+   host that needs the sheet in a client's own brand adds a class alongside
+   .packet-preview and re-points the variables; it does not fork the rules.
+   3E NDT's packet works exactly this way — see themes/3e.css. Never hard-code
+   a colour into a rule below: that is the one change that forces every
+   consumer to fork.
 
-   TYPE — Plus Jakarta Sans throughout, per the brand. Titles are 800 weight
-   at -0.02em, the same treatment as web headlines. Every token below carries
+   COLOR SYSTEM — the Aspendora default uses the *interface* palette (navy and
+   blue on slate), not the identity crimson and not the burgundy of
+   document.css. Two reasons: the identity gradient is logo-only (brand rule 1),
+   and the sheet's job is to walk someone into the same blue Microsoft/portal UI
+   they are about to sign in to. A red-accented "here is your password" page
+   reads as an alarm. document.css stays burgundy for proposals and reports.
+
+   TYPE — Plus Jakarta Sans throughout, per the brand. Titles are 800 weight at
+   -0.02em, the same treatment as web headlines. Every --asp-* reference carries
    a literal fallback, so this file also works standalone without tokens.css.
 
-   SIZING — the sheet is laid out at its true physical size (8.5in x 11in,
-   with the margins baked in as padding), so the on-screen preview and the
-   printed page are the same object rather than an approximation. @page
-   therefore takes a zero margin.
+   SIZING — the sheet is laid out at its true physical size (8.5in x 11in, with
+   the margins baked in as padding), so the on-screen preview and the printed
+   page are the same object rather than an approximation. @page therefore takes
+   a zero margin.
    ============================================================================= */
 
 @import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap");
@@ -53,7 +61,53 @@
     box-sizing: border-box;
 }
 
+/* ---- The theme contract. Override these, not the rules. ------------------ */
 .packet-preview {
+    /* Type */
+    --pk-font: var(--asp-font, "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif);
+    --pk-heading-font: var(--pk-font);
+    --pk-heading-weight: 800;
+    --pk-heading-tracking: -0.02em;
+    --pk-heading-leading: 1.05;
+    /* Step headings on page 2 are set smaller, so they take less negative
+       tracking than the display titles. Its own variable rather than reusing
+       --pk-heading-tracking: a pixel diff caught them drifting when they shared
+       one. */
+    --pk-subheading-tracking: -0.01em;
+    /* The small uppercase labels (eyebrow, card head, password label, sign-in
+       label). Tracking and weight move together per brand, and the sign-in row
+       is a flex layout, so a label that tracks differently shifts the URL
+       beside it. */
+    --pk-label-tracking: 0.18em;
+    --pk-label-weight: 700;
+    --pk-mono: Consolas, "SF Mono", Menlo, "Courier New", monospace;
+
+    /* Accent — the head rule, step bullets, borders, callout labels */
+    --pk-accent: var(--asp-blue, #2563eb);
+    --pk-accent-dark: var(--asp-action-hover, #1d4ed8);
+    --pk-accent-light: var(--asp-blue-light, #60a5fa);
+    --pk-rule: var(--asp-grad-cta, linear-gradient(90deg, #2563eb 0%, #1d4ed8 50%, #2563eb 100%));
+    --pk-eyebrow: var(--asp-action, #2563eb);
+    --pk-marker: var(--asp-action, #2563eb);
+
+    /* Grounds */
+    --pk-ink: var(--asp-navy-hero, #0f172a);
+    --pk-wash: #eff6ff;
+    --pk-surface: var(--asp-slate-100, #f1f5f9);
+    --pk-badge-bg: var(--asp-navy-hero, #0f172a);
+
+    /* Text */
+    --pk-text: var(--asp-text, #0f1729);
+    --pk-body: var(--asp-slate-700, #334155);
+    --pk-muted: var(--asp-text-muted, #475569);
+    /* The lede sits between body and muted, and the two brands land on
+       different sides of that line. */
+    --pk-lede-color: var(--pk-muted);
+    --pk-border: var(--asp-border, #e2e8f0);
+
+    /* Shape */
+    --pk-radius: var(--asp-r-sm, 8px);
+
     background: var(--asp-slate-200, #e2e8f0);
     padding: 1.5rem;
     overflow-x: auto;
@@ -76,22 +130,22 @@
     width: 8.5in;
     min-height: 11in;
     padding: 0.6in 0.8in;
-    background: var(--asp-white, #ffffff);
-    color: var(--asp-text, #0f1729);
-    font-family: var(--asp-font, "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif);
+    background: #ffffff;
+    color: var(--pk-text);
+    font-family: var(--pk-font);
     font-size: 11.5pt;
     line-height: 1.5;
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
 }
 
-/* Full-bleed blue rule across the head of every sheet. */
+/* Full-bleed accent rule across the head of every sheet. */
 .pk-rule {
     position: absolute;
     top: 0;
     left: 0;
     right: 0;
     height: 0.16in;
-    background: var(--asp-grad-cta, linear-gradient(90deg, #2563eb 0%, #1d4ed8 50%, #2563eb 100%));
+    background: var(--pk-rule);
 }
 
 .pk-head {
@@ -99,12 +153,11 @@
     align-items: center;
     justify-content: space-between;
     padding-bottom: 0.18in;
-    border-bottom: 1px solid var(--asp-border, #e2e8f0);
+    border-bottom: 1px solid var(--pk-border);
 }
 
-/* Sized by height so any lockup aspect ratio drops in cleanly. Prefer the SVG
-   master (assets/logo/svg/aspendora-logo.svg) — this sheet gets printed, and
-   the raster lockups soften at 0.55in. */
+/* Sized by height so any lockup aspect ratio drops in cleanly. Prefer an SVG
+   master — this sheet gets printed, and raster lockups soften at 0.55in. */
 .pk-logo {
     height: 0.55in;
     width: auto;
@@ -117,23 +170,24 @@
     font-size: 15pt;
     font-weight: 800;
     letter-spacing: -0.02em;
-    color: var(--asp-navy-hero, #0f172a);
+    color: var(--pk-ink);
 }
 
 .pk-eyebrow {
     font-size: 9pt;
-    font-weight: 700;
-    letter-spacing: 0.18em;
+    font-weight: var(--pk-label-weight);
+    letter-spacing: var(--pk-label-tracking);
     text-transform: uppercase;
-    color: var(--asp-action, #2563eb);
+    color: var(--pk-eyebrow);
 }
 
 .pk-title {
+    font-family: var(--pk-heading-font);
     font-size: 30pt;
-    font-weight: 800;
-    letter-spacing: -0.02em;
-    line-height: 1.05;
-    color: var(--asp-navy-hero, #0f172a);
+    font-weight: var(--pk-heading-weight);
+    letter-spacing: var(--pk-heading-tracking);
+    line-height: var(--pk-heading-leading);
+    color: var(--pk-ink);
     margin: 0.32in 0 0.1in;
 }
 
@@ -144,7 +198,7 @@
 .pk-lede {
     font-size: 12pt;
     line-height: 1.55;
-    color: var(--asp-text-muted, #475569);
+    color: var(--pk-lede-color);
     margin: 0 0 0.28in;
     max-width: 5.9in;
 }
@@ -152,18 +206,18 @@
 /* --- Account details card --- */
 
 .pk-card {
-    border: 1px solid var(--asp-border, #e2e8f0);
-    border-radius: var(--asp-r-sm, 8px);
+    border: 1px solid var(--pk-border);
+    border-radius: var(--pk-radius);
     overflow: hidden;
     margin-bottom: 0.26in;
 }
 
 .pk-card-head {
-    background: var(--asp-navy-hero, #0f172a);
-    color: var(--asp-white, #ffffff);
+    background: var(--pk-ink);
+    color: #ffffff;
     font-size: 9pt;
-    font-weight: 700;
-    letter-spacing: 0.18em;
+    font-weight: var(--pk-label-weight);
+    letter-spacing: var(--pk-label-tracking);
     text-transform: uppercase;
     padding: 0.09in 0.18in;
 }
@@ -178,7 +232,7 @@
 
 .pk-details dt {
     font-size: 10pt;
-    color: var(--asp-text-muted, #475569);
+    color: var(--pk-muted);
     padding: 0.06in 0 0.02in;
 }
 
@@ -187,16 +241,16 @@
     padding: 0.06in 0 0.02in;
     font-size: 11.5pt;
     font-weight: 600;
-    color: var(--asp-navy-hero, #0f172a);
+    color: var(--pk-ink);
     word-break: break-word;
 }
 
 /* --- The password itself --- */
 
 .pk-password {
-    border: 2px solid var(--asp-action, #2563eb);
-    border-radius: var(--asp-r-sm, 8px);
-    background: #eff6ff; /* blue-50 — a wash of the action color, not a token */
+    border: 2px solid var(--pk-accent);
+    border-radius: var(--pk-radius);
+    background: var(--pk-wash);
     padding: 0.2in 0.22in;
     text-align: center;
     margin-bottom: 0.24in;
@@ -204,18 +258,18 @@
 
 .pk-password-label {
     font-size: 9pt;
-    font-weight: 700;
-    letter-spacing: 0.18em;
+    font-weight: var(--pk-label-weight);
+    letter-spacing: var(--pk-label-tracking);
     text-transform: uppercase;
-    color: var(--asp-action-hover, #1d4ed8);
+    color: var(--pk-accent-dark);
 }
 
 .pk-password-value {
-    font-family: Consolas, "SF Mono", Menlo, "Courier New", monospace;
+    font-family: var(--pk-mono);
     font-size: 21pt;
     font-weight: 700;
     letter-spacing: 0.01em;
-    color: var(--asp-navy-hero, #0f172a);
+    color: var(--pk-ink);
     margin: 0.09in 0 0.07in;
     /* Prefer the hyphens as break points — a mid-word break reads as though
        the password contains a space or a line-ending character. */
@@ -225,7 +279,7 @@
 .pk-password-hint {
     font-size: 9.5pt;
     line-height: 1.45;
-    color: var(--asp-slate-700, #334155);
+    color: var(--pk-body);
     max-width: 4.6in;
     margin: 0 auto;
 }
@@ -233,21 +287,21 @@
 /* --- Notices --- */
 
 .pk-notice {
-    border-left: 4px solid var(--asp-action, #2563eb);
-    background: var(--asp-slate-100, #f1f5f9);
+    border-left: 4px solid var(--pk-accent);
+    background: var(--pk-surface);
     padding: 0.13in 0.18in;
     font-size: 10pt;
     line-height: 1.5;
-    color: var(--asp-slate-700, #334155);
+    color: var(--pk-body);
     margin-bottom: 0.24in;
 }
 
 .pk-notice strong {
-    color: var(--asp-navy-hero, #0f172a);
+    color: var(--pk-ink);
 }
 
 .pk-notice-quiet {
-    border-left-color: var(--asp-navy-hero, #0f172a);
+    border-left-color: var(--pk-ink);
     margin-top: 0.1in;
 }
 
@@ -258,16 +312,16 @@
     align-items: baseline;
     gap: 0.14in;
     padding: 0.14in 0.18in;
-    background: var(--asp-navy-hero, #0f172a);
-    border-radius: var(--asp-r-sm, 8px);
-    color: var(--asp-white, #ffffff);
+    background: var(--pk-ink);
+    border-radius: var(--pk-radius);
+    color: #ffffff;
 }
 
 .pk-signin-label {
     font-size: 9pt;
-    letter-spacing: 0.18em;
+    letter-spacing: var(--pk-label-tracking);
     text-transform: uppercase;
-    color: var(--asp-blue-light, #60a5fa);
+    color: var(--pk-accent-light);
 }
 
 .pk-signin-url {
@@ -300,8 +354,8 @@
     width: 0.34in;
     height: 0.34in;
     border-radius: 50%;
-    background: var(--asp-action, #2563eb);
-    color: var(--asp-white, #ffffff);
+    background: var(--pk-accent);
+    color: #ffffff;
     font-size: 13pt;
     font-weight: 700;
     display: flex;
@@ -310,10 +364,11 @@
 }
 
 .pk-steps h2 {
+    font-family: var(--pk-heading-font);
     font-size: 14pt;
-    font-weight: 800;
-    letter-spacing: -0.01em;
-    color: var(--asp-navy-hero, #0f172a);
+    font-weight: var(--pk-heading-weight);
+    letter-spacing: var(--pk-subheading-tracking);
+    color: var(--pk-ink);
     margin: 0 0 0.04in;
 }
 
@@ -321,19 +376,21 @@
     margin: 0;
     font-size: 10.5pt;
     line-height: 1.5;
-    color: var(--asp-slate-700, #334155);
+    color: var(--pk-body);
 }
 
-/* Emphasis badge, deliberately navy and not red: in this brand red means
-   risk, and "required" here is emphasis on a routine setup step. */
+/* Emphasis badge. The Aspendora theme makes this navy rather than red: in this
+   brand red means risk, and "required" here is emphasis on a routine step. A
+   client theme is free to disagree. */
 .pk-req {
     display: inline-block;
     vertical-align: 2px;
     margin-left: 0.08in;
     padding: 0.02in 0.09in;
     border-radius: var(--asp-r-pill, 9999px);
-    background: var(--asp-navy-hero, #0f172a);
-    color: var(--asp-white, #ffffff);
+    background: var(--pk-badge-bg);
+    color: #ffffff;
+    font-family: var(--pk-font);
     font-size: 7.5pt;
     font-weight: 700;
     letter-spacing: 0.1em;
@@ -345,11 +402,11 @@
     padding-left: 0.2in;
     font-size: 10.5pt;
     line-height: 1.55;
-    color: var(--asp-slate-700, #334155);
+    color: var(--pk-body);
 }
 
 .pk-substeps li::marker {
-    color: var(--asp-action, #2563eb);
+    color: var(--pk-marker);
 }
 
 .pk-apps {
@@ -360,7 +417,7 @@
 }
 
 .pk-apps > div {
-    border-left: 3px solid var(--asp-blue-light, #60a5fa);
+    border-left: 3px solid var(--pk-accent-light);
     padding-left: 0.11in;
     font-size: 10pt;
     line-height: 1.35;
@@ -368,11 +425,11 @@
 
 .pk-apps strong {
     display: block;
-    color: var(--asp-navy-hero, #0f172a);
+    color: var(--pk-ink);
 }
 
 .pk-apps span {
-    color: var(--asp-text-muted, #475569);
+    color: var(--pk-muted);
 }
 
 /* The guide page carries five steps plus a closing notice, which is more
@@ -387,15 +444,22 @@
 
 .pk-guide .pk-lede {
     font-size: 11pt;
-    margin-bottom: 0.12in;
+    margin-bottom: 0.09in;
 }
 
 .pk-guide .pk-steps {
-    margin-bottom: 0.08in;
+    margin-bottom: 0.06in;
 }
 
+/* Step 3 (Authenticator) carries five sub-steps, which is what sets the height
+   of this page. These margins are the slack that keeps the guide on one sheet;
+   if you add content, re-print and count pages before assuming it still fits. */
 .pk-guide .pk-steps > li {
-    margin-bottom: 0.1in;
+    margin-bottom: 0.075in;
+}
+
+.pk-guide .pk-substeps {
+    margin-top: 0.05in;
 }
 
 .pk-guide .pk-steps p,
@@ -415,12 +479,12 @@
 .pk-foot {
     margin-top: auto;
     padding-top: 0.14in;
-    border-top: 1px solid var(--asp-border, #e2e8f0);
+    border-top: 1px solid var(--pk-border);
     display: flex;
     justify-content: space-between;
     gap: 0.2in;
     font-size: 8.5pt;
-    color: var(--asp-text-muted, #475569);
+    color: var(--pk-muted);
 }
 
 /* =============================================================================
@@ -435,7 +499,7 @@
     }
 
     html, body {
-        background: var(--asp-white, #ffffff);
+        background: #ffffff;
         margin: 0;
         padding: 0;
     }

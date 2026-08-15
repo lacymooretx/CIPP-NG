@@ -7,10 +7,19 @@ import { useSettings } from '../../../../../hooks/use-settings'
 import { ApiGetCall, ApiPostCall } from '../../../../../api/ApiCall'
 import { CippHead } from '../../../../../components/CippComponents/CippHead'
 import tabOptions from './tabOptions'
-import { Alert, Button, Card, CardContent, CardHeader, CircularProgress, Typography } from '@mui/material'
+import {
+  Alert,
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  CircularProgress,
+  TextField,
+  Typography,
+} from '@mui/material'
 import { Box, Stack } from '@mui/system'
 import GlobalStyles from '@mui/material/GlobalStyles'
-import { LockReset, Launch, Print } from '@mui/icons-material'
+import { LockReset, Launch, Print, Send } from '@mui/icons-material'
 
 /*
  * Printable new-hire welcome packet.
@@ -63,6 +72,8 @@ const Page = () => {
 
   const [confirmingReset, setConfirmingReset] = useState(false)
   const [resetError, setResetError] = useState(null)
+  const [welcomeEmailTo, setWelcomeEmailTo] = useState('')
+  const [emailResult, setEmailResult] = useState(null)
 
   const packetRequest = ApiGetCall({
     url: `/api/ExecWelcomePacket?UserID=${userId}&tenantFilter=${tenant}`,
@@ -105,6 +116,36 @@ const Page = () => {
         },
       },
       { onError: (error) => setResetError(error?.response?.data?.Results ?? error.message) },
+    )
+  }
+
+  const sendEmail = ApiPostCall({})
+
+  const handleSendEmail = () => {
+    setEmailResult(null)
+    sendEmail.mutate(
+      {
+        url: '/api/ExecSendWelcomeEmail',
+        data: {
+          tenantFilter: tenant,
+          UserID: packet.user.userPrincipalName,
+          RecipientEmail: welcomeEmailTo,
+          // The sheet is being printed from this page, so tell the reader to
+          // look for the password there rather than for a link that is not coming.
+          Delivery: 'printed',
+        },
+      },
+      {
+        onSuccess: (r) => {
+          setEmailResult({ ok: true, message: r?.data?.Results ?? 'Sent.' })
+          setWelcomeEmailTo('')
+        },
+        onError: (error) =>
+          setEmailResult({
+            ok: false,
+            message: error?.response?.data?.Results ?? error.message,
+          }),
+      },
     )
   }
 
@@ -156,6 +197,10 @@ const Page = () => {
 
                 {resetError && <Alert severity="error">{resetError}</Alert>}
 
+                {emailResult && (
+                  <Alert severity={emailResult.ok ? 'success' : 'error'}>{emailResult.message}</Alert>
+                )}
+
                 {hasPassword && (
                   <Typography variant="body2" color="text.secondary">
                     Read from IT Glue record <strong>{packet.itGlueName}</strong>
@@ -206,6 +251,24 @@ const Page = () => {
                       </Button>
                     </>
                   )}
+
+                  <TextField
+                    size="small"
+                    label="Send the welcome email to"
+                    placeholder="personal@example.com"
+                    value={welcomeEmailTo}
+                    onChange={(e) => setWelcomeEmailTo(e.target.value)}
+                    helperText="A personal address or their manager — not the new mailbox"
+                    sx={{ minWidth: 280 }}
+                  />
+                  <Button
+                    variant="outlined"
+                    startIcon={<Send />}
+                    disabled={!welcomeEmailTo.includes('@') || sendEmail.isPending}
+                    onClick={handleSendEmail}
+                  >
+                    {sendEmail.isPending ? 'Sending…' : 'Send welcome email'}
+                  </Button>
 
                   {packet.itGlueUrl && (
                     <Button
@@ -367,19 +430,29 @@ const WelcomePacketSheets = ({ packet }) => {
               <h2>
                 Set up Microsoft Authenticator <span className="pk-req">required</span>
               </h2>
-              <p>This keeps your account safe even if your password is ever stolen. On your phone:</p>
+              <p>
+                Keeps your account safe even if your password is stolen. You need your phone and
+                this computer:
+              </p>
               <ol className="pk-substeps">
                 <li>
-                  Install <strong>Microsoft Authenticator</strong> from the App Store or Google Play.
+                  <strong>Phone:</strong> install <strong>Microsoft Authenticator</strong> from the
+                  App Store or Google Play.
                 </li>
                 <li>
-                  Open it, tap <strong>+</strong>, and choose <strong>Work or school account</strong>.
+                  <strong>Computer:</strong> go to <strong>aka.ms/mfasetup</strong> — you may land
+                  there automatically after step 2.
                 </li>
                 <li>
-                  Choose <strong>Scan a QR code</strong> and point your phone at the code on your
-                  screen.
+                  Choose <strong>Add sign-in method</strong> → <strong>Authenticator app</strong>. A
+                  QR code appears on your screen.
                 </li>
-                <li>Approve the test notification that arrives on your phone.</li>
+                <li>
+                  <strong>Phone:</strong> tap <strong>+</strong> →{' '}
+                  <strong>Work or school account</strong> → <strong>Scan a QR code</strong>, then
+                  point it at that code.
+                </li>
+                <li>Approve the test notification.</li>
               </ol>
             </li>
             <li>
