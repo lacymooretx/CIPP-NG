@@ -498,26 +498,37 @@
         margin: 0;
     }
 
-    /* Clamp the document to the paper.
+    /* Fit the document to the PRINTABLE AREA, never to a fixed paper width.
 
-       A host that hides its app shell with `visibility: hidden` (the usual
-       trick, because it does not disturb the packet's own layout) leaves the
-       shell OCCUPYING ITS FULL WIDTH — visibility hides pixels, not boxes. The
-       printed document is then as wide as the application, Chrome scales the
-       whole page down to make it fit, and the sheet arrives shrunk with a band
-       of dead paper at the foot. The scale factor is whatever the operator's
-       window happened to be, so the same packet prints differently every time.
+       Two separate things shrink this sheet, and only one of them was fixed
+       first time round:
 
-       Observed in the wild before this rule existed: a sheet scaled to 0.90,
-       with 1.76in of blank paper below the footer instead of 0.74in.
+       1. A host that hides its app shell with `visibility: hidden` (the usual
+          trick, because it does not disturb the packet's own layout) leaves the
+          shell OCCUPYING ITS FULL WIDTH — visibility hides pixels, not boxes.
+          The printed document is then as wide as the application and Chrome
+          scales the page down to fit. `overflow: hidden` below clips that.
 
-       Clamping here rather than in the host because every consumer with a
-       sidebar hits it, and a narrow test fixture will not reveal it. */
+       2. The operator's print dialog. `@page { margin: 0 }` above is only a
+          REQUEST: whenever the Margins dropdown is left on "Default" the browser
+          applies ~0.4in itself, so the printable area is 7.7in. Pinning the
+          document to a hard 8.5in then guarantees a 0.8in overflow and Chrome
+          shrink-to-fits the whole sheet — the fixed width CAUSED the scaling it
+          was meant to prevent. Measured on the wide-shell fixture: body type
+          10.00pt -> 9.07pt, text 6.900in -> 6.248in, a 0.905 scale. That is the
+          0.90 seen on real printouts, and no stylesheet can override the
+          dialog.
+
+       So: `width: 100%` resolves against the page area (paper minus whatever
+       margin actually applied), and `max-width` stops a wide shell pushing past
+       the paper. With Margins: None the sheet is pixel-identical to before;
+       with Default margins it lays out 0.8in narrower at TRUE SIZE rather than
+       printing everything at 90%. Legible either way, exact when set to None. */
     html, body {
         background: #ffffff;
         margin: 0;
         padding: 0;
-        width: 8.5in !important;
+        width: 100% !important;
         max-width: 8.5in !important;
         overflow: hidden !important;
     }
@@ -542,9 +553,32 @@
 
     .packet-page {
         width: 100%;
-        /* Just under 11in: an element exactly as tall as the page box can
-           round up and emit a trailing blank sheet. */
-        min-height: 10.9in;
+        /* Just under a full page box, for the same reason the width above is
+           relative: a hard 10.9in overflows the 10.2in page area that Default
+           dialog margins leave, and each sheet then spills a blank one after it
+           (measured: 2 pages became 4). In paged media 1vh is 1% of the page
+           box, so this tracks whatever margin actually applied. 99, not 100,
+           because an element exactly as tall as the page box can round up and
+           emit a trailing blank sheet. */
+        min-height: 99vh;
+
+        /* ABSORB the dialog's margin into our own padding.
+
+           The sheet wants a 6.9in text column inset 0.8in/0.6in from the paper.
+           If the browser has already applied its own margin, taking the full
+           0.8in again on top would push the column inward, and page 2 (the
+           dense one) then no longer fits — measured as a real third sheet, not
+           just white space. So pad by the REMAINDER:
+
+               applied margin  = (8.5in - 100%) / 2
+               padding we want = 0.8in - applied  = 50% - 3.45in
+
+           and the same vertically against 100vh. Margins: None gives exactly
+           0.8in/0.6in as before; Default (0.4in) gives 0.4in/0.2in, and the ink
+           still lands 0.8in/0.6in from the paper edge. max() keeps it sane if
+           someone sets margins wider than the inset, where the column simply
+           narrows instead of scaling. */
+        padding: max(0in, calc(50vh - 4.9in)) max(0in, calc(50% - 3.45in));
         margin: 0;
         box-shadow: none;
     }
