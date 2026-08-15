@@ -30,6 +30,10 @@ function Set-ITGluePassword {
     Skips the tenant lookup when the caller already resolved the organization.
     #>
     [CmdletBinding(SupportsShouldProcess)]
+    # Plaintext by necessity: this writes the password into IT Glue's password vault via its
+    # REST API, which takes it as a JSON string field. Converting to SecureString here would
+    # only be undone before the request is built.
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingUsernameAndPasswordParams', '', Justification = 'UserPrincipalName/Password are the record being written into the IT Glue password vault, not an interactive logon; the API takes the value as a JSON string')]
     param(
         [Parameter(Mandatory)]
         [string]$TenantFilter,

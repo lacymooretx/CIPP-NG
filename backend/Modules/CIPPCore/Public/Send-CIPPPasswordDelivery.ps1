@@ -63,6 +63,11 @@ function Send-CIPPPasswordDelivery {
     the push label.
     #>
     [CmdletBinding()]
+    # The password arrives as plaintext because that is what this function exists to move:
+    # Graph has just generated or reset it, and it has to reach Password Pusher and IT Glue
+    # over HTTPS as a string. A SecureString parameter would be decoded back to plaintext on
+    # the first line and would advertise a protection that is not there.
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingUsernameAndPasswordParams', '', Justification = 'UserPrincipalName/Password are a freshly issued credential being handed to the delivery channels, not an interactive logon prompt; the value must stay plaintext to reach the pwpush and IT Glue APIs')]
     param(
         [Parameter(Mandatory)]
         [string]$TenantFilter,
