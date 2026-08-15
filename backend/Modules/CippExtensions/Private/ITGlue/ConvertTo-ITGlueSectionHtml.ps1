@@ -22,6 +22,14 @@ function ConvertTo-ITGlueSectionHtml {
     .PARAMETER Truncated
         Reference to a list. When truncation happens, a note describing it is added so the
         caller can surface it in the asset's Collection Notes field.
+    .PARAMETER Overflow
+        Reference to a list that receives parts 2..N when MaxParts is greater than 1.
+        Aspendora's own tenant has 802 settings-catalog rows - 54% of them do not fit a
+        single 64KB field - so the big sections are spread over continuation fields rather
+        than truncated. Truncation is the last resort, not the first.
+    .PARAMETER MaxParts
+        Number of fields available for this section, including the first. Rows that still
+        do not fit after the last part are truncated, visibly.
     .FUNCTIONALITY
         Internal
     #>
@@ -32,7 +40,15 @@ function ConvertTo-ITGlueSectionHtml {
 
         [int]$MaxBytes = 60000,
 
-        [System.Collections.Generic.List[object]]$Truncated
+        [System.Collections.Generic.List[object]]$Truncated,
+
+        # Receives parts 2..N when a section needs more than one IT Glue field. The caller
+        # maps them onto continuation traits ("Settings Catalog (continued)"). Part 1 is
+        # always the return value, so single-field callers need not pass this.
+        [System.Collections.Generic.List[string]]$Overflow,
+
+        # How many fields the caller has available for this section, including the first.
+        [int]$MaxParts = 1
     )
 
     function _enc([string]$v) {
@@ -77,17 +93,22 @@ function ConvertTo-ITGlueSectionHtml {
     $NoticeReserve = 320
     $Budget = $MaxBytes - $HeadHtml.Length - $Tail.Length - $NoticeReserve
 
+    $Parts = [System.Collections.Generic.List[string]]::new()
     $Body = [System.Text.StringBuilder]::new()
     $Written = 0
     $PrevCells = $null
-    foreach ($Row in $Rows) {
-        $Cells = @($Row)
+    $Index = 0
+
+    while ($Index -lt $Rows.Count -and $Parts.Count -lt $MaxParts) {
+        $Cells = @($Rows[$Index])
         $RowSb = [System.Text.StringBuilder]::new()
         $null = $RowSb.Append('<tr>')
 
         # Collapse repeated leading columns. A settings-catalog section repeats the policy
         # name and its assignment on every one of its settings; blanking the repeats reads
         # like a grouped table and buys back a large share of the byte budget.
+        # $PrevCells is reset at every part boundary, so a continuation field never opens
+        # with blank cells whose meaning lived in the previous field.
         $StillRepeating = $null -ne $PrevCells
         for ($i = 0; $i -lt $Cells.Count; $i++) {
             $Text = _cell $Cells[$i]
@@ -101,30 +122,46 @@ function ConvertTo-ITGlueSectionHtml {
         $null = $RowSb.Append('</tr>')
         $RowHtml = $RowSb.ToString()
 
-        if (($Body.Length + $RowHtml.Length) -gt $Budget) { break }
+        if (($Body.Length + $RowHtml.Length) -gt $Budget) {
+            # This part is full. Close it and start the next one, unless a single row is
+            # itself too large to ever fit - in which case advancing avoids an infinite loop.
+            if ($Body.Length -eq 0) { $Index++; continue }
+            $Parts.Add($HeadHtml + $Body.ToString() + $Tail)
+            $Body = [System.Text.StringBuilder]::new()
+            $PrevCells = $null
+            continue
+        }
 
         $null = $Body.Append($RowHtml)
         $PrevCells = @($Cells | ForEach-Object { _cell $_ })
         $Written++
+        $Index++
     }
 
-    $Html = $HeadHtml + $Body.ToString() + $Tail
+    if ($Body.Length -gt 0 -or $Parts.Count -eq 0) {
+        $Parts.Add($HeadHtml + $Body.ToString() + $Tail)
+    }
 
     if ($Written -lt $Rows.Count) {
         $Withheld = $Rows.Count - $Written
+        $Where = if ($MaxParts -gt 1) { "the $MaxParts fields available for this section" } else { "IT Glue's 64KB field limit" }
         $Notice = "<p style=""margin:8px 0 0 0;padding:6px 8px;background:#fff4e5;border-left:3px solid #d97706;font-size:12px;"">" +
         "<strong>Truncated:</strong> showing $Written of $($Rows.Count) rows. " +
-        "$Withheld more could not fit IT Glue's 64KB field limit - open the full report in CIPP for the complete list.</p>"
-        $Html += $Notice
+        "$Withheld more could not fit $Where - open the full report in CIPP for the complete list.</p>"
+        $Parts[$Parts.Count - 1] += $Notice
         # $null -ne, not a truthiness test: an empty List[object] is falsy in PowerShell,
         # which would skip the note on exactly the first (and usually only) truncation.
         if ($null -ne $Truncated) {
             $Truncated.Add(@{
                     Section = $Title
-                    Detail  = "Showed $Written of $($Rows.Count) rows; $Withheld withheld to stay under the 64KB field limit."
+                    Detail  = "Showed $Written of $($Rows.Count) rows; $Withheld withheld to stay under $Where."
                 })
         }
     }
 
-    return $Html
+    if ($null -ne $Overflow) {
+        for ($i = 1; $i -lt $Parts.Count; $i++) { $Overflow.Add($Parts[$i]) }
+    }
+
+    return $Parts[0]
 }

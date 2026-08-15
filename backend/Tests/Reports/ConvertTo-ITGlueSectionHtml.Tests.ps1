@@ -60,7 +60,8 @@ Describe 'ConvertTo-ITGlueSectionHtml' {
 
         $Notes.Count | Should -Be 1
         $Notes[0].Section | Should -Be 'Settings Catalog'
-        $Notes[0].Detail | Should -Match 'withheld to stay under the 64KB field limit'
+        $Notes[0].Detail | Should -Match "withheld to stay under IT Glue's 64KB field limit"
+
     }
 
     It 'adds no note when nothing was withheld' {
@@ -155,5 +156,81 @@ Describe 'ConvertTo-ITGlueSectionHtml density' {
         $Notes.Count | Should -Be 0
         $Html | Should -Not -Match 'Truncated:'
         $Html.Length | Should -BeLessThan 65536
+    }
+}
+
+Describe 'ConvertTo-ITGlueSectionHtml continuation fields' {
+    # Truncation is the last resort, not the first. Aspendora's own tenant produced 802
+    # settings-catalog rows and lost 436 of them (54%) to a single 64KB field. Spreading a
+    # section across continuation fields is what makes the documentation complete; these
+    # tests pin that the split is lossless and that each part stands on its own.
+
+    It 'spreads a large section across the parts it is given' {
+        $Overflow = [System.Collections.Generic.List[string]]::new()
+        $Notes = [System.Collections.Generic.List[object]]::new()
+
+        $Part1 = ConvertTo-ITGlueSectionHtml -Section (New-Section 802) -Overflow $Overflow -MaxParts 3 -Truncated $Notes
+
+        $Overflow.Count | Should -BeGreaterThan 0
+        # Every part must independently satisfy the limit - IT Glue checks per field.
+        foreach ($Part in @($Part1) + $Overflow) { $Part.Length | Should -BeLessThan $script:HardLimit }
+    }
+
+    It 'loses no rows when the parts are sufficient' {
+        $Overflow = [System.Collections.Generic.List[string]]::new()
+        $Notes = [System.Collections.Generic.List[object]]::new()
+
+        $Part1 = ConvertTo-ITGlueSectionHtml -Section (New-Section 802) -Overflow $Overflow -MaxParts 3 -Truncated $Notes
+
+        $Notes.Count | Should -Be 0
+        $All = @($Part1) + $Overflow -join ''
+        # 802 body rows plus one header row per part.
+        $Rendered = ([regex]::Matches($All, '<tr>')).Count - (1 + $Overflow.Count)
+        $Rendered | Should -Be 802
+        $All | Should -Not -Match 'Truncated:'
+    }
+
+    It 'repeats the column headers on every continuation part' {
+        $Overflow = [System.Collections.Generic.List[string]]::new()
+        $null = ConvertTo-ITGlueSectionHtml -Section (New-Section 802) -Overflow $Overflow -MaxParts 3
+
+        foreach ($Part in $Overflow) {
+            $Part | Should -Match '<thead>'
+            $Part | Should -Match 'Assigned To'
+        }
+    }
+
+    It 'opens a continuation part with a fully written row, never a collapsed one' {
+        # The repeat-collapse blanks a cell whose value is on the row above. If that state
+        # carried across a part boundary, a continuation field would open with empty cells
+        # whose meaning lived in a different field entirely.
+        $Overflow = [System.Collections.Generic.List[string]]::new()
+        $null = ConvertTo-ITGlueSectionHtml -Section (New-Section 802) -Overflow $Overflow -MaxParts 3
+
+        foreach ($Part in $Overflow) {
+            $FirstRow = ([regex]::Match($Part, '<tbody>(<tr>.*?</tr>)')).Groups[1].Value
+            $FirstRow | Should -Not -Match '<td></td>'
+        }
+    }
+
+    It 'still truncates - visibly, on the last part - when even the parts are not enough' {
+        $Overflow = [System.Collections.Generic.List[string]]::new()
+        $Notes = [System.Collections.Generic.List[object]]::new()
+
+        $Part1 = ConvertTo-ITGlueSectionHtml -Section (New-Section 20000) -Overflow $Overflow -MaxParts 2 -Truncated $Notes
+
+        $Notes.Count | Should -Be 1
+        $Notes[0].Detail | Should -Match 'the 2 fields available for this section'
+        $Part1 | Should -Not -Match 'Truncated:'
+        $Overflow[$Overflow.Count - 1] | Should -Match 'Truncated:'
+    }
+
+    It 'behaves exactly as before when given a single part' {
+        $Notes = [System.Collections.Generic.List[object]]::new()
+        $Html = ConvertTo-ITGlueSectionHtml -Section (New-Section 20) -Truncated $Notes
+
+        $Html | Should -BeOfType [string]
+        $Notes.Count | Should -Be 0
+        ([regex]::Matches($Html, '<tr>')).Count | Should -Be 21
     }
 }

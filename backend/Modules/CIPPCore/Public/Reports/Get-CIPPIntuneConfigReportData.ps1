@@ -276,6 +276,100 @@ function Get-CIPPIntuneConfigReportData {
             'No Autopilot profiles or custom enrollment configurations are present.'
     }
 
+    # ---- RBAC and Scope Tags -------------------------------------------------------
+    # Scope tags silently change which admins see and manage a policy, and delegated Intune
+    # admins are invisible in every other view we have. Neither is in the policy cache, so
+    # these are read live - cheaply, three list calls.
+    Invoke-Section 'RBAC' 'RBAC and Scope Tags' {
+        $r = New-RowList
+
+        $ScopeTags = @()
+        try { $ScopeTags = @(New-GraphGetRequest -uri "$GraphBeta/deviceManagement/roleScopeTags" -tenantid $TenantFilter) } catch {
+            $Notes.Add(@{ Section = 'RBAC and Scope Tags'; Detail = "Scope tags unavailable: $($_.Exception.Message)" })
+        }
+        foreach ($t in $ScopeTags) {
+            $Default = if ($t.isBuiltIn -eq $true) { 'Built-in' } else { 'Custom' }
+            $r.Add(@('Scope Tag', [string]$t.displayName, $Default, [string]$t.description))
+        }
+
+        $RoleDefinitions = @()
+        try { $RoleDefinitions = @(New-GraphGetRequest -uri "$GraphBeta/deviceManagement/roleDefinitions" -tenantid $TenantFilter) } catch {
+            $Notes.Add(@{ Section = 'RBAC and Scope Tags'; Detail = "Role definitions unavailable: $($_.Exception.Message)" })
+        }
+        # Built-in roles are the same in every tenant; only custom roles document anything.
+        foreach ($d in ($RoleDefinitions | Where-Object { $_.isBuiltIn -ne $true })) {
+            $r.Add(@('Custom Role', [string]$d.displayName, 'Custom role definition', [string]$d.description))
+        }
+
+        $Assignments = @()
+        try { $Assignments = @(New-GraphGetRequest -uri "$GraphBeta/deviceManagement/roleAssignments" -tenantid $TenantFilter) } catch {
+            $Notes.Add(@{ Section = 'RBAC and Scope Tags'; Detail = "Role assignments unavailable: $($_.Exception.Message)" })
+        }
+        foreach ($a in $Assignments) {
+            $Scope = if ($a.scopeType) { [string]$a.scopeType } else { '' }
+            $r.Add(@('Role Assignment', [string]$a.displayName, $Scope, [string]$a.description))
+        }
+
+        $CustomRoleCount = @($RoleDefinitions | Where-Object { $_.isBuiltIn -ne $true }).Count
+        $State.Count += (@($ScopeTags).Count + $CustomRoleCount + @($Assignments).Count)
+        Add-Section 'RBAC' 'RBAC and Scope Tags' 'info' `
+            "$(@($ScopeTags).Count) scope tags, $CustomRoleCount custom roles, $(@($Assignments).Count) role assignments. Built-in roles are omitted - they are identical in every tenant." `
+            @('Type', 'Name', 'Detail', 'Description') $r `
+            'No scope tags, custom roles or delegated role assignments. Intune administration is not delegated in this tenant.'
+    }
+
+    # ---- Additional Configurations -------------------------------------------------
+    # The long tail: real configuration that lives outside the policy families CIPP caches.
+    # Registry-driven so adding an area is one row, and fail-soft per endpoint - a 403 on
+    # one of these must never look like "the tenant has none of this".
+    Invoke-Section 'AdditionalConfigurations' 'Additional Configurations' {
+        $Registry = @(
+            @{ Label = 'Policy Set'; Path = '/deviceAppManagement/policySets' }
+            @{ Label = 'Terms and Conditions'; Path = '/deviceManagement/termsAndConditions' }
+            @{ Label = 'Notification Template'; Path = '/deviceManagement/notificationMessageTemplates' }
+            @{ Label = 'Compliance Script'; Path = '/deviceManagement/deviceComplianceScripts' }
+            @{ Label = 'macOS Custom Attribute'; Path = '/deviceManagement/deviceCustomAttributeShellScripts' }
+            @{ Label = 'Microsoft Tunnel Configuration'; Path = '/deviceManagement/microsoftTunnelConfigurations' }
+            @{ Label = 'Microsoft Tunnel Site'; Path = '/deviceManagement/microsoftTunnelSites' }
+            @{ Label = 'Hardware Configuration'; Path = '/deviceManagement/hardwareConfigurations' }
+            @{ Label = 'Mobile Threat Defense Connector'; Path = '/deviceManagement/mobileThreatDefenseConnectors'; Name = 'partnerState' }
+            @{ Label = 'Device Management Partner'; Path = '/deviceManagement/deviceManagementPartners'; Name = 'partnerAppType' }
+            @{ Label = 'Remote Assistance Partner'; Path = '/deviceManagement/remoteAssistancePartners' }
+            @{ Label = 'iOS LOB Provisioning Profile'; Path = '/deviceAppManagement/iosLobAppProvisioningConfigurations' }
+            @{ Label = 'VPP Token'; Path = '/deviceAppManagement/vppTokens'; Name = 'appleId' }
+        )
+
+        $r = New-RowList
+        $Found = 0
+        foreach ($Entry in $Registry) {
+            try {
+                $Items = @(New-GraphGetRequest -uri "$GraphBeta$($Entry.Path)" -tenantid $TenantFilter)
+                foreach ($i in $Items) {
+                    $NameProp = if ($Entry.Name) { $Entry.Name } else { 'displayName' }
+                    $Name = if ($i.$NameProp) { [string]$i.$NameProp } elseif ($i.displayName) { [string]$i.displayName } else { '(unnamed)' }
+                    $Modified = if ($i.lastModifiedDateTime) {
+                        try { ([datetime]$i.lastModifiedDateTime).ToString('yyyy-MM-dd') } catch { '' }
+                    } else { '' }
+                    $r.Add(@($Entry.Label, $Name, [string]$i.description, $Modified))
+                    $Found++
+                }
+            } catch {
+                # A 404 on these endpoints usually means the feature is not enabled in the
+                # tenant, which is not a failure. Anything else is worth recording.
+                $Message = $_.Exception.Message
+                if ($Message -notmatch '404|NotFound|ResourceNotFound') {
+                    $Notes.Add(@{ Section = 'Additional Configurations'; Detail = "$($Entry.Label) ($($Entry.Path)): $Message" })
+                }
+            }
+        }
+
+        $State.Count += $Found
+        Add-Section 'AdditionalConfigurations' 'Additional Configurations' 'info' `
+            "$Found objects across $($Registry.Count) additional configuration areas." `
+            @('Area', 'Name', 'Description', 'Modified') $r `
+            'None of the additional configuration areas are in use in this tenant.'
+    }
+
     # ---- executive findings --------------------------------------------------------
     $ComplianceCount = @(Select-Family @('deviceCompliancePolicies')).Count
     if ($ComplianceCount -eq 0) {
