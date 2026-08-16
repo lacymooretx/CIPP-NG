@@ -71,24 +71,36 @@ function Sync-CIPPTenantGroupsFromConnectWise {
     # fields=id,name,status,types and every company came back unusable, so the sync would
     # have emptied both groups - caught by running it in WhatIf first. This is the same
     # call shape Get-ConnectWiseMapping already uses successfully.
-    $Companies = @{}
+    # Collect into a List with AddRange, exactly as Get-ConnectWiseMapping does. A first
+    # cut used `foreach ($c in @(Invoke-RestMethod ...))` and the loop ran ONCE with $c
+    # bound to the whole 44-company collection, so the hashtable got a single key made of
+    # every id space-joined ("250 19296 19297 ...") and every lookup missed. AddRange
+    # flattens what the pipeline would not.
+    $AllCompanies = [System.Collections.Generic.List[object]]::new()
     $Page = 1
     $PageSize = 1000
+    $LastCount = 0
     do {
         $Uri = "$BaseURL/company/companies?pageSize=$PageSize&page=$Page"
         try {
-            $Batch = @(Invoke-RestMethod -AllowInsecureRedirect -Uri $Uri -Method GET -Headers $Headers)
+            $Batch = Invoke-RestMethod -AllowInsecureRedirect -Uri $Uri -Method GET -Headers $Headers
         } catch {
             $Result.Errors.Add("ConnectWise company fetch failed on page ${Page}: $($_.Exception.Message)")
-            $Batch = @()
+            $Batch = $null
         }
-        $Result.Diagnostics.Add("page $Page returned $($Batch.Count) companies")
-        foreach ($Company in $Batch) { $Companies["$($Company.id)"] = $Company }
+        $LastCount = 0
+        if ($Batch) {
+            $AllCompanies.AddRange(@($Batch))
+            $LastCount = @($Batch).Count
+        }
         $Page++
-    } while ($Batch.Count -eq $PageSize)
+    } while ($LastCount -eq $PageSize)
 
-    $Result.Diagnostics.Add("company key count: $($Companies.Count)")
-    $Result.Diagnostics.Add("sample keys: $((@($Companies.Keys) | Select-Object -First 8) -join ', ')")
+    $Companies = @{}
+    foreach ($Company in $AllCompanies) {
+        if ($Company.id) { $Companies["$($Company.id)"] = $Company }
+    }
+    $Result.Diagnostics.Add("fetched $($AllCompanies.Count) companies, $($Companies.Count) keyed")
 
     if ($Companies.Count -eq 0) {
         # Never reconcile against an empty picture: that would remove every member of both
