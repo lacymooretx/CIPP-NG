@@ -1090,6 +1090,17 @@
       },
       {
         "type": "switch",
+        "name": "ITGlue.ImportTenantOverview",
+        "label": "Document tenant overview in IT Glue",
+        "condition": {
+          "field": "ITGlue.Enabled",
+          "compareType": "is",
+          "compareValue": true,
+          "action": "disable"
+        }
+      },
+      {
+        "type": "switch",
         "name": "ITGlue.ImportEmailSecurityConfig",
         "label": "Document email security configuration in IT Glue",
         "condition": {

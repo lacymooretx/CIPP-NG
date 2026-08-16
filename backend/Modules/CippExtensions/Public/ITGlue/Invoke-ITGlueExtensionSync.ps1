@@ -131,6 +131,17 @@ function Invoke-ITGlueExtensionSync {
         }
 
         # ============================================================
+        # TENANT OVERVIEW DOCUMENT (optional)
+        # ============================================================
+        if ($ITGConfig.ImportTenantOverview -eq $true) {
+            try {
+                Sync-ITGlueTenantOverview -OrgId $OrgId -Tenant $Tenant -CompanyResult $CompanyResult
+            } catch {
+                $CompanyResult.Errors.Add("Tenant overview: $($_.Exception.Message)")
+            }
+        }
+
+        # ============================================================
         # Log results
         # ============================================================
         $LogMessage = "IT Glue sync complete for $($Tenant.displayName): $($CompanyResult.Users) users, $($CompanyResult.Devices) devices, $($CompanyResult.Errors.Count) errors"
@@ -977,6 +988,115 @@ function Get-ITGlueEmailSecurityFlexAssetTypeId {
         if ($Created.data.id) {
             $script:ITGlueEmailSecurityFlexAssetTypeId = [int]$Created.data.id
             return $script:ITGlueEmailSecurityFlexAssetTypeId
+        }
+    } catch {
+        Write-Warning ("Failed to create '{0}' flex asset type: {1}" -f $TypeName, $_.Exception.Message)
+    }
+    return $null
+}
+
+# ---------- TENANT OVERVIEW ----------
+
+function Sync-ITGlueTenantOverview {
+    <#
+        .SYNOPSIS
+        Write one tenant's overview - who they are, whether we manage them, what they pay
+        for - into IT Glue.
+        .DESCRIPTION
+        Phase 5, and the record a tech opens first. Uses the same shared helpers as the
+        other documents, plus one extra scalar trait: Management Status is promoted out of
+        the Tenant Details table into its own show-in-list field, so the managed/unmanaged
+        split is visible in the IT Glue asset list without opening a record.
+
+        No continuation fields: none of these sections approach the 64KB cap.
+    #>
+    param($OrgId, $Tenant, $CompanyResult)
+
+    $TypeId = Get-ITGlueTenantOverviewFlexAssetTypeId
+    if (-not $TypeId) {
+        $CompanyResult.Errors.Add('Tenant overview: could not resolve or create the CIPP Tenant Overview flex asset type.')
+        return
+    }
+
+    $Model = Get-CIPPTenantOverviewReportData -TenantFilter $Tenant.defaultDomainName
+    if (-not $Model) {
+        $CompanyResult.Errors.Add('Tenant overview: report model came back empty.')
+        return
+    }
+
+    $TraitMap = @{
+        'TenantDetails'      = 'tenant-details'
+        'Domains'            = 'domains'
+        'Licensing'          = 'licensing'
+        'Sharing'            = 'sharing-and-collaboration'
+        'StandardsAlignment' = 'standards-alignment'
+    }
+
+    $TruncationNotes = [System.Collections.Generic.List[object]]::new()
+    $Traits = Get-ITGlueDocumentIdentityTraits -Model $Model -CountTrait 'object-count'
+    $SectionTraits = ConvertTo-ITGlueSectionTraits -Sections $Model.Sections `
+        -TraitMap $TraitMap -Truncated $TruncationNotes
+    foreach ($Name in $SectionTraits.Keys) { $Traits[$Name] = $SectionTraits[$Name] }
+
+    # Promote management status to its own column so the asset list is sortable by it.
+    $StatusFinding = @($Model.Findings) | Where-Object { $_.Title -eq 'Management status' } | Select-Object -First 1
+    $Traits['management-status'] = if ($StatusFinding.Detail -match '^This tenant is in the Managed') { 'Managed' }
+    elseif ($StatusFinding.Detail -match '^This tenant is in the Unmanaged') { 'Unmanaged' }
+    else { 'Unclassified' }
+
+    $Traits['collection-notes'] = Get-ITGlueCollectionNotesHtml -Model $Model -Truncations $TruncationNotes -SourceLabel 'tenant, licensing and standards alignment'
+
+    Set-ITGlueDocumentAsset -OrgId $OrgId -TypeId $TypeId -Traits $Traits `
+        -Label 'Tenant overview' -ObjectCount $Model.ObjectCount `
+        -TruncationCount $TruncationNotes.Count -Tenant $Tenant -CompanyResult $CompanyResult
+}
+
+function Get-ITGlueTenantOverviewFlexAssetTypeId {
+    if ($script:ITGlueTenantOverviewFlexAssetTypeId) { return $script:ITGlueTenantOverviewFlexAssetTypeId }
+
+    $TypeName = 'CIPP Tenant Overview'
+    $AllTypes = Invoke-ITGlueRequest -Path '/flexible_asset_types' -AllPages
+    $Match = $AllTypes | Where-Object { $_.attributes.name -eq $TypeName } | Select-Object -First 1
+    if ($Match) {
+        $script:ITGlueTenantOverviewFlexAssetTypeId = [int]$Match.id
+        return $script:ITGlueTenantOverviewFlexAssetTypeId
+    }
+
+    $CreatePayload = @{
+        data = @{
+            type          = 'flexible_asset_types'
+            attributes    = @{
+                name           = $TypeName
+                description    = 'Microsoft 365 tenant overview synced by CIPP. One record per client.'
+                icon           = 'flag'
+                enabled        = $true
+                'show-in-menu' = $true
+            }
+            relationships = @{
+                'flexible-asset-fields' = @{
+                    data = @(
+                        @{ type = 'flexible_asset_fields'; attributes = @{ order = 1; name = 'Tenant'; kind = 'Text'; required = $true; 'show-in-list' = $true; 'use-for-title' = $true } }
+                        @{ type = 'flexible_asset_fields'; attributes = @{ order = 2; name = 'Tenant Domain'; kind = 'Text'; required = $false; 'show-in-list' = $true } }
+                        @{ type = 'flexible_asset_fields'; attributes = @{ order = 3; name = 'Management Status'; kind = 'Text'; required = $false; 'show-in-list' = $true } }
+                        @{ type = 'flexible_asset_fields'; attributes = @{ order = 4; name = 'Last Synced'; kind = 'Text'; required = $false; 'show-in-list' = $true } }
+                        @{ type = 'flexible_asset_fields'; attributes = @{ order = 5; name = 'Object Count'; kind = 'Text'; required = $false; 'show-in-list' = $true } }
+                        @{ type = 'flexible_asset_fields'; attributes = @{ order = 6; name = 'Tenant Details'; kind = 'Textbox'; required = $false } }
+                        @{ type = 'flexible_asset_fields'; attributes = @{ order = 7; name = 'Domains'; kind = 'Textbox'; required = $false } }
+                        @{ type = 'flexible_asset_fields'; attributes = @{ order = 8; name = 'Licensing'; kind = 'Textbox'; required = $false } }
+                        @{ type = 'flexible_asset_fields'; attributes = @{ order = 9; name = 'Sharing and Collaboration'; kind = 'Textbox'; required = $false } }
+                        @{ type = 'flexible_asset_fields'; attributes = @{ order = 10; name = 'Standards Alignment'; kind = 'Textbox'; required = $false } }
+                        @{ type = 'flexible_asset_fields'; attributes = @{ order = 11; name = 'Collection Notes'; kind = 'Textbox'; required = $false } }
+                    )
+                }
+            }
+        }
+    }
+
+    try {
+        $Created = Invoke-ITGlueRequest -Path '/flexible_asset_types' -Method POST -Body $CreatePayload -Raw
+        if ($Created.data.id) {
+            $script:ITGlueTenantOverviewFlexAssetTypeId = [int]$Created.data.id
+            return $script:ITGlueTenantOverviewFlexAssetTypeId
         }
     } catch {
         Write-Warning ("Failed to create '{0}' flex asset type: {1}" -f $TypeName, $_.Exception.Message)

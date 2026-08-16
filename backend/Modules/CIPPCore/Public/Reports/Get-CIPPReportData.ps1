@@ -26,6 +26,7 @@ function Get-CIPPReportData {
         'IntuneConfig' { return Get-CIPPIntuneConfigReportData -TenantFilter $TenantFilter }
         'IdentityConfig' { return Get-CIPPIdentityConfigReportData -TenantFilter $TenantFilter }
         'EmailSecurity' { return Get-CIPPEmailSecurityReportData -TenantFilter $TenantFilter }
+        'TenantOverview' { return Get-CIPPTenantOverviewReportData -TenantFilter $TenantFilter }
         'Licenses' { return Get-CIPPLicenseReportData -TenantFilter $TenantFilter }
         'AdminTracker' { return Get-CIPPAdminReportData -TenantFilter $TenantFilter }
         'DomainInfo' { return Get-CIPPDomainReportData -TenantFilter $TenantFilter }
