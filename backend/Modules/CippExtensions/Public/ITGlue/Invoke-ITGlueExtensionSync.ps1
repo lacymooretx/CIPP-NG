@@ -1154,6 +1154,31 @@ function Sync-ITGlueStorageUsage {
         return
     }
 
+    # Weekly, riding the nightly extension task. Checked here rather than by giving this
+    # document its own schedule, because the ITGlue sync is one task per tenant and splitting
+    # it would double the scheduling surface for one document.
+    #
+    # Storage is the only one of the six documents whose subject is volatile - the others
+    # describe configuration. Rewriting a byte count nightly churns IT Glue's revision history
+    # with a number that is stale on arrival, and it regenerates an expensive report (Graph
+    # plus two table scans) six times a week for no reader benefit.
+    $MinDaysBetweenSyncs = 6
+    try {
+        $Existing = Invoke-ITGlueRequest -Path "/flexible_assets?filter[organization-id]=$OrgId&filter[flexible-asset-type-id]=$TypeId" -AllPages
+        $Asset = $Existing | Select-Object -First 1
+        if ($Asset.attributes.'updated-at') {
+            $AgeDays = ((Get-Date).ToUniversalTime() - ([datetime]$Asset.attributes.'updated-at').ToUniversalTime()).TotalDays
+            if ($AgeDays -lt $MinDaysBetweenSyncs) {
+                $CompanyResult.Logs.Add(("Storage and usage: skipped, record refreshed {0:N1} day(s) ago (weekly cadence)." -f $AgeDays))
+                return
+            }
+        }
+    } catch {
+        # Cannot tell how old the record is - write it. A duplicate refresh is harmless;
+        # never refreshing because a lookup failed is not.
+        $CompanyResult.Logs.Add("Storage and usage: could not read existing record age, syncing anyway. $($_.Exception.Message)")
+    }
+
     $Model = Get-CIPPStorageUsageReportData -TenantFilter $Tenant.defaultDomainName
     if (-not $Model) {
         $CompanyResult.Errors.Add('Storage and usage: report model came back empty.')

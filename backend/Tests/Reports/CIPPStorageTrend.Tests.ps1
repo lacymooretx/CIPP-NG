@@ -459,3 +459,32 @@ Describe 'Get-CIPPMailboxQuotaRisk' {
         (Get-CIPPMailboxQuotaRisk -Mailboxes $null).Checked | Should -Be 0
     }
 }
+
+Describe 'Format-Size (lifted verbatim from Get-CIPPStorageUsageReportData)' {
+    # Copied rather than imported: it is a local function inside the report builder, which
+    # is the house pattern for these formatter tests. Keep in step with the original.
+    BeforeAll {
+        function Format-Size([double]$Bytes) {
+            $Sign = if ($Bytes -lt 0) { '-' } else { '' }
+            $Abs = [math]::Abs($Bytes)
+            if ($Abs -ge 1TB) { return '{0}{1:N2} TB' -f $Sign, ($Abs / 1TB) }
+            if ($Abs -ge 1GB) { return '{0}{1:N2} GB' -f $Sign, ($Abs / 1GB) }
+            if ($Abs -ge 1MB) { return '{0}{1:N1} MB' -f $Sign, ($Abs / 1MB) }
+            return '{0}{1:N0} KB' -f $Sign, ($Abs / 1KB)
+        }
+    }
+
+    It 'picks the unit from the magnitude, not the signed value' {
+        # Shipped wrong once: a negative fails every -ge threshold and falls through to KB,
+        # so Main Properties' 369 MB reduction read "-377,698 KB" in its IT Glue record.
+        Format-Size (-387 * 1MB) | Should -Be '-387.0 MB'
+        Format-Size (-2.5 * 1GB) | Should -Be '-2.50 GB'
+        Format-Size (-3 * 1TB) | Should -Be '-3.00 TB'
+    }
+
+    It 'formats positives without a sign' {
+        Format-Size (2.82 * 1TB) | Should -Be '2.82 TB'
+        Format-Size (67.74 * 1GB) | Should -Be '67.74 GB'
+        Format-Size 0 | Should -Be '0 KB'
+    }
+}

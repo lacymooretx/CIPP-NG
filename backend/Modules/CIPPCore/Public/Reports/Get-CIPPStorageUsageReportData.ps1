@@ -61,10 +61,15 @@ function Get-CIPPStorageUsageReportData {
         }
     }
     function Format-Size([double]$Bytes) {
-        if ($Bytes -ge 1TB) { return '{0:N2} TB' -f ($Bytes / 1TB) }
-        if ($Bytes -ge 1GB) { return '{0:N2} GB' -f ($Bytes / 1GB) }
-        if ($Bytes -ge 1MB) { return '{0:N1} MB' -f ($Bytes / 1MB) }
-        return '{0:N0} KB' -f ($Bytes / 1KB)
+        # Pick the unit from the MAGNITUDE, then reapply the sign. Comparing a negative
+        # value against the thresholds directly fails every one and falls through to KB, so
+        # a 369 MB reduction rendered as "-377,698 KB" in a client-facing document.
+        $Sign = if ($Bytes -lt 0) { '-' } else { '' }
+        $Abs = [math]::Abs($Bytes)
+        if ($Abs -ge 1TB) { return '{0}{1:N2} TB' -f $Sign, ($Abs / 1TB) }
+        if ($Abs -ge 1GB) { return '{0}{1:N2} GB' -f $Sign, ($Abs / 1GB) }
+        if ($Abs -ge 1MB) { return '{0}{1:N1} MB' -f $Sign, ($Abs / 1MB) }
+        return '{0}{1:N0} KB' -f $Sign, ($Abs / 1KB)
     }
     function Format-Rate([double]$BytesPerDay) {
         $Sign = if ($BytesPerDay -lt 0) { '-' } else { '+' }
