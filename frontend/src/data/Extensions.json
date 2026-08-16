@@ -1090,6 +1090,17 @@
       },
       {
         "type": "switch",
+        "name": "ITGlue.ImportIdentityConfig",
+        "label": "Document identity & access configuration in IT Glue",
+        "condition": {
+          "field": "ITGlue.Enabled",
+          "compareType": "is",
+          "compareValue": true,
+          "action": "disable"
+        }
+      },
+      {
+        "type": "switch",
         "name": "ITGlue.ImportIntuneConfig",
         "label": "Document Intune configuration in IT Glue",
         "condition": {

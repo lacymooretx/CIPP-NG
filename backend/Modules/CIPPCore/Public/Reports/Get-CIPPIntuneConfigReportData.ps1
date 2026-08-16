@@ -152,9 +152,25 @@ function Get-CIPPIntuneConfigReportData {
     # ---- Security Baselines and App Protection -------------------------------------
     Invoke-Section 'SecurityBaselines' 'Security Baselines and App Protection' {
         $Baselines = Select-Family @('Intents')
+        # App protection comes from a DB cache that Set-CIPPDBCacheIntuneAppProtectionPolicies
+        # skips for any tenant failing its Intune licence check - so an empty cache is the
+        # normal state on most tenants, not a fault. Falling back to Graph keeps the document
+        # correct regardless of cache state, and lets "none configured" be told apart from
+        # "could not read", which a bare cache miss cannot do.
         $Protection = @()
-        try { $Protection = @(Get-CIPPIntuneAppProtectionPolicyReport -TenantFilter $TenantFilter) } catch {
-            $Notes.Add(@{ Section = 'Security Baselines and App Protection'; Detail = "App protection policies unavailable: $($_.Exception.Message)" })
+        try { $Protection = @(Get-CIPPIntuneAppProtectionPolicyReport -TenantFilter $TenantFilter) } catch { $Protection = @() }
+        if ($Protection.Count -eq 0) {
+            try {
+                $Protection = @(New-GraphGetRequest -uri "$GraphBeta/deviceAppManagement/managedAppPolicies?`$orderby=displayName" -tenantid $TenantFilter)
+            } catch {
+                $Message = $_.Exception.Message
+                $Detail = if ($Message -match '403|Forbidden|license|Unauthorized') {
+                    "App protection policies could not be read - the tenant appears not to be licensed for them ($Message)."
+                } else {
+                    "App protection policies could not be read: $Message"
+                }
+                $Notes.Add(@{ Section = 'Security Baselines and App Protection'; Detail = $Detail })
+            }
         }
         $r = New-RowList
         foreach ($p in $Baselines) {
@@ -354,10 +370,14 @@ function Get-CIPPIntuneConfigReportData {
                     $Found++
                 }
             } catch {
-                # A 404 on these endpoints usually means the feature is not enabled in the
-                # tenant, which is not a failure. Anything else is worth recording.
+                # These endpoints answer for features the tenant may never have turned on,
+                # and they are inconsistent about how they say so: Autopilot-era services
+                # 404, the RemoteAssist proxy returns BadRequest, VPP returns UnknownError.
+                # All three mean "not set up here", which is not a collection failure.
+                # Anything else IS recorded - a 403 must never read as "the tenant has none".
                 $Message = $_.Exception.Message
-                if ($Message -notmatch '404|NotFound|ResourceNotFound') {
+                $NotConfigured = '404|NotFound|ResourceNotFound|BadRequest|UnknownError'
+                if ($Message -notmatch $NotConfigured) {
                     $Notes.Add(@{ Section = 'Additional Configurations'; Detail = "$($Entry.Label) ($($Entry.Path)): $Message" })
                 }
             }

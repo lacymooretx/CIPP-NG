@@ -1,4 +1,4 @@
-function ConvertTo-ITGlueIntuneTraits {
+function ConvertTo-ITGlueSectionTraits {
     <#
     .SYNOPSIS
         Map report-model sections onto IT Glue flexible-asset traits.

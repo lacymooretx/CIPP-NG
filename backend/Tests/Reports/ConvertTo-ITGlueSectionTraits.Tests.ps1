@@ -11,7 +11,7 @@
 BeforeAll {
     $RepoRoot = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $PSCommandPath))
     . (Join-Path $RepoRoot 'Modules/CippExtensions/Private/ITGlue/ConvertTo-ITGlueSectionHtml.ps1')
-    . (Join-Path $RepoRoot 'Modules/CippExtensions/Private/ITGlue/ConvertTo-ITGlueIntuneTraits.ps1')
+    . (Join-Path $RepoRoot 'Modules/CippExtensions/Private/ITGlue/ConvertTo-ITGlueSectionTraits.ps1')
 
     # The real maps from Sync-ITGlueIntuneConfig.
     $script:TraitMap = @{
@@ -40,13 +40,13 @@ BeforeAll {
     }
 }
 
-Describe 'ConvertTo-ITGlueIntuneTraits' {
+Describe 'ConvertTo-ITGlueSectionTraits' {
 
     It 'maps a section with no continuation fields without throwing' {
         # The exact production failure: RBAC has no entry in OverflowMap.
         $Sections = @((New-TestSection 'RBAC' 'RBAC and Scope Tags' 3))
 
-        { ConvertTo-ITGlueIntuneTraits -Sections $Sections -TraitMap $script:TraitMap -OverflowMap $script:OverflowMap } |
+        { ConvertTo-ITGlueSectionTraits -Sections $Sections -TraitMap $script:TraitMap -OverflowMap $script:OverflowMap } |
             Should -Not -Throw
     }
 
@@ -57,7 +57,7 @@ Describe 'ConvertTo-ITGlueIntuneTraits' {
             (New-TestSection 'RBAC' 'RBAC and Scope Tags' 5),
             (New-TestSection 'AdditionalConfigurations' 'Additional Configurations' 5)
         )
-        $Traits = ConvertTo-ITGlueIntuneTraits -Sections $Sections -TraitMap $script:TraitMap -OverflowMap $script:OverflowMap
+        $Traits = ConvertTo-ITGlueSectionTraits -Sections $Sections -TraitMap $script:TraitMap -OverflowMap $script:OverflowMap
 
         foreach ($Key in $Traits.Keys) {
             $Key | Should -Not -BeNullOrEmpty
@@ -67,7 +67,7 @@ Describe 'ConvertTo-ITGlueIntuneTraits' {
 
     It 'writes exactly one trait for a section with no continuation fields' {
         $Sections = @((New-TestSection 'CompliancePolicies' 'Compliance Policies' 4))
-        $Traits = ConvertTo-ITGlueIntuneTraits -Sections $Sections -TraitMap $script:TraitMap -OverflowMap $script:OverflowMap
+        $Traits = ConvertTo-ITGlueSectionTraits -Sections $Sections -TraitMap $script:TraitMap -OverflowMap $script:OverflowMap
 
         $Traits.Keys.Count | Should -Be 1
         $Traits.ContainsKey('compliance-policies') | Should -BeTrue
@@ -75,7 +75,7 @@ Describe 'ConvertTo-ITGlueIntuneTraits' {
 
     It 'fills continuation traits for a section that needs them' {
         $Sections = @((New-TestSection 'SettingsCatalog' 'Settings Catalog' 900))
-        $Traits = ConvertTo-ITGlueIntuneTraits -Sections $Sections -TraitMap $script:TraitMap -OverflowMap $script:OverflowMap
+        $Traits = ConvertTo-ITGlueSectionTraits -Sections $Sections -TraitMap $script:TraitMap -OverflowMap $script:OverflowMap
 
         $Traits.ContainsKey('settings-catalog') | Should -BeTrue
         $Traits.ContainsKey('settings-catalog-continued') | Should -BeTrue
@@ -85,7 +85,7 @@ Describe 'ConvertTo-ITGlueIntuneTraits' {
 
     It 'blanks unused continuation traits so a shrinking tenant leaves no stale rows' {
         $Sections = @((New-TestSection 'SettingsCatalog' 'Settings Catalog' 3))
-        $Traits = ConvertTo-ITGlueIntuneTraits -Sections $Sections -TraitMap $script:TraitMap -OverflowMap $script:OverflowMap
+        $Traits = ConvertTo-ITGlueSectionTraits -Sections $Sections -TraitMap $script:TraitMap -OverflowMap $script:OverflowMap
 
         # Present, and empty - not absent, which would leave last run's content in IT Glue.
         $Traits.ContainsKey('settings-catalog-continued') | Should -BeTrue
@@ -95,7 +95,7 @@ Describe 'ConvertTo-ITGlueIntuneTraits' {
 
     It 'maps a full nine-section model to the expected trait names' {
         $Sections = @($script:TraitMap.Keys | ForEach-Object { New-TestSection $_ $_ 2 })
-        $Traits = ConvertTo-ITGlueIntuneTraits -Sections $Sections -TraitMap $script:TraitMap -OverflowMap $script:OverflowMap
+        $Traits = ConvertTo-ITGlueSectionTraits -Sections $Sections -TraitMap $script:TraitMap -OverflowMap $script:OverflowMap
 
         # 9 sections + 2 continuation fields.
         $Traits.Keys.Count | Should -Be 11
@@ -104,24 +104,24 @@ Describe 'ConvertTo-ITGlueIntuneTraits' {
 
     It 'skips unknown sections rather than inventing a trait for them' {
         $Sections = @((New-TestSection 'SomethingNew' 'Future Section' 2))
-        $Traits = ConvertTo-ITGlueIntuneTraits -Sections $Sections -TraitMap $script:TraitMap -OverflowMap $script:OverflowMap
+        $Traits = ConvertTo-ITGlueSectionTraits -Sections $Sections -TraitMap $script:TraitMap -OverflowMap $script:OverflowMap
         $Traits.Keys.Count | Should -Be 0
     }
 
     It 'tolerates a null section list and null elements' {
-        { ConvertTo-ITGlueIntuneTraits -Sections $null -TraitMap $script:TraitMap } | Should -Not -Throw
-        { ConvertTo-ITGlueIntuneTraits -Sections @($null) -TraitMap $script:TraitMap } | Should -Not -Throw
+        { ConvertTo-ITGlueSectionTraits -Sections $null -TraitMap $script:TraitMap } | Should -Not -Throw
+        { ConvertTo-ITGlueSectionTraits -Sections @($null) -TraitMap $script:TraitMap } | Should -Not -Throw
     }
 
     It 'works with no OverflowMap supplied at all' {
         $Sections = @((New-TestSection 'SettingsCatalog' 'Settings Catalog' 5))
-        { ConvertTo-ITGlueIntuneTraits -Sections $Sections -TraitMap $script:TraitMap } | Should -Not -Throw
+        { ConvertTo-ITGlueSectionTraits -Sections $Sections -TraitMap $script:TraitMap } | Should -Not -Throw
     }
 
     It 'collects truncation notes from the sections it renders' {
         $Notes = [System.Collections.Generic.List[object]]::new()
         $Sections = @((New-TestSection 'CompliancePolicies' 'Compliance Policies' 20000))
-        $null = ConvertTo-ITGlueIntuneTraits -Sections $Sections -TraitMap $script:TraitMap -OverflowMap $script:OverflowMap -Truncated $Notes
+        $null = ConvertTo-ITGlueSectionTraits -Sections $Sections -TraitMap $script:TraitMap -OverflowMap $script:OverflowMap -Truncated $Notes
 
         $Notes.Count | Should -Be 1
         $Notes[0].Section | Should -Be 'Compliance Policies'
