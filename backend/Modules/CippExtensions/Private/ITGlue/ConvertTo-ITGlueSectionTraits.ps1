@@ -48,8 +48,18 @@ function ConvertTo-ITGlueSectionTraits {
         $Key = [string]$Section.Key
         if (-not $Key -or -not $TraitMap.ContainsKey($Key)) { continue }
 
-        # ContainsKey, not @($OverflowMap[$Key]) - see the note above.
-        $ContinuationFields = if ($OverflowMap.ContainsKey($Key)) { @($OverflowMap[$Key]) } else { @() }
+        # Two PowerShell traps in one line, both of which shipped:
+        #  1. ContainsKey, not @($OverflowMap[$Key]) - a hashtable miss yields a
+        #     one-element array containing $null, not an empty array.
+        #  2. [string[]] and a plain assignment, NOT `$x = if (...) { @(...) }` - the
+        #     output of an `if` goes through the pipeline, which UNROLLS a single-element
+        #     array to its element. A one-entry overflow list then became a bare string,
+        #     and $ContinuationFields[0] returned its first CHARACTER, producing a trait
+        #     keyed 'c'. Two-entry lists survived, so the Intune tests never caught it.
+        [string[]]$ContinuationFields = @()
+        if ($OverflowMap.ContainsKey($Key)) {
+            [string[]]$ContinuationFields = @($OverflowMap[$Key])
+        }
 
         $Overflow = [System.Collections.Generic.List[string]]::new()
         $Traits[$TraitMap[$Key]] = ConvertTo-ITGlueSectionHtml -Section $Section `

@@ -127,3 +127,45 @@ Describe 'ConvertTo-ITGlueSectionTraits' {
         $Notes[0].Section | Should -Be 'Compliance Policies'
     }
 }
+
+Describe 'ConvertTo-ITGlueSectionTraits with a single continuation field' {
+    # The Intune document has TWO continuation fields; the Identity document has ONE. That
+    # difference alone broke production: `$x = if (...) { @($map[$key]) }` sends the array
+    # through the pipeline, which UNROLLS a single-element array to its element. The
+    # one-entry list became a bare string, $ContinuationFields[0] returned its first
+    # CHARACTER, and the traits hashtable gained a key 'c' of type [char] - which
+    # ConvertTo-Json rejects with "Keys must be strings", failing all 9 tenants.
+    #
+    # Every existing test used the two-entry Intune map and passed throughout.
+
+    BeforeAll {
+        $script:OneField = @{ 'ConditionalAccess' = @('conditional-access-policies-continued') }
+        $script:OneMap = @{ 'ConditionalAccess' = 'conditional-access-policies' }
+    }
+
+    It 'produces only string keys' {
+        $Traits = ConvertTo-ITGlueSectionTraits -Sections @((New-TestSection 'ConditionalAccess' 'CA' 3)) `
+            -TraitMap $script:OneMap -OverflowMap $script:OneField
+
+        foreach ($Key in $Traits.Keys) {
+            $Key | Should -BeOfType [string] -Because "a [char] key means the field list was unrolled to a string"
+        }
+    }
+
+    It 'names the continuation trait in full, not by its first character' {
+        $Traits = ConvertTo-ITGlueSectionTraits -Sections @((New-TestSection 'ConditionalAccess' 'CA' 3)) `
+            -TraitMap $script:OneMap -OverflowMap $script:OneField
+
+        $Traits.ContainsKey('conditional-access-policies-continued') | Should -BeTrue
+        $Traits.ContainsKey('c') | Should -BeFalse
+    }
+
+    It 'produces a payload ConvertTo-Json accepts' {
+        # The exact failure mode: a non-string key makes the whole IT Glue write throw.
+        $Traits = ConvertTo-ITGlueSectionTraits -Sections @((New-TestSection 'ConditionalAccess' 'CA' 900)) `
+            -TraitMap $script:OneMap -OverflowMap $script:OneField
+        $Payload = @{ data = @{ type = 'flexible-assets'; attributes = @{ traits = $Traits } } }
+
+        { $Payload | ConvertTo-Json -Depth 20 -Compress } | Should -Not -Throw
+    }
+}
