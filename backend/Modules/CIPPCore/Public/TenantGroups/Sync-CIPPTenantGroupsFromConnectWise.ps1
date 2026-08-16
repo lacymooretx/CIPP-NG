@@ -45,6 +45,7 @@ function Sync-CIPPTenantGroupsFromConnectWise {
         Unmapped    = [System.Collections.Generic.List[string]]::new()
         Offboarding = [System.Collections.Generic.List[string]]::new()
         Errors      = [System.Collections.Generic.List[string]]::new()
+        Diagnostics = [System.Collections.Generic.List[string]]::new()
     }
 
     # ---- ConnectWise configuration -------------------------------------------------
@@ -75,10 +76,19 @@ function Sync-CIPPTenantGroupsFromConnectWise {
     $PageSize = 1000
     do {
         $Uri = "$BaseURL/company/companies?pageSize=$PageSize&page=$Page"
-        $Batch = @(Invoke-RestMethod -AllowInsecureRedirect -Uri $Uri -Method GET -Headers $Headers)
+        try {
+            $Batch = @(Invoke-RestMethod -AllowInsecureRedirect -Uri $Uri -Method GET -Headers $Headers)
+        } catch {
+            $Result.Errors.Add("ConnectWise company fetch failed on page ${Page}: $($_.Exception.Message)")
+            $Batch = @()
+        }
+        $Result.Diagnostics.Add("page $Page returned $($Batch.Count) companies")
         foreach ($Company in $Batch) { $Companies["$($Company.id)"] = $Company }
         $Page++
     } while ($Batch.Count -eq $PageSize)
+
+    $Result.Diagnostics.Add("company key count: $($Companies.Count)")
+    $Result.Diagnostics.Add("sample keys: $((@($Companies.Keys) | Select-Object -First 8) -join ', ')")
 
     if ($Companies.Count -eq 0) {
         # Never reconcile against an empty picture: that would remove every member of both
