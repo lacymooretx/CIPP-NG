@@ -120,6 +120,17 @@ function Invoke-ITGlueExtensionSync {
         }
 
         # ============================================================
+        # EMAIL SECURITY CONFIGURATION DOCUMENT (optional)
+        # ============================================================
+        if ($ITGConfig.ImportEmailSecurityConfig -eq $true) {
+            try {
+                Sync-ITGlueEmailSecurityConfig -OrgId $OrgId -Tenant $Tenant -CompanyResult $CompanyResult
+            } catch {
+                $CompanyResult.Errors.Add("Email security configuration: $($_.Exception.Message)")
+            }
+        }
+
+        # ============================================================
         # Log results
         # ============================================================
         $LogMessage = "IT Glue sync complete for $($Tenant.displayName): $($CompanyResult.Users) users, $($CompanyResult.Devices) devices, $($CompanyResult.Errors.Count) errors"
@@ -862,6 +873,110 @@ function Get-ITGlueIdentityConfigFlexAssetTypeId {
         if ($Created.data.id) {
             $script:ITGlueIdentityConfigFlexAssetTypeId = [int]$Created.data.id
             return $script:ITGlueIdentityConfigFlexAssetTypeId
+        }
+    } catch {
+        Write-Warning ("Failed to create '{0}' flex asset type: {1}" -f $TypeName, $_.Exception.Message)
+    }
+    return $null
+}
+
+# ---------- EMAIL SECURITY CONFIGURATION ----------
+
+function Sync-ITGlueEmailSecurityConfig {
+    <#
+        .SYNOPSIS
+        Write one tenant's mail flow and mail security configuration into IT Glue.
+        .DESCRIPTION
+        Phase 4 sibling of Sync-ITGlueIntuneConfig and Sync-ITGlueIdentityConfig, using the
+        same shared helpers. Transport rules get the continuation field: a tenant's rule set
+        carries a rendered description per rule, which is where the bytes go.
+    #>
+    param($OrgId, $Tenant, $CompanyResult)
+
+    $TypeId = Get-ITGlueEmailSecurityFlexAssetTypeId
+    if (-not $TypeId) {
+        $CompanyResult.Errors.Add('Email security configuration: could not resolve or create the CIPP Email Security Configuration flex asset type.')
+        return
+    }
+
+    $Model = Get-CIPPEmailSecurityReportData -TenantFilter $Tenant.defaultDomainName
+    if (-not $Model) {
+        $CompanyResult.Errors.Add('Email security configuration: report model came back empty.')
+        return
+    }
+
+    $TraitMap = @{
+        'TransportRules'          = 'transport-rules'
+        'Connectors'              = 'mail-flow-connectors'
+        'AntiSpamAndMalware'      = 'anti-spam-malware-and-phishing'
+        'SafeLinksAndAttachments' = 'safe-links-and-safe-attachments'
+        'QuarantineAndLists'      = 'quarantine-and-allow-block-lists'
+        'DomainAuthentication'    = 'domain-authentication'
+    }
+    $OverflowMap = @{
+        'TransportRules' = @('transport-rules-continued')
+    }
+
+    $TruncationNotes = [System.Collections.Generic.List[object]]::new()
+    $Traits = Get-ITGlueDocumentIdentityTraits -Model $Model -CountTrait 'object-count'
+    $SectionTraits = ConvertTo-ITGlueSectionTraits -Sections $Model.Sections `
+        -TraitMap $TraitMap -OverflowMap $OverflowMap -Truncated $TruncationNotes
+    foreach ($Name in $SectionTraits.Keys) { $Traits[$Name] = $SectionTraits[$Name] }
+
+    $Traits['collection-notes'] = Get-ITGlueCollectionNotesHtml -Model $Model -Truncations $TruncationNotes -SourceLabel 'mail flow and mail security'
+
+    Set-ITGlueDocumentAsset -OrgId $OrgId -TypeId $TypeId -Traits $Traits `
+        -Label 'Email security configuration' -ObjectCount $Model.ObjectCount `
+        -TruncationCount $TruncationNotes.Count -Tenant $Tenant -CompanyResult $CompanyResult
+}
+
+function Get-ITGlueEmailSecurityFlexAssetTypeId {
+    if ($script:ITGlueEmailSecurityFlexAssetTypeId) { return $script:ITGlueEmailSecurityFlexAssetTypeId }
+
+    $TypeName = 'CIPP Email Security Configuration'
+    $AllTypes = Invoke-ITGlueRequest -Path '/flexible_asset_types' -AllPages
+    $Match = $AllTypes | Where-Object { $_.attributes.name -eq $TypeName } | Select-Object -First 1
+    if ($Match) {
+        $script:ITGlueEmailSecurityFlexAssetTypeId = [int]$Match.id
+        return $script:ITGlueEmailSecurityFlexAssetTypeId
+    }
+
+    $CreatePayload = @{
+        data = @{
+            type          = 'flexible_asset_types'
+            attributes    = @{
+                name           = $TypeName
+                description    = 'Mail flow and mail security for a Microsoft 365 tenant, synced by CIPP. One record per client.'
+                icon           = 'envelope-o'
+                enabled        = $true
+                'show-in-menu' = $true
+            }
+            relationships = @{
+                'flexible-asset-fields' = @{
+                    data = @(
+                        @{ type = 'flexible_asset_fields'; attributes = @{ order = 1; name = 'Tenant'; kind = 'Text'; required = $true; 'show-in-list' = $true; 'use-for-title' = $true } }
+                        @{ type = 'flexible_asset_fields'; attributes = @{ order = 2; name = 'Tenant Domain'; kind = 'Text'; required = $false; 'show-in-list' = $true } }
+                        @{ type = 'flexible_asset_fields'; attributes = @{ order = 3; name = 'Last Synced'; kind = 'Text'; required = $false; 'show-in-list' = $true } }
+                        @{ type = 'flexible_asset_fields'; attributes = @{ order = 4; name = 'Object Count'; kind = 'Text'; required = $false; 'show-in-list' = $true } }
+                        @{ type = 'flexible_asset_fields'; attributes = @{ order = 5; name = 'Transport Rules'; kind = 'Textbox'; required = $false } }
+                        @{ type = 'flexible_asset_fields'; attributes = @{ order = 6; name = 'Transport Rules (continued)'; kind = 'Textbox'; required = $false } }
+                        @{ type = 'flexible_asset_fields'; attributes = @{ order = 7; name = 'Mail Flow Connectors'; kind = 'Textbox'; required = $false } }
+                        @{ type = 'flexible_asset_fields'; attributes = @{ order = 8; name = 'Anti-Spam Malware and Phishing'; kind = 'Textbox'; required = $false } }
+                        @{ type = 'flexible_asset_fields'; attributes = @{ order = 9; name = 'Safe Links and Safe Attachments'; kind = 'Textbox'; required = $false } }
+                        @{ type = 'flexible_asset_fields'; attributes = @{ order = 10; name = 'Quarantine and Allow Block Lists'; kind = 'Textbox'; required = $false } }
+                        @{ type = 'flexible_asset_fields'; attributes = @{ order = 11; name = 'Domain Authentication'; kind = 'Textbox'; required = $false } }
+                        @{ type = 'flexible_asset_fields'; attributes = @{ order = 12; name = 'Collection Notes'; kind = 'Textbox'; required = $false } }
+                    )
+                }
+            }
+        }
+    }
+
+    try {
+        $Created = Invoke-ITGlueRequest -Path '/flexible_asset_types' -Method POST -Body $CreatePayload -Raw
+        if ($Created.data.id) {
+            $script:ITGlueEmailSecurityFlexAssetTypeId = [int]$Created.data.id
+            return $script:ITGlueEmailSecurityFlexAssetTypeId
         }
     } catch {
         Write-Warning ("Failed to create '{0}' flex asset type: {1}" -f $TypeName, $_.Exception.Message)

@@ -45,6 +45,7 @@ const REPORT_TYPES = [
   { label: "Intune Compliance Report", value: "IntuneCompliance" },
   { label: "Intune Configuration Document", value: "IntuneConfig" },
   { label: "Identity Configuration Document", value: "IdentityConfig" },
+  { label: "Email Security Document", value: "EmailSecurity" },
   { label: "License Report", value: "Licenses" },
   { label: "Administrator Report", value: "AdminTracker" },
   { label: "Domain Health Report", value: "DomainInfo" },
