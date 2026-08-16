@@ -105,6 +105,11 @@ function Push-CIPPStorageSnapshot {
         $Result.CollectionNotes.Add('No storage history returned by any workload; trend not updated.')
     } elseif ($PSCmdlet.ShouldProcess($Domain, "Write $($TrendRows.Count) storage trend rows")) {
         $TrendTable = Get-CIPPTable -TableName 'CippStorageTrend'
+        # Accumulate-and-flush, exactly as Add-CIPPDbItem does. A first cut sliced the list
+        # with a range index instead - $List[0..99] - which returns object[] for a multi-row
+        # slice and unrolls to a bare Hashtable when the slice holds one row, so .ToArray()
+        # threw "does not contain a method named 'ToArray'" on the first live run. Calling
+        # ToArray on the List itself has neither problem.
         $Batch = [System.Collections.Generic.List[hashtable]]::new()
         foreach ($Row in $TrendRows) {
             $Batch.Add(@{
@@ -119,11 +124,14 @@ function Push-CIPPStorageSnapshot {
                     TotalBytes        = [long]$Row.TotalBytes
                     MeasuredWorkloads = [string]$Row.MeasuredWorkloads
                 })
+            # Flush at 100: the table SDK rejects larger transactions and 180 days exceeds it.
+            if ($Batch.Count -ge 100) {
+                $null = Add-CIPPAzDataTableEntity @TrendTable -Entity $Batch.ToArray() -Force
+                $Batch.Clear()
+            }
         }
-        # Batches of 100: the table SDK rejects larger transactions, and 180 rows exceeds it.
-        for ($i = 0; $i -lt $Batch.Count; $i += 100) {
-            $Slice = $Batch[$i..([Math]::Min($i + 99, $Batch.Count - 1))]
-            $null = Add-CIPPAzDataTableEntity @TrendTable -Entity $Slice.ToArray() -Force
+        if ($Batch.Count -gt 0) {
+            $null = Add-CIPPAzDataTableEntity @TrendTable -Entity $Batch.ToArray() -Force
         }
         $Result.TrendRows = $TrendRows.Count
     }
@@ -219,10 +227,13 @@ function Push-CIPPStorageSnapshot {
                     ObjectId     = [string]$Item.Id
                     Data         = [string]$Item.Data
                 })
+            if ($Entities.Count -ge 100) {
+                $null = Add-CIPPAzDataTableEntity @SnapTable -Entity $Entities.ToArray() -Force
+                $Entities.Clear()
+            }
         }
-        for ($i = 0; $i -lt $Entities.Count; $i += 100) {
-            $Slice = $Entities[$i..([Math]::Min($i + 99, $Entities.Count - 1))]
-            $null = Add-CIPPAzDataTableEntity @SnapTable -Entity $Slice.ToArray() -Force
+        if ($Entities.Count -gt 0) {
+            $null = Add-CIPPAzDataTableEntity @SnapTable -Entity $Entities.ToArray() -Force
         }
     }
 
