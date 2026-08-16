@@ -192,6 +192,25 @@
     "recommendedRunInterval": "1d"
   },
   {
+    "name": "StorageQuota",
+    "label": "Alert on mailbox storage quota (managed clients only, with repeat suppression)",
+    "requiresInput": true,
+    "multipleInput": true,
+    "inputs": [
+      {
+        "inputType": "textField",
+        "inputLabel": "Percentage of the send/receive quota that counts as at risk (default: 85). Judged on the hard quota, not issueWarningQuota, which is not always rescaled when a mailbox moves to a larger plan.",
+        "inputName": "StorageQuotaPercent"
+      },
+      {
+        "inputType": "textField",
+        "inputLabel": "Days before an unchanged finding is raised again (default: 14). A finding that crosses a band (85/90/95%) is raised immediately regardless.",
+        "inputName": "StorageReNotifyDays"
+      }
+    ],
+    "recommendedRunInterval": "1d"
+  },
+  {
     "name": "SharePointQuota",
     "label": "Alert on % SharePoint quota used",
     "requiresInput": true,

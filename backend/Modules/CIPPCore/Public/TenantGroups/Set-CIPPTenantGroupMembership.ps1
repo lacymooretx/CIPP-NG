@@ -31,12 +31,17 @@ function Set-CIPPTenantGroupMembership {
     $GroupTable = Get-CippTable -tablename 'TenantGroups'
     $MembersTable = Get-CippTable -tablename 'TenantGroupMembers'
 
-    $Group = Get-CIPPAzDataTableEntity @GroupTable | Where-Object { $_.Name -eq $GroupName } | Select-Object -First 1
+    # PartitionKey must be 'TenantGroup'. Get-TenantGroups, Expand-CIPPTenantGroups, the tenant
+    # selector, dynamic rules and scheduled-task fan-out all filter on it; a group written under
+    # any other partition exists in the table but is invisible to every consumer, and the members
+    # under it resolve to nothing. Filter the lookup on it too, so a miss creates a usable group
+    # rather than silently adopting an unreachable one.
+    $Group = Get-CIPPAzDataTableEntity @GroupTable -Filter "PartitionKey eq 'TenantGroup'" | Where-Object { $_.Name -eq $GroupName } | Select-Object -First 1
     if (-not $Group) {
         $GroupId = [guid]::NewGuid().ToString()
         if (-not $WhatIfOnly) {
             Add-CIPPAzDataTableEntity @GroupTable -Entity @{
-                PartitionKey = 'Group'
+                PartitionKey = 'TenantGroup'
                 RowKey       = $GroupId
                 Name         = $GroupName
                 Description  = [string]$Description

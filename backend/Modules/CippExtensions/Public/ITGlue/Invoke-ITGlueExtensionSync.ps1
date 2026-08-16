@@ -142,6 +142,17 @@ function Invoke-ITGlueExtensionSync {
         }
 
         # ============================================================
+        # M365 STORAGE AND USAGE DOCUMENT (optional)
+        # ============================================================
+        if ($ITGConfig.ImportStorageUsage -eq $true) {
+            try {
+                Sync-ITGlueStorageUsage -OrgId $OrgId -Tenant $Tenant -CompanyResult $CompanyResult
+            } catch {
+                $CompanyResult.Errors.Add("Storage and usage: $($_.Exception.Message)")
+            }
+        }
+
+        # ============================================================
         # Log results
         # ============================================================
         $LogMessage = "IT Glue sync complete for $($Tenant.displayName): $($CompanyResult.Users) users, $($CompanyResult.Devices) devices, $($CompanyResult.Errors.Count) errors"
@@ -1097,6 +1108,146 @@ function Get-ITGlueTenantOverviewFlexAssetTypeId {
         if ($Created.data.id) {
             $script:ITGlueTenantOverviewFlexAssetTypeId = [int]$Created.data.id
             return $script:ITGlueTenantOverviewFlexAssetTypeId
+        }
+    } catch {
+        Write-Warning ("Failed to create '{0}' flex asset type: {1}" -f $TypeName, $_.Exception.Message)
+    }
+    return $null
+}
+
+function Sync-ITGlueStorageUsage {
+    <#
+        .SYNOPSIS
+        Write one managed client's M365 storage position and growth into IT Glue.
+        .DESCRIPTION
+        Unlike the other five documents, this one is MANAGED CLIENTS ONLY by operator
+        decision, and it skips rather than writing a record that says "not collected".
+        An unmanaged client with a storage document in IT Glue implies we are watching
+        their capacity, and we are not.
+
+        It is also the only one of the six whose subject is volatile. The others describe
+        configuration, which is stable and worth a nightly diff; storage changes every day,
+        and a nightly write would churn IT Glue's revision history with a number that is
+        stale on arrival. The scheduled sync therefore runs this weekly - see the runbook -
+        and the record leans on shape (quotas, tiers, growth rate, archival candidates)
+        rather than a precise byte count.
+
+        Two scalar traits are promoted out of the tables so the asset list is scannable
+        without opening records: Total Consumption and Growth Trend.
+
+        No continuation fields: none of these sections approach the 64KB cap - the largest
+        is the site list, and the biggest tenant has 41 sites.
+    #>
+    param($OrgId, $Tenant, $CompanyResult)
+
+    $Managed = Test-CIPPTenantManaged -TenantFilter $Tenant.defaultDomainName
+    if (-not $Managed.IsManaged) {
+        # Logs, not Errors - a deliberate scope decision, not a failure. Recorded so a
+        # missing record is explicable rather than looking like a broken sync.
+        $CompanyResult.Logs.Add("Storage and usage: skipped, tenant is '$($Managed.Status)'; storage documentation is limited to managed clients.")
+        return
+    }
+
+    $TypeId = Get-ITGlueStorageUsageFlexAssetTypeId
+    if (-not $TypeId) {
+        $CompanyResult.Errors.Add('Storage and usage: could not resolve or create the CIPP M365 Storage and Usage flex asset type.')
+        return
+    }
+
+    $Model = Get-CIPPStorageUsageReportData -TenantFilter $Tenant.defaultDomainName
+    if (-not $Model) {
+        $CompanyResult.Errors.Add('Storage and usage: report model came back empty.')
+        return
+    }
+
+    $TraitMap = @{
+        'Summary'            = 'storage-summary'
+        'Growth'             = 'growth-and-projection'
+        'MailboxRisk'        = 'mailboxes-approaching-quota'
+        'QuotaWarningConfig' = 'mailboxes-warned-below-quota'
+        'TopMailboxes'       = 'largest-mailboxes'
+        'SharePointSites'    = 'largest-sharepoint-sites'
+        'OneDrive'           = 'onedrive-consumption'
+        'ArchivalCandidates' = 'archival-candidates'
+        'SharedMailboxes'    = 'shared-mailbox-storage'
+    }
+
+    $TruncationNotes = [System.Collections.Generic.List[object]]::new()
+    $Traits = Get-ITGlueDocumentIdentityTraits -Model $Model -CountTrait 'object-count'
+    $SectionTraits = ConvertTo-ITGlueSectionTraits -Sections $Model.Sections `
+        -TraitMap $TraitMap -Truncated $TruncationNotes
+    foreach ($Name in $SectionTraits.Keys) { $Traits[$Name] = $SectionTraits[$Name] }
+
+    # Promote the two figures worth seeing in a list view. Read from the rendered summary
+    # section rather than recomputed, so the column can never disagree with the record.
+    $Summary = @($Model.Sections) | Where-Object { $_.Key -eq 'Summary' } | Select-Object -First 1
+    $TotalRow = @($Summary.Rows) | Where-Object { @($_)[0] -eq 'Total consumption' } | Select-Object -First 1
+    $Traits['total-consumption'] = if ($TotalRow) { [string](@($TotalRow)[1]) } else { 'Unknown' }
+
+    $GrowthSection = @($Model.Sections) | Where-Object { $_.Key -eq 'Growth' } | Select-Object -First 1
+    $TrendRow = @($GrowthSection.Rows) | Where-Object { @($_)[0] -eq 'Trend' } | Select-Object -First 1
+    $Traits['growth-trend'] = if ($TrendRow) { [string](@($TrendRow)[1]) } else { 'Unknown' }
+
+    $Traits['collection-notes'] = Get-ITGlueCollectionNotesHtml -Model $Model -Truncations $TruncationNotes `
+        -SourceLabel 'Microsoft 365 storage consumption, growth history and archival candidates'
+
+    Set-ITGlueDocumentAsset -OrgId $OrgId -TypeId $TypeId -Traits $Traits `
+        -Label 'Storage and usage' -ObjectCount $Model.ObjectCount `
+        -TruncationCount $TruncationNotes.Count -Tenant $Tenant -CompanyResult $CompanyResult
+}
+
+function Get-ITGlueStorageUsageFlexAssetTypeId {
+    if ($script:ITGlueStorageUsageFlexAssetTypeId) { return $script:ITGlueStorageUsageFlexAssetTypeId }
+
+    $TypeName = 'CIPP M365 Storage and Usage'
+    $AllTypes = Invoke-ITGlueRequest -Path '/flexible_asset_types' -AllPages
+    $Match = $AllTypes | Where-Object { $_.attributes.name -eq $TypeName } | Select-Object -First 1
+    if ($Match) {
+        $script:ITGlueStorageUsageFlexAssetTypeId = [int]$Match.id
+        return $script:ITGlueStorageUsageFlexAssetTypeId
+    }
+
+    $CreatePayload = @{
+        data = @{
+            type          = 'flexible_asset_types'
+            attributes    = @{
+                name           = $TypeName
+                description    = 'Microsoft 365 storage consumption and growth, synced by CIPP. Managed clients only. One record per client: totals by workload, growth rate over several windows, mailboxes near quota, largest sites and mailboxes, and SharePoint archival candidates.'
+                icon           = 'hdd-o'
+                enabled        = $true
+                'show-in-menu' = $true
+            }
+            relationships = @{
+                'flexible-asset-fields' = @{
+                    data = @(
+                        @{ type = 'flexible_asset_fields'; attributes = @{ order = 1; name = 'Tenant'; kind = 'Text'; required = $true; 'show-in-list' = $true; 'use-for-title' = $true } }
+                        @{ type = 'flexible_asset_fields'; attributes = @{ order = 2; name = 'Tenant Domain'; kind = 'Text'; required = $false; 'show-in-list' = $true } }
+                        @{ type = 'flexible_asset_fields'; attributes = @{ order = 3; name = 'Total Consumption'; kind = 'Text'; required = $false; 'show-in-list' = $true } }
+                        @{ type = 'flexible_asset_fields'; attributes = @{ order = 4; name = 'Growth Trend'; kind = 'Text'; required = $false; 'show-in-list' = $true } }
+                        @{ type = 'flexible_asset_fields'; attributes = @{ order = 5; name = 'Last Synced'; kind = 'Text'; required = $false; 'show-in-list' = $true } }
+                        # Text, not Number: IT Glue renders a Number field as '75.0'.
+                        @{ type = 'flexible_asset_fields'; attributes = @{ order = 6; name = 'Object Count'; kind = 'Text'; required = $false; 'show-in-list' = $true } }
+                        @{ type = 'flexible_asset_fields'; attributes = @{ order = 7; name = 'Storage Summary'; kind = 'Textbox'; required = $false } }
+                        @{ type = 'flexible_asset_fields'; attributes = @{ order = 8; name = 'Growth and Projection'; kind = 'Textbox'; required = $false } }
+                        @{ type = 'flexible_asset_fields'; attributes = @{ order = 9; name = 'Mailboxes Approaching Quota'; kind = 'Textbox'; required = $false } }
+                        @{ type = 'flexible_asset_fields'; attributes = @{ order = 10; name = 'Mailboxes Warned Below Quota'; kind = 'Textbox'; required = $false } }
+                        @{ type = 'flexible_asset_fields'; attributes = @{ order = 11; name = 'Largest Mailboxes'; kind = 'Textbox'; required = $false } }
+                        @{ type = 'flexible_asset_fields'; attributes = @{ order = 12; name = 'Largest SharePoint Sites'; kind = 'Textbox'; required = $false } }
+                        @{ type = 'flexible_asset_fields'; attributes = @{ order = 13; name = 'OneDrive Consumption'; kind = 'Textbox'; required = $false } }
+                        @{ type = 'flexible_asset_fields'; attributes = @{ order = 14; name = 'Archival Candidates'; kind = 'Textbox'; required = $false } }
+                        @{ type = 'flexible_asset_fields'; attributes = @{ order = 15; name = 'Shared Mailbox Storage'; kind = 'Textbox'; required = $false } }
+                        @{ type = 'flexible_asset_fields'; attributes = @{ order = 16; name = 'Collection Notes'; kind = 'Textbox'; required = $false } }
+                    )
+                }
+            }
+        }
+    }
+
+    try {
+        $Created = Invoke-ITGlueRequest -Path '/flexible_asset_types' -Method POST -Body $CreatePayload -Raw
+        if ($Created.data.id) {
+            $script:ITGlueStorageUsageFlexAssetTypeId = [int]$Created.data.id
+            return $script:ITGlueStorageUsageFlexAssetTypeId
         }
     } catch {
         Write-Warning ("Failed to create '{0}' flex asset type: {1}" -f $TypeName, $_.Exception.Message)

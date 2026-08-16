@@ -47,6 +47,7 @@ const REPORT_TYPES = [
   { label: "Identity Configuration Document", value: "IdentityConfig" },
   { label: "Email Security Document", value: "EmailSecurity" },
   { label: "Tenant Overview Document", value: "TenantOverview" },
+  { label: "M365 Storage & Usage Report", value: "StorageUsage" },
   { label: "License Report", value: "Licenses" },
   { label: "Administrator Report", value: "AdminTracker" },
   { label: "Domain Health Report", value: "DomainInfo" },

@@ -20,7 +20,17 @@ BeforeAll {
     function Get-CippTable { param($tablename) @{ Table = $tablename } }
     function Get-CIPPAzDataTableEntity {
         param($Table, $Filter)
-        if ($Table -eq 'TenantGroups') { return @($global:GroupRows) }
+        if ($Table -eq 'TenantGroups') {
+            # The stub MUST honour the PartitionKey filter. The original returned every row
+            # regardless, which is exactly why a group written under PartitionKey 'Group' -
+            # invisible to Get-TenantGroups and therefore to the tenant selector, dynamic
+            # rules and scheduled-task fan-out - passed all seven tests.
+            if ($Filter -match "PartitionKey eq '([^']+)'") {
+                $Pk = $Matches[1]
+                return @($global:GroupRows | Where-Object { $_.PartitionKey -eq $Pk })
+            }
+            return @($global:GroupRows)
+        }
         if ($Filter -match "GroupId eq '([^']+)'") {
             $Id = $Matches[1]
             return @($global:MemberRows | Where-Object { $_.GroupId -eq $Id })
@@ -102,6 +112,37 @@ Describe 'Set-CIPPTenantGroupMembership' {
 
         $Changes | Should -Contain 'Managed Clients + IMTEC'
         CurrentIds 'Managed Clients' | Should -Be @('a')
+    }
+
+    It 'creates the group under PartitionKey TenantGroup so every consumer can see it' {
+        # Regression, production bug found 2026-08-16. The group was created under
+        # PartitionKey 'Group' while Get-TenantGroups.ps1 and ten other call sites filter on
+        # 'TenantGroup'. The row existed, the sync reported success, and the group was
+        # invisible to the tenant selector and to scheduled-task fan-out - which is the
+        # mechanism that scopes alerts to managed clients only.
+        $null = Set-CIPPTenantGroupMembership -GroupName 'Managed Clients' -Members @((Member 'a' 'Acme'))
+
+        $Group = $global:GroupRows | Where-Object { $_.Name -eq 'Managed Clients' } | Select-Object -First 1
+        $Group.PartitionKey | Should -Be 'TenantGroup'
+        $Group.GroupType | Should -Be 'static'
+    }
+
+    It 'does not adopt a group stored under the wrong PartitionKey' {
+        # A legacy row from the buggy version must not be reused: adopting it would keep
+        # writing members under a GroupId that resolves to nothing.
+        $global:GroupRows.Add([pscustomobject]@{
+                PartitionKey = 'Group'; RowKey = 'legacy-id'; Name = 'Managed Clients'
+                Description = ''; GroupType = 'static'
+            })
+
+        $Changes = Set-CIPPTenantGroupMembership -GroupName 'Managed Clients' -Members @((Member 'a' 'Acme'))
+
+        $Changes | Should -Contain "Created group 'Managed Clients'"
+        $Good = $global:GroupRows | Where-Object { $_.Name -eq 'Managed Clients' -and $_.PartitionKey -eq 'TenantGroup' } | Select-Object -First 1
+        $Good | Should -Not -BeNullOrEmpty
+        # Members land under the reachable group, not the orphan.
+        @($global:MemberRows | Where-Object { $_.GroupId -eq $Good.RowKey }).Count | Should -Be 1
+        @($global:MemberRows | Where-Object { $_.GroupId -eq 'legacy-id' }).Count | Should -Be 0
     }
 
     It 'ignores malformed members rather than writing a null customerId' {

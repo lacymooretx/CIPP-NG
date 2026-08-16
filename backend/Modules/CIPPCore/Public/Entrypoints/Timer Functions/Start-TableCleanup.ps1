@@ -116,6 +116,20 @@ function Start-TableCleanup {
             }
         }
         @{
+            # Per-object storage detail only. CippStorageTrend is deliberately absent from
+            # this list: it is one small row per tenant per day and it is the whole point of
+            # the feature - purging it would delete history that cannot be re-fetched, since
+            # Graph only serves the last 180 days.
+            FunctionName   = 'TableCleanupTask'
+            Type           = 'CleanupRule'
+            TableName      = 'CippStorageSnapshot'
+            DataTableProps = @{
+                Filter   = "Timestamp lt datetime'$((Get-Date).AddDays(-91).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ'))'"
+                First    = 10000
+                Property = @('PartitionKey', 'RowKey', 'ETag')
+            }
+        }
+        @{
             FunctionName = 'TableCleanupTask'
             Type         = 'DeleteTable'
             Tables       = @('knownlocationdb', 'CacheExtensionSync', 'ExtensionSync')

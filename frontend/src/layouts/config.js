@@ -303,6 +303,11 @@ export const nativeMenuItems = [
             permissions: ['Tenant.Reports.*'],
           },
           {
+            title: 'M365 Storage & Usage',
+            path: '/tenant/reports/storage-usage',
+            permissions: ['Tenant.Reports.*'],
+          },
+          {
             title: 'Custom Test Report',
             path: '/tenant/reports/custom-test-report',
             permissions: ['Tenant.Reports.*'],
