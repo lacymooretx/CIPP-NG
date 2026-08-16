@@ -78,7 +78,16 @@ function Get-CIPPStorageUsageReportData {
     $DefaultDomain = ($Org.verifiedDomains | Where-Object { $_.isDefault }).name
     if (-not $DefaultDomain) { $DefaultDomain = $TenantFilter }
 
-    $State = @{ Count = 0; AtRisk = 0; StaleWarning = 0; Archival = 0; ReclaimBytes = 0L; Trend = 'Unknown'; NoHistory = $false }
+    # Invoke-Section runs each builder with &, which creates a CHILD SCOPE. Anything one
+    # section produces and another consumes has to live in this hashtable: assigning
+    # `$Mailboxes = ...` inside a section writes a child-scope copy that vanishes on exit,
+    # and the downstream sections then render "No mailbox data." against a healthy tenant.
+    # Shipped exactly that way once - five of nine sections came back empty on 3E NDT.
+    $State = @{
+        Count = 0; AtRisk = 0; StaleWarning = 0; Archival = 0; ReclaimBytes = 0L
+        Trend = 'Unknown'; NoHistory = $false
+        Mailboxes = @(); Sites = @(); Risk = $null
+    }
 
     # ---- managed gate ----------------------------------------------------------------
     $Managed = Test-CIPPTenantManaged -TenantFilter $TenantFilter
@@ -174,13 +183,13 @@ function Get-CIPPStorageUsageReportData {
     }
 
     # ---- Mailboxes at risk ---------------------------------------------------------------
-    $Mailboxes = @()
     Invoke-Section 'MailboxRisk' 'Mailboxes Approaching Quota' {
-        $Mailboxes = @(New-GraphGetRequest -tenantid $TenantFilter -AsApp $true `
+        $State.Mailboxes = @(New-GraphGetRequest -tenantid $TenantFilter -AsApp $true `
                 -uri "$GraphBeta/reports/getMailboxUsageDetail(period='D7')?`$format=application/json&`$top=999" |
                 Where-Object { $_.isDeleted -ne $true -and $_.userPrincipalName })
 
-        $Risk = Get-CIPPMailboxQuotaRisk -Mailboxes $Mailboxes
+        $Risk = Get-CIPPMailboxQuotaRisk -Mailboxes $State.Mailboxes
+        $State.Risk = $Risk
         $State.AtRisk = @($Risk.AtRisk).Count
         $State.StaleWarning = @($Risk.StaleWarning).Count
 
@@ -201,7 +210,8 @@ function Get-CIPPStorageUsageReportData {
 
     # ---- Warned but not at risk ------------------------------------------------------------
     Invoke-Section 'QuotaWarningConfig' 'Mailboxes Warned Below Their Quota' {
-        $Risk = Get-CIPPMailboxQuotaRisk -Mailboxes $Mailboxes
+        $Risk = $State.Risk
+        if (-not $Risk) { $Risk = Get-CIPPMailboxQuotaRisk -Mailboxes $State.Mailboxes }
         $r = New-RowList
         foreach ($W in $Risk.WarnedOnly) {
             $Stale = @($Risk.StaleWarning | Where-Object { $_.Upn -eq $W.Upn }).Count -gt 0
@@ -219,7 +229,7 @@ function Get-CIPPStorageUsageReportData {
     # ---- Largest mailboxes ----------------------------------------------------------------
     Invoke-Section 'TopMailboxes' 'Largest Mailboxes' {
         $r = New-RowList
-        $Top = @($Mailboxes | Sort-Object -Property { [long]($_.storageUsedInBytes ?? 0) } -Descending | Select-Object -First 10)
+        $Top = @($State.Mailboxes | Sort-Object -Property { [long]($_.storageUsedInBytes ?? 0) } -Descending | Select-Object -First 10)
         foreach ($M in $Top) {
             $Used = [long]($M.storageUsedInBytes ?? 0)
             $Hard = [long]($M.prohibitSendReceiveQuotaInBytes ?? 0)
@@ -236,15 +246,14 @@ function Get-CIPPStorageUsageReportData {
     }
 
     # ---- Sites ------------------------------------------------------------------------------
-    $Sites = @()
     Invoke-Section 'SharePointSites' 'Largest SharePoint Sites' {
         $Snapshot = Get-CIPPStorageSnapshot -TenantFilter $TenantFilter -Scope 'Site'
-        $Sites = @($Snapshot.Items)
-        if ($Sites.Count -eq 0) {
+        $State.Sites = @($Snapshot.Items)
+        if ($State.Sites.Count -eq 0) {
             $Notes.Add(@{ Section = 'Largest SharePoint Sites'; Detail = 'No site snapshot stored yet; run Push-CIPPStorageSnapshot.' })
         }
         $r = New-RowList
-        $Top = @($Sites | Where-Object { $_.isPersonalSite -ne $true } |
+        $Top = @($State.Sites | Where-Object { $_.isPersonalSite -ne $true } |
                 Sort-Object -Property { [long]($_.sharePointStorageUsedInBytes ?? 0) } -Descending | Select-Object -First 15)
         foreach ($S in $Top) {
             $r.Add(@([string]$S.displayName,
@@ -262,7 +271,7 @@ function Get-CIPPStorageUsageReportData {
     # ---- OneDrive ------------------------------------------------------------------------------
     Invoke-Section 'OneDrive' 'OneDrive Consumption' {
         $r = New-RowList
-        $Drives = @($Sites | Where-Object { $_.isPersonalSite -eq $true } |
+        $Drives = @($State.Sites | Where-Object { $_.isPersonalSite -eq $true } |
                 Sort-Object -Property { [long]($_.oneDriveStorageUsedInBytes ?? 0) } -Descending)
         foreach ($D in @($Drives | Select-Object -First 10)) {
             $Used = [long]($D.oneDriveStorageUsedInBytes ?? 0)
@@ -278,8 +287,8 @@ function Get-CIPPStorageUsageReportData {
         # Worth stating plainly: few provisioned OneDrives usually means staff are keeping
         # work somewhere we do not manage or back up, which is a bigger problem than usage.
         $Description = "$(@($Drives).Count) provisioned OneDrive(s)."
-        if (@($Drives).Count -gt 0 -and @($Mailboxes).Count -gt (@($Drives).Count * 2)) {
-            $Description += " Only $(@($Drives).Count) of $(@($Mailboxes).Count) mailbox users have a provisioned OneDrive - worth confirming where the rest are storing work."
+        if (@($Drives).Count -gt 0 -and @($State.Mailboxes).Count -gt (@($Drives).Count * 2)) {
+            $Description += " Only $(@($Drives).Count) of $(@($State.Mailboxes).Count) mailbox users have a provisioned OneDrive - worth confirming where the rest are storing work."
         }
         Add-Section 'OneDrive' 'OneDrive Consumption' 'info' $Description `
             @('Owner', 'Used', 'Of allocation', 'Files', 'Last activity') $r 'No OneDrive data.'
@@ -287,7 +296,7 @@ function Get-CIPPStorageUsageReportData {
 
     # ---- Archival candidates -----------------------------------------------------------------
     Invoke-Section 'ArchivalCandidates' 'Archival Candidates' {
-        $Archival = Get-CIPPStorageArchivalCandidate -Sites $Sites
+        $Archival = Get-CIPPStorageArchivalCandidate -Sites $State.Sites
         $State.Archival = @($Archival.Candidates).Count
         $State.ReclaimBytes = [long]$Archival.ReclaimableBytes
 
@@ -310,7 +319,7 @@ function Get-CIPPStorageUsageReportData {
     # ---- Shared mailboxes ----------------------------------------------------------------------
     Invoke-Section 'SharedMailboxes' 'Shared Mailbox Storage' {
         $r = New-RowList
-        $Shared = @($Mailboxes | Where-Object { ($_.recipientType -replace 'Mailbox$') -eq 'Shared' } |
+        $Shared = @($State.Mailboxes | Where-Object { ($_.recipientType -replace 'Mailbox$') -eq 'Shared' } |
                 Sort-Object -Property { [long]($_.storageUsedInBytes ?? 0) } -Descending)
         foreach ($S in $Shared) {
             $Used = [long]($S.storageUsedInBytes ?? 0)
