@@ -66,17 +66,26 @@ function Sync-CIPPTenantGroupsFromConnectWise {
     $Tenants = Get-Tenants -IncludeErrors
 
     # ---- ConnectWise companies, with their types -----------------------------------
-    # The mapping helper projects companies down to name/value, so fetch our own copy
-    # asking for the fields this decision actually rests on.
+    # Fetch whole company objects rather than a `fields=` projection. A first cut asked for
+    # fields=id,name,status,types and every company came back unusable, so the sync would
+    # have emptied both groups - caught by running it in WhatIf first. This is the same
+    # call shape Get-ConnectWiseMapping already uses successfully.
     $Companies = @{}
     $Page = 1
     $PageSize = 1000
     do {
-        $Uri = "$BaseURL/company/companies?pageSize=$PageSize&page=$Page&fields=id,name,status,types"
+        $Uri = "$BaseURL/company/companies?pageSize=$PageSize&page=$Page"
         $Batch = @(Invoke-RestMethod -AllowInsecureRedirect -Uri $Uri -Method GET -Headers $Headers)
         foreach ($Company in $Batch) { $Companies["$($Company.id)"] = $Company }
         $Page++
     } while ($Batch.Count -eq $PageSize)
+
+    if ($Companies.Count -eq 0) {
+        # Never reconcile against an empty picture: that would remove every member of both
+        # groups because "ConnectWise says nobody is managed".
+        $Result.Errors.Add('ConnectWise returned no companies; refusing to reconcile group membership against an empty result.')
+        return $Result
+    }
 
     # ---- classify ------------------------------------------------------------------
     $ManagedMembers = [System.Collections.Generic.List[object]]::new()
