@@ -165,14 +165,43 @@ function Get-CIPPTenantOverviewReportData {
         } catch {
             $Notes.Add(@{ Section = 'Sharing and Collaboration'; Detail = "SharePoint tenant settings unavailable: $($_.Exception.Message)" })
         }
+        # SPO returns these as bare enum integers. "SharePoint external sharing: 2" is not
+        # documentation - it is a number a reader has to go and look up, which is the whole
+        # thing this document exists to avoid. Translate, and keep the raw value visible
+        # where a reader may need it to match against a script or Microsoft's own docs.
+        $SharingCapability = @{
+            '0' = 'Disabled - no external sharing'
+            '1' = 'External users only (must sign in)'
+            '2' = 'External users and anonymous guest links'
+            '3' = 'Existing external users only'
+        }
+        $LinkType = @{
+            '0' = 'None'; '1' = 'Direct - specific people'
+            '2' = 'Internal - people in the organisation'; '3' = 'Anonymous - anyone with the link'
+        }
+        $LinkPermission = @{ '0' = 'None'; '1' = 'View'; '2' = 'Edit' }
+        function Format-Enum($Map, $Value) {
+            if ($null -eq $Value) { return '' }
+            $Key = "$Value"
+            if ($Map.ContainsKey($Key)) { return "$($Map[$Key]) ($Key)" }
+            return $Key
+        }
+
         if ($Spo) {
-            $r.Add(@('SharePoint external sharing', [string]$Spo.SharingCapability))
-            $r.Add(@('OneDrive external sharing', [string]$Spo.ODBSharingCapability))
-            if ($null -ne $Spo.DefaultSharingLinkType) { $r.Add(@('Default sharing link type', [string]$Spo.DefaultSharingLinkType)) }
-            if ($null -ne $Spo.DefaultLinkPermission) { $r.Add(@('Default link permission', [string]$Spo.DefaultLinkPermission)) }
-            if ($null -ne $Spo.RequireAnonymousLinksExpireInDays) { $r.Add(@('Anonymous links expire (days)', "$($Spo.RequireAnonymousLinksExpireInDays)")) }
+            $r.Add(@('SharePoint external sharing', (Format-Enum $SharingCapability $Spo.SharingCapability)))
+            $r.Add(@('OneDrive external sharing', (Format-Enum $SharingCapability $Spo.ODBSharingCapability)))
+            if ($null -ne $Spo.DefaultSharingLinkType) { $r.Add(@('Default sharing link type', (Format-Enum $LinkType $Spo.DefaultSharingLinkType))) }
+            if ($null -ne $Spo.DefaultLinkPermission) { $r.Add(@('Default link permission', (Format-Enum $LinkPermission $Spo.DefaultLinkPermission))) }
+            if ($null -ne $Spo.RequireAnonymousLinksExpireInDays) {
+                # -1 is SPO's sentinel for "never", not a negative number of days.
+                $Expiry = if ([int]$Spo.RequireAnonymousLinksExpireInDays -lt 0) { 'Never expire' } else { "$($Spo.RequireAnonymousLinksExpireInDays) days" }
+                $r.Add(@('Anonymous links expire', $Expiry))
+            }
             if ($null -ne $Spo.PreventExternalUsersFromResharing) { $r.Add(@('External users can reshare', "$(-not $Spo.PreventExternalUsersFromResharing)")) }
-            if ($null -ne $Spo.OneDriveStorageQuota) { $r.Add(@('OneDrive storage quota (MB)', "$($Spo.OneDriveStorageQuota)")) }
+            if ($null -ne $Spo.OneDriveStorageQuota) {
+                $Gb = [math]::Round(([double]$Spo.OneDriveStorageQuota) / 1024, 0)
+                $r.Add(@('OneDrive storage quota', "$Gb GB"))
+            }
         }
         $State.Count += $r.Count
         Add-Section 'Sharing' 'Sharing and Collaboration' 'info' `
