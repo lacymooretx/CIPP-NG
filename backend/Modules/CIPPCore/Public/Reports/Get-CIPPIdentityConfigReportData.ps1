@@ -146,7 +146,11 @@ function Get-CIPPIdentityConfigReportData {
         try {
             $Policy = New-GraphGetRequest -uri "$GraphBeta/policies/authenticationMethodsPolicy" -tenantid $TenantFilter
             foreach ($Config in @($Policy.authenticationMethodConfigurations)) {
-                $Method = ($Config.id -replace '([a-z])([A-Z])', '$1 $2')
+                # -creplace, NOT -replace: PowerShell's -replace is case-INSENSITIVE by
+                # default, so [A-Z] also matches lowercase and every letter pair gets split
+                # ("microsoftAuthenticator" -> "m ic ro so ft Au th en ti ca to r").
+                $Method = ($Config.id -creplace '([a-z0-9])([A-Z])', '$1 $2')
+                if ($Method) { $Method = $Method.Substring(0, 1).ToUpper() + $Method.Substring(1) }
                 $Targets = (@($Config.includeTargets | ForEach-Object { $_.targetType }) | Where-Object { $_ }) -join ', '
                 $r.Add(@('Method', $Method, [string]$Config.state, $Targets))
             }
