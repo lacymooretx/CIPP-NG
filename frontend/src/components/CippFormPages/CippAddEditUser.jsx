@@ -701,7 +701,7 @@ const CippAddEditUser = (props) => {
               manager in Entra yet, so a supervisor must be entered here.
             </Typography>
           </Grid>
-          <Grid size={{ xs: 6 }}>
+          <Grid size={{ xs: 12, sm: 6 }}>
             <CippFormComponent
               type="switch"
               label="Email the secret link to the user"
@@ -721,7 +721,7 @@ const CippAddEditUser = (props) => {
               formControl={formControl}
             />
           </Grid>
-          <Grid size={{ xs: 6 }}>
+          <Grid size={{ xs: 12, sm: 6 }}>
             <CippFormComponent
               type="switch"
               label="Send the same link to a supervisor"
