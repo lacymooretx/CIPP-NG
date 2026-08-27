@@ -28193,11 +28193,12 @@
     },
     "/api/ExecOnboardTenant": {
       "post": {
-        "summary": "ExecOnboardTenant",
+        "summary": "Cross-integration onboarding orchestrator. Adds or updates a CIPP\ntenant's mappings across Pax8, IT Glue, ConnectWise, Sherweb, Hudu\nin one call — idempotent, only touches the mappings you reference.",
         "operationId": "ExecOnboardTenant",
         "tags": [
-          "Tenant > Administration > Tenant"
+          "General"
         ],
+        "description": "Two modes:\n\n1. Explicit mappings — POST a body like\n   {\n     \"tenantId\":\"<customerId-guid>\",\n     \"mappings\": {\n       \"Pax8\":        \"<pax8-company-uuid>\",\n       \"ITGlue\":      \"<itglue-org-id>\",\n       \"ConnectWise\": \"<cw-company-id>\",\n       \"Hudu\":        \"<hudu-company-id>\",\n       \"Sherweb\":     \"<sherweb-customer-id>\"\n     }\n   }\n   Each entry creates/overwrites the mapping for that one tenant\n   in that one mapping table. Other tenants are untouched.\n\n2. Auto-match by name — POST\n   {\n     \"tenantId\":\"<customerId-guid>\" | \"all\",\n     \"autoMatch\": true,\n     \"providers\": [\"Pax8\",\"ITGlue\",\"ConnectWise\"]   // optional, defaults to enabled\n   }\n   For each provider, pulls the remote list and matches by\n   normalized display name. Unique matches get linked; ambiguous\n   or zero matches are skipped and reported back.\n\nBody shape tolerance: cipp_call MCP wraps payloads as objects,\nso this accepts the request body as-is and reads .tenantId / .mappings\n/ .autoMatch directly.",
         "requestBody": {
           "required": false,
           "content": {
@@ -28205,29 +28206,16 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "addMissingGroups": {
-                    "type": "string"
-                  },
-                  "autoMapRoles": {
-                    "type": "string"
-                  },
-                  "Cancel": {
+                  "autoMatch": {
                     "type": "boolean"
                   },
-                  "gdapRoles": {
+                  "mappings": {
                     "type": "string"
                   },
-                  "id": {
-                    "type": "string",
-                    "description": "Interact with query parameters or the body of the request."
-                  },
-                  "ignoreMissingRoles": {
+                  "providers": {
                     "type": "string"
                   },
-                  "Retry": {
-                    "type": "boolean"
-                  },
-                  "standardsExcludeAllTenants": {
+                  "tenantId": {
                     "type": "string"
                   }
                 }
@@ -28241,47 +28229,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "description": "Derived from the fields written into the storage table it reads, and the fields the endpoint selects onto each record. Fields taken from the storage writers may be omitted by this endpoint, and the response may carry computed fields not listed here.",
-                  "properties": {
-                    "CustomerId": {
-                      "x-cipp-field-source": "storage,backend"
-                    },
-                    "ETag": {
-                      "type": "string",
-                      "x-cipp-field-source": "storage"
-                    },
-                    "Exception": {
-                      "type": "string",
-                      "x-cipp-field-source": "storage,backend"
-                    },
-                    "Logs": {
-                      "type": "string",
-                      "x-cipp-field-source": "storage,backend"
-                    },
-                    "OnboardingSteps": {
-                      "type": "string",
-                      "x-cipp-field-source": "storage,backend"
-                    },
-                    "PartitionKey": {
-                      "x-cipp-field-source": "storage,backend"
-                    },
-                    "Relationship": {
-                      "type": "string",
-                      "x-cipp-field-source": "storage,backend"
-                    },
-                    "RowKey": {
-                      "type": "string",
-                      "x-cipp-field-source": "storage,backend"
-                    },
-                    "Status": {
-                      "x-cipp-field-source": "storage,backend"
-                    },
-                    "Timestamp": {
-                      "type": "string",
-                      "x-cipp-field-source": "storage"
-                    }
-                  }
+                  "$ref": "#/components/schemas/StandardResults"
                 }
               }
             }
@@ -28304,8 +28252,7 @@
             "bearerAuth": []
           }
         ],
-        "x-cipp-role": "Tenant.Administration.ReadWrite",
-        "x-cipp-any-tenant": true
+        "x-cipp-role": "CIPP.Extension.ReadWrite"
       }
     },
     "/api/ExecOneDriveProvision": {
