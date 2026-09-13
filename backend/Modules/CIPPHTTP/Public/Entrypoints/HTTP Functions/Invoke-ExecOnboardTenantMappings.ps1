@@ -1,4 +1,4 @@
-function Invoke-ExecOnboardTenant {
+function Invoke-ExecOnboardTenantMappings {
     <#
     .FUNCTIONALITY
         Entrypoint

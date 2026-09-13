@@ -65,7 +65,7 @@ const Page = () => {
           <Button
             variant="outlined"
             color="primary"
-            onClick={() => autoMap.mutate({ url: '/api/ExecOnboardTenant', data: { tenantId: 'all', autoMatch: true } })}
+            onClick={() => autoMap.mutate({ url: '/api/ExecOnboardTenantMappings', data: { tenantId: 'all', autoMatch: true } })}
             disabled={autoMap.isPending}
           >
             {autoMap.isPending ? 'Auto-mapping...' : 'Auto-map All Tenants'}
