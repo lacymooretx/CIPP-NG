@@ -783,6 +783,16 @@ export const nativeMenuItems = [
             path: '/teams-share/teams/business-voice',
             permissions: ['Teams.Voice.*'],
           },
+          {
+            title: 'Teams Policies',
+            path: '/teams-share/teams/policies',
+            permissions: ['Teams.Config.*'],
+          },
+          {
+            title: 'Voice Apps & Assignments',
+            path: '/teams-share/teams/voice-apps',
+            permissions: ['Teams.Voice.*'],
+          },
         ],
       },
     ],
