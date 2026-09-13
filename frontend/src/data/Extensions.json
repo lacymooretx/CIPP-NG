@@ -1543,6 +1543,7 @@
     "type": "ConnectWisePSA",
     "cat": "Ticketing",
     "logo": "/assets/integrations/connectwise.png",
+    "logoNeedsLightBacking": true,
     "comingSoon": true,
     "description": "Enable the ConnectWise PSA integration to send alerts to your ticketing system.",
     "mappingRequired": false
@@ -1553,6 +1554,7 @@
     "type": "AutotaskPSA",
     "cat": "Ticketing",
     "logo": "/assets/integrations/autotask.png",
+    "logoNeedsLightBacking": true,
     "comingSoon": true,
     "description": "Enable the Autotask PSA integration to send alerts to your ticketing system.",
     "mappingRequired": false
@@ -1563,6 +1565,7 @@
     "type": "KaseyaBMS",
     "cat": "Ticketing",
     "logo": "/assets/integrations/kaseya.svg",
+    "logoNeedsLightBacking": true,
     "comingSoon": true,
     "description": "Enable the Kaseya BMS integration to send alerts to your ticketing system.",
     "mappingRequired": false

@@ -36,7 +36,12 @@ const eslintConfig = defineConfig([
       'react-hooks/static-components': 'warn',
       'react-hooks/use-memo': 'warn',
       'react-hooks/rules-of-hooks': 'warn',
+      // Added by the 10.10.x eslint-config-next bump; fires on upstream's own test files.
+      'react-hooks/globals': 'warn',
       '@next/next/no-assign-module-variable': 'warn',
+      // JSX must live in .jsx files: vite 8's oxc transform (vitest/storybook)
+      // decides JSX handling purely by file extension
+      'react/jsx-filename-extension': ['error', { extensions: ['.jsx'] }],
     },
   },
   {
