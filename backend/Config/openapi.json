@@ -36270,6 +36270,121 @@
         "x-cipp-role": "CIPP.Core.ReadWrite"
       }
     },
+    "/api/ExecTeamsVoiceApp": {
+      "post": {
+        "summary": "ExecTeamsVoiceApp",
+        "operationId": "ExecTeamsVoiceApp",
+        "tags": [
+          "Teams-Sharepoint"
+        ],
+        "description": "Creates, updates and deletes Teams voice-app objects - call queues, auto\nattendants, schedules, resource-account associations - via the Teams ConfigAPI\n(New-TeamsRequestV2 -Path). The write counterpart of ListTeamsVoiceApp.\n\nBody params:\n  TenantFilter (required) - tenant default domain or customer id\n  Route        (required) - route key from Config/TeamsVoiceAppRoutes.json\n                            (e.g. 'CallQueues', 'AutoAttendants', 'Schedules')\n  Method                  - POST (default) | PUT | PATCH | DELETE\n  Identity                - instance id, appended to the route. Required for\n                            PUT/PATCH/DELETE against a specific object\n  Body                    - request payload (object or pre-serialized JSON string)\n\nRead the object with ListTeamsVoiceApp first and send back a full, modified copy:\nthese routes are not documented as merge semantics, so a partial PUT can drop\nproperties. Always read back after writing - a 2xx is not proof the write landed.\n\nEvery call is audited. The SAM/GDAP scope remains the real safety boundary.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "AsApp": {
+                    "type": "string"
+                  },
+                  "Body": {
+                    "type": "string"
+                  },
+                  "Identity": {
+                    "type": "string"
+                  },
+                  "Method": {
+                    "type": "string"
+                  },
+                  "Route": {
+                    "type": "string"
+                  },
+                  "TeamsRequestBody": {
+                    "type": "string"
+                  },
+                  "TenantFilter": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "Route",
+                  "TenantFilter"
+                ]
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "AsApp",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Identity",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Method",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Route",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/tenantFilter"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Not described statically: this endpoint returns the upstream response as-is, so its fields are determined by the upstream API rather than by CIPP. Call the endpoint to see the actual shape, or add a response schema in backend/Config/openapi-overrides."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - missing required field or invalid input"
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cipp-role": "Teams.Voice.ReadWrite"
+      }
+    },
     "/api/ExecTeamsVoicePhoneNumberAssignment": {
       "post": {
         "summary": "ExecTeamsVoicePhoneNumberAssignment",
@@ -58992,6 +59107,115 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cipp-role": "Teams.Voice.Read"
+      }
+    },
+    "/api/ListTeamsVoiceApp": {
+      "get": {
+        "summary": "ListTeamsVoiceApp",
+        "operationId": "ListTeamsVoiceApp",
+        "tags": [
+          "Teams-Sharepoint"
+        ],
+        "description": "Reads Teams voice-app and assignment surfaces that live OUTSIDE\n/Skype.Policy/configurations - call queues, auto attendants, schedules, resource\naccounts, emergency locations and group policy assignments - via the Teams\nConfigAPI (New-TeamsRequestV2 -Path).\n\nWhere ListTeamsPolicy covers the policy/configuration surface, this covers the\nrest. The route map is Config/TeamsVoiceAppRoutes.json, which also records which\nroutes were verified live and which are denied or absent.\n\nQuery/body params:\n  TenantFilter - required unless Catalog=true\n  Route        - route key from the catalog (e.g. 'CallQueues', 'AutoAttendants',\n                 'GroupPolicyAssignments'). Omit to sweep the whole catalog.\n  Identity     - optional instance id appended to the route\n  Catalog      - true to return the route catalog only, no tenant calls\n  Category     - filter to one category (Voice apps, Voice, Assignment, Tenant)\n  AsApp        - true to use an application token instead of delegated\n\nA sweep reports per-route errors inline rather than failing the whole request,\nbecause this surface is undocumented and route availability varies by tenant.",
+        "parameters": [
+          {
+            "name": "AsApp",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Catalog",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Category",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Identity",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Route",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/tenantFilter"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "description": "Derived from the fields the endpoint selects onto each record. The response may carry more; these are the ones known to exist.",
+                    "properties": {
+                      "Category": {
+                        "x-cipp-field-source": "backend"
+                      },
+                      "Count": {
+                        "x-cipp-field-source": "backend"
+                      },
+                      "Error": {
+                        "x-cipp-field-source": "backend"
+                      },
+                      "Items": {
+                        "x-cipp-field-source": "backend"
+                      },
+                      "Path": {
+                        "x-cipp-field-source": "backend"
+                      },
+                      "Route": {
+                        "x-cipp-field-source": "backend"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - missing required field or invalid input"
           },
           "401": {
             "description": "Unauthorized - invalid or missing bearer token"

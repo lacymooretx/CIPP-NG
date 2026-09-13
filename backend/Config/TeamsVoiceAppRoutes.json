@@ -1,0 +1,34 @@
+{
+  "_comment": "Teams ConfigAPI routes outside /Skype.Policy/configurations, reached via New-TeamsRequestV2 -Path. Verified live against aspendora.com on 2026-09-13 unless marked otherwise. 'verified' records what a live GET actually returned: 200 = reachable, 401 = exists but denied to CIPP's token (Microsoft-internal support surface), 404 = no such route.",
+  "routes": [
+    { "key": "CallQueues", "category": "Voice apps", "path": "Teams.VoiceApps/callqueues", "collection": "CallQueues", "verified": 200, "description": "Call queues with full routing, overflow, timeout, agent and voicemail configuration." },
+    { "key": "AutoAttendants", "category": "Voice apps", "path": "Teams.VoiceApps/auto-attendants", "collection": "AutoAttendants", "verified": null, "description": "Auto attendants: call flows, menus, prompts, holidays." },
+    { "key": "Schedules", "category": "Voice apps", "path": "Teams.VoiceApps/schedules", "collection": "Schedules", "verified": null, "description": "Business-hours and holiday schedules used by auto attendants." },
+    { "key": "ComplianceRecording", "category": "Voice apps", "path": "Teams.VoiceApps/compliance-recording", "collection": null, "verified": null, "description": "Compliance recording application configuration." },
+    { "key": "SharedCallQueueHistory", "category": "Voice apps", "path": "Teams.VoiceApps/shared-call-queue-history", "collection": null, "verified": null, "description": "Shared call queue history settings." },
+    { "key": "ApplicationInstanceAssociations", "category": "Voice apps", "path": "Teams.VoiceApps/applicationinstanceassociations", "collection": null, "verified": null, "description": "Which resource account is associated with which call queue / auto attendant." },
+    { "key": "SupportedLanguages", "category": "Voice apps", "path": "Teams.VoiceApps/supported-languages/identity", "collection": null, "verified": null, "description": "Languages available for voice app prompts." },
+    { "key": "SupportedTimezones", "category": "Voice apps", "path": "Teams.VoiceApps/supported-timezones/identity", "collection": null, "verified": null, "description": "Timezones available for voice app schedules." },
+
+    { "key": "ResourceAccounts", "category": "Voice", "path": "Teams.PlatformService/v2/ApplicationInstances", "collection": null, "verified": null, "description": "Resource accounts (application instances) backing call queues and auto attendants. Already used by Set-CIPPDBCacheTeamsResourceAccounts." },
+    { "key": "EmergencyLocations", "category": "Voice", "path": "Skype.Ncs/locations", "collection": null, "verified": null, "description": "Emergency (LIS) locations. Already used by Get-CippTeamsLocationLookup." },
+
+    { "key": "GroupPolicyAssignments", "category": "Assignment", "path": "Skype.Policy/groupPolicyAssignments", "collection": null, "verified": 200, "description": "Group policy assignments. Returns null when none are configured." },
+    { "key": "AssignmentOperations", "category": "Assignment", "path": "Skype.Policy/assignments/operations/status", "collection": null, "verified": 200, "description": "Status of batch/group policy assignment operations." },
+
+    { "key": "ServiceDiscovery", "category": "Tenant", "path": "Teams.Tenant/tenants", "collection": null, "verified": 200, "description": "Tenant info plus serviceDiscovery (ConfigApiEndpoint, AdminServiceEndpoint, X-MS-Forest) and the full assignedPlans list." }
+  ],
+  "denied": [
+    { "path": "Skype.Policy/groupPolicyAssignments/oce", "status": 401, "note": "Microsoft-internal support read. 401 persists with service discovery AND with x-ms-target-uri/x-ms-tenant-id headers. Use Skype.Policy/groupPolicyAssignments instead." },
+    { "path": "Skype.Policy/groupPolicyAssignments/oce/{groupId}/policyTypes", "status": 401, "note": "Same internal surface." },
+    { "path": "Teams.InternalSupport/*", "status": 401, "note": "Microsoft-internal support routes from CmdletSettings.json. Not customer-accessible." }
+  ],
+  "notFound": [
+    { "path": "Skype.Policy/users/{id}/policyassignments", "status": 404 },
+    { "path": "Skype.Policy/users/{id}", "status": 404 },
+    { "path": "Teams.Users/users/{id}", "status": 404 },
+    { "path": "Skype.Policy/userPolicyAssignments", "status": 404 },
+    { "path": "Skype.Policy/batchpolicyassignments", "status": 404 },
+    { "_note": "No per-user policy-assignment REST route exists on the customer ConfigAPI surface. Grant-Cs* in the MicrosoftTeams module rides the OCE remote-PowerShell path (admin<forest>.online.lync.com/OcsPowershellWebservice) - the surface New-TeamsRequestV2's own docs record as 40301 Forbidden under CSP/GDAP. See docs/teams-management-build-progress.md Phase 2." }
+  ]
+}
