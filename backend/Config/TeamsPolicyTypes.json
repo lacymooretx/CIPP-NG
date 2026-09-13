@@ -1,0 +1,58 @@
+{
+  "_comment": "Catalog of Microsoft Teams admin ConfigAPI types reachable via New-TeamsRequestV2 (https://api.interfaces.records.teams.microsoft.com/Skype.Policy/configurations/{Type}). 'identity' describes the instance model: 'Global' = single tenant-wide object only; 'Named' = Global plus custom named instances (Tag:<Name>). 'premium' flags types whose meaningful settings require a Teams Premium license. ConfigAPI is an undocumented internal surface; treat 'identity' as best-effort and verify per tenant.",
+  "types": [
+    { "type": "TeamsMeetingPolicy", "category": "Meetings", "identity": "Named", "premium": false, "description": "Core meeting policy: lobby, recording, transcription, screen sharing, anonymous join, watermarking and end-to-end encryption toggles." },
+    { "type": "TeamsMeetingConfiguration", "category": "Meetings", "identity": "Global", "premium": false, "description": "Tenant-wide meeting settings: anonymous join, meeting join URL / custom branding hooks, QoS port ranges." },
+    { "type": "TeamsMeetingBrandingPolicy", "category": "Meetings", "identity": "Named", "premium": true, "description": "Teams Premium meeting branding: custom lobby backgrounds, theming, logos." },
+    { "type": "TeamsMeetingTemplatePermissionPolicy", "category": "Meetings", "identity": "Named", "premium": true, "description": "Teams Premium: which meeting templates a user may see and use." },
+    { "type": "TeamsEventsPolicy", "category": "Meetings", "identity": "Named", "premium": false, "description": "Webinars and town halls: who may create them, advanced registration controls (Premium features gated inside)." },
+    { "type": "TeamsVirtualAppointmentsPolicy", "category": "Meetings", "identity": "Named", "premium": true, "description": "Teams Premium virtual appointments: SMS notifications, branded waiting room." },
+    { "type": "TeamsEnhancedEncryptionPolicy", "category": "Meetings", "identity": "Named", "premium": true, "description": "End-to-end encryption availability for calls and meetings." },
+    { "type": "TeamsRecordingRollOutPolicy", "category": "Meetings", "identity": "Named", "premium": false, "description": "Controls rollout of new recording/transcription behaviour." },
+    { "type": "TeamsMeetingBroadcastPolicy", "category": "Meetings", "identity": "Named", "premium": false, "description": "Live events policy: who may produce, recording and attendee options." },
+    { "type": "TeamsMeetingBroadcastConfiguration", "category": "Meetings", "identity": "Global", "premium": false, "description": "Tenant-wide live events configuration, including the SDN/eCDN provider." },
+
+    { "type": "TeamsMessagingPolicy", "category": "Messaging", "identity": "Named", "premium": false, "description": "Chat and channel messaging: edit/delete, read receipts, giphy, urgent messages, chat with external users." },
+    { "type": "TeamsMessagingConfiguration", "category": "Messaging", "identity": "Global", "premium": false, "description": "Tenant-wide messaging configuration." },
+    { "type": "TeamsChannelsPolicy", "category": "Messaging", "identity": "Named", "premium": false, "description": "Private and shared channel creation, org-wide teams." },
+    { "type": "TeamsNotificationAndFeedsPolicy", "category": "Messaging", "identity": "Named", "premium": false, "description": "Activity feed and notification behaviour." },
+    { "type": "TeamsFilesPolicy", "category": "Messaging", "identity": "Named", "premium": false, "description": "File sharing providers available in Teams." },
+
+    { "type": "TeamsAppSetupPolicy", "category": "Apps", "identity": "Named", "premium": false, "description": "Pinned apps, app bar layout, custom app uploading." },
+    { "type": "TeamsAppPermissionPolicy", "category": "Apps", "identity": "Named", "premium": false, "description": "Which Microsoft, third-party and custom apps users may install." },
+
+    { "type": "TenantFederationSettings", "category": "External access", "identity": "Global", "premium": false, "description": "Federation and external access: allowed/blocked domains, Teams Consumer federation, open federation. NOTE: the cmdlet noun is TenantFederationConfiguration; New-TeamsRequestV2 aliases it to this type automatically." },
+    { "type": "ExternalAccessPolicy", "category": "External access", "identity": "Named", "premium": false, "description": "Per-user external access: federated user communication, Teams Consumer, public cloud access." },
+    { "type": "TeamsAcsFederationConfiguration", "category": "External access", "identity": "Global", "premium": false, "description": "Azure Communication Services federation." },
+    { "type": "TeamsGuestMessagingConfiguration", "category": "External access", "identity": "Global", "premium": false, "description": "What guest accounts may do in chat." },
+    { "type": "TeamsGuestMeetingConfiguration", "category": "External access", "identity": "Global", "premium": false, "description": "Guest meeting capabilities." },
+    { "type": "TeamsGuestCallingConfiguration", "category": "External access", "identity": "Global", "premium": false, "description": "Guest calling capabilities." },
+
+    { "type": "TeamsCallingPolicy", "category": "Voice", "identity": "Named", "premium": false, "description": "Calling: private calling, call forwarding, delegation, voicemail, busy-on-busy, spam filtering." },
+    { "type": "TeamsCallParkPolicy", "category": "Voice", "identity": "Named", "premium": false, "description": "Call park and retrieve." },
+    { "type": "TeamsCallHoldPolicy", "category": "Voice", "identity": "Named", "premium": false, "description": "Custom hold music/branding." },
+    { "type": "TeamsEmergencyCallingPolicy", "category": "Voice", "identity": "Named", "premium": false, "description": "Emergency calling notifications and security desk routing." },
+    { "type": "TeamsEmergencyCallRoutingPolicy", "category": "Voice", "identity": "Named", "premium": false, "description": "Emergency numbers and routing for Direct Routing." },
+    { "type": "TeamsVoiceApplicationsPolicy", "category": "Voice", "identity": "Named", "premium": false, "description": "Auto attendant and call queue management permissions." },
+    { "type": "TeamsSharedCallingRoutingPolicy", "category": "Voice", "identity": "Named", "premium": false, "description": "Shared calling configuration." },
+    { "type": "OnlineVoiceRoutingPolicy", "category": "Voice", "identity": "Named", "premium": false, "description": "Direct Routing voice routes." },
+    { "type": "OnlineVoicemailPolicy", "category": "Voice", "identity": "Named", "premium": false, "description": "Voicemail transcription, profanity masking, maximum recording length." },
+    { "type": "TenantDialPlan", "category": "Voice", "identity": "Named", "premium": false, "description": "Normalization rules for dialled numbers." },
+    { "type": "TeamsAudioConferencingPolicy", "category": "Voice", "identity": "Named", "premium": false, "description": "Dial-in conferencing numbers offered to users." },
+    { "type": "TeamsComplianceRecordingPolicy", "category": "Voice", "identity": "Named", "premium": false, "description": "Third-party compliance recording integration." },
+    { "type": "TeamsCarrierEmergencyCallRoutingPolicy", "category": "Voice", "identity": "Named", "premium": false, "description": "Carrier-provided emergency call routing (Operator Connect)." },
+    { "type": "TeamsVideoInteropServicePolicy", "category": "Voice", "identity": "Named", "premium": false, "description": "Cloud Video Interop provider for legacy VTC endpoints." },
+
+    { "type": "TeamsClientConfiguration", "category": "Client & general", "identity": "Global", "premium": false, "description": "Tenant-wide client behaviour: email integration, resource account calling, organisation tab, third-party cloud storage." },
+    { "type": "TeamsUpdateManagementPolicy", "category": "Client & general", "identity": "Named", "premium": false, "description": "Teams client update ring and preview access." },
+    { "type": "TeamsFeedbackPolicy", "category": "Client & general", "identity": "Named", "premium": false, "description": "In-product survey and feedback availability." },
+    { "type": "TeamsMobilityPolicy", "category": "Client & general", "identity": "Named", "premium": false, "description": "Mobile client behaviour over cellular." },
+    { "type": "TeamsIPPhonePolicy", "category": "Client & general", "identity": "Named", "premium": false, "description": "Teams-certified desk phone sign-in mode and hot desking." },
+    { "type": "TeamsBYODAndDesksPolicy", "category": "Client & general", "identity": "Named", "premium": false, "description": "Bring-your-own-device and hot desk peripherals." },
+    { "type": "TeamsShiftsPolicy", "category": "Client & general", "identity": "Named", "premium": false, "description": "Shifts app behaviour." },
+    { "type": "TeamsMediaLoggingPolicy", "category": "Client & general", "identity": "Named", "premium": false, "description": "Verbose media logging for support diagnostics." },
+    { "type": "TeamsTargetingPolicy", "category": "Client & general", "identity": "Named", "premium": false, "description": "Targeted communications / tag management in teams." },
+    { "type": "TeamsAIPolicy", "category": "Client & general", "identity": "Named", "premium": false, "description": "AI feature availability in Teams (Copilot-adjacent controls)." },
+    { "type": "TeamsEducationAssignmentsAppPolicy", "category": "Client & general", "identity": "Named", "premium": false, "description": "Education assignments app settings." }
+  ]
+}

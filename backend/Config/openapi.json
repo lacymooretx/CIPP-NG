@@ -35969,6 +35969,307 @@
         "x-cipp-role": "Endpoint.Application.ReadWrite"
       }
     },
+    "/api/ExecTeamsPolicy": {
+      "post": {
+        "summary": "ExecTeamsPolicy",
+        "operationId": "ExecTeamsPolicy",
+        "tags": [
+          "Teams-Sharepoint"
+        ],
+        "description": "Creates, updates and removes Microsoft Teams admin policies for a tenant via the\nTeams ConfigAPI (New-TeamsRequestV2). The typed write counterpart of\nListTeamsPolicy.\n\nBody params:\n  TenantFilter (required) - tenant default domain or customer id\n  PolicyType   (required) - ConfigAPI type, cmdlet noun, or full cmdlet name\n                            (e.g. 'TeamsMeetingPolicy')\n  Action                  - Set (default) | New | Remove\n  Identity                - policy instance. Default 'Global'. Custom instances are\n                            conventionally 'Tag:<Name>'\n  Parameters              - object of properties to write. Required for Set/New.\n                            Set is a MERGE - only the properties you send change\n  NoRead                  - true to skip the read-for-Key step and PUT bare props\n  AsApp                   - true to use an application token instead of delegated\n\nSet applies to the whole tenant (Global) or to everyone the named policy is\nassigned to. Every call is audited. Per New-TeamsRequestV2's own notes, New and\nRemove are best-effort - not every ConfigAPI type supports creating named\ninstances this way. Always read back after writing.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "Action": {
+                    "type": "string"
+                  },
+                  "AsApp": {
+                    "type": "string"
+                  },
+                  "Identity": {
+                    "type": "string"
+                  },
+                  "NoRead": {
+                    "type": "string"
+                  },
+                  "Parameters": {
+                    "type": "string"
+                  },
+                  "PolicyType": {
+                    "type": "string"
+                  },
+                  "TenantFilter": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "PolicyType",
+                  "TenantFilter"
+                ]
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "Action",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "AsApp",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Identity",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "NoRead",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "PolicyType",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/tenantFilter"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Not described statically: this endpoint returns the upstream response as-is, so its fields are determined by the upstream API rather than by CIPP. Call the endpoint to see the actual shape, or add a response schema in backend/Config/openapi-overrides."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - missing required field or invalid input"
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cipp-role": "Teams.Config.ReadWrite"
+      }
+    },
+    "/api/ExecTeamsRequest": {
+      "post": {
+        "summary": "ExecTeamsRequest",
+        "operationId": "ExecTeamsRequest",
+        "tags": [
+          "CIPP > Core"
+        ],
+        "description": "Generic Microsoft Teams admin ConfigAPI passthrough - the Teams counterpart of\nExecGraphRequest and ExecExoRequest. Executes an arbitrary Teams admin request\nagainst a single tenant via New-TeamsRequestV2, which speaks the ACMS surface\n(api.interfaces.records.teams.microsoft.com) rather than the MicrosoftTeams\nPowerShell module. The module's policy writes go through\n/Skype.Policy/tenants/policies and return 40301 Forbidden under CSP/GDAP; the\nConfigAPI surface this uses authorizes with the roles CIPP already holds.\n\nGated to CIPP.Core.ReadWrite. It can reach any Teams surface with any verb, so the\nunderlying SAM/GDAP permissions remain the real safety boundary. Every mutating\ncall is audited.\n\nTwo mutually exclusive modes, mirroring New-TeamsRequestV2's parameter sets.\n\nConfiguration mode (default) - addresses /Skype.Policy/configurations/{Type}:\n  TenantFilter (required) - tenant default domain or customer id\n  Type         (required) - ConfigAPI type ('TeamsMeetingPolicy'), a cmdlet noun,\n                            or a full cmdlet name ('Set-CsTeamsMeetingPolicy');\n                            the verb is stripped and noun->type aliases applied\n  Action                  - Get (default) | Set | New | Remove\n  Identity                - policy instance, default 'Global' (e.g. 'Tag:Executives')\n  Parameters              - object of properties to write (Set/New). Only these are\n                            sent; Set is a merge, not a replace\n  ListAll                 - Get: return every instance of the type as an array\n  NoRead                  - Set: skip the read-for-Key step and PUT bare props\n\nPath mode - any other ConfigAPI surface, by raw path:\n  Path         (required) - e.g. 'Skype.Ncs/locations',\n                            'Teams.PlatformService/v2/ApplicationInstances'\n  Method                  - GET (default) | POST | PUT | PATCH | DELETE\n  Body                    - request body (object or JSON string)\n  QueryParameters         - object appended as a query string\n  AdditionalHeaders       - object of extra request headers\n\nBoth modes:\n  AsApp                - $true to force an application token instead of delegated\n  UseServiceDiscovery  - $true to resolve the per-tenant ConfigApi host and\n                         X-MS-Forest header first. Required for federation types\n                         and the legacy OcsPowershellWebservice surfaces.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "Action": {
+                    "type": "string"
+                  },
+                  "AdditionalHeaders": {
+                    "type": "string"
+                  },
+                  "AsApp": {
+                    "type": "string"
+                  },
+                  "Body": {
+                    "type": "string"
+                  },
+                  "Identity": {
+                    "type": "string"
+                  },
+                  "ListAll": {
+                    "type": "string"
+                  },
+                  "Method": {
+                    "type": "string"
+                  },
+                  "NoRead": {
+                    "type": "string"
+                  },
+                  "Parameters": {
+                    "type": "string"
+                  },
+                  "Path": {
+                    "type": "string"
+                  },
+                  "QueryParameters": {
+                    "type": "string"
+                  },
+                  "TeamsRequestBody": {
+                    "type": "string"
+                  },
+                  "TenantFilter": {
+                    "type": "string",
+                    "description": "Accept params from body (POST-style) first, falling back to query (GET-style)."
+                  },
+                  "Type": {
+                    "type": "string"
+                  },
+                  "UseServiceDiscovery": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "TenantFilter"
+                ]
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "Action",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "AsApp",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Identity",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "ListAll",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Method",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "NoRead",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Path",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/tenantFilter"
+          },
+          {
+            "name": "Type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "UseServiceDiscovery",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Derived from the fields the endpoint selects onto each record. The response may carry more; these are the ones known to exist.",
+                  "properties": {
+                    "Results": {
+                      "x-cipp-field-source": "backend"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - missing required field or invalid input"
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cipp-role": "CIPP.Core.ReadWrite"
+      }
+    },
     "/api/ExecTeamsVoicePhoneNumberAssignment": {
       "post": {
         "summary": "ExecTeamsVoicePhoneNumberAssignment",
@@ -58147,6 +58448,118 @@
           }
         ],
         "x-cipp-role": "Teams.Voice.Read"
+      }
+    },
+    "/api/ListTeamsPolicy": {
+      "get": {
+        "summary": "ListTeamsPolicy",
+        "operationId": "ListTeamsPolicy",
+        "tags": [
+          "Teams-Sharepoint"
+        ],
+        "description": "Reads Microsoft Teams admin policies and configuration for a tenant via the Teams\nConfigAPI (New-TeamsRequestV2). The typed read counterpart of ExecTeamsPolicy.\n\nQuery/body params:\n  TenantFilter - tenant default domain or customer id. Required unless Catalog=true.\n  PolicyType   - ConfigAPI type, cmdlet noun, or full cmdlet name\n                 (e.g. 'TeamsMeetingPolicy' / 'Get-CsTeamsMeetingPolicy').\n                 Omit to return every type in the catalog for this tenant.\n  Identity     - a single policy instance to read (e.g. 'Global', 'Tag:Executives').\n                 Omit to list all instances of the type.\n  Catalog      - true to return the static type catalog only, with no tenant calls.\n  Category     - filter the catalog / all-types sweep to one category\n                 (Meetings, Messaging, Apps, External access, Voice, Client & general).\n  AsApp        - true to use an application token instead of delegated.\n\nWith neither PolicyType nor Catalog this sweeps every catalogued type for the\ntenant. That is a lot of sequential ConfigAPI calls, so it reports per-type errors\ninline rather than failing the whole request, and Category is the way to narrow it.",
+        "parameters": [
+          {
+            "name": "AsApp",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Catalog",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Category",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Identity",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "PolicyType",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/tenantFilter"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "description": "Derived from the fields the endpoint selects onto each record. The response may carry more; these are the ones known to exist.",
+                    "properties": {
+                      "Category": {
+                        "x-cipp-field-source": "backend"
+                      },
+                      "Count": {
+                        "x-cipp-field-source": "backend"
+                      },
+                      "Description": {
+                        "x-cipp-field-source": "backend"
+                      },
+                      "Error": {
+                        "x-cipp-field-source": "backend"
+                      },
+                      "Instances": {
+                        "x-cipp-field-source": "backend"
+                      },
+                      "PolicyType": {
+                        "x-cipp-field-source": "backend"
+                      },
+                      "Premium": {
+                        "x-cipp-field-source": "backend"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - missing required field or invalid input"
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cipp-role": "Teams.Config.Read"
       }
     },
     "/api/ListTeamsVoice": {
