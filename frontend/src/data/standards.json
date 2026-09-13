@@ -8517,5 +8517,36 @@
       "warn": false,
       "remediate": false
     }
+  },
+  {
+    "name": "standards.TeamsPolicyTemplate",
+    "cat": "Teams Standards",
+    "tag": [],
+    "helpText": "Compares the tenant's Teams configuration against a template captured with AddTeamsPolicyTemplate, and optionally corrects any drift. Where the individual Teams standards each pin a handful of properties, this enforces an entire captured baseline - every property the template holds. Capture the template from a reference tenant under Teams > Teams Policies, then select it here.",
+    "executiveText": "Keeps Microsoft Teams settings consistent across every managed customer by comparing each tenant against an approved reference configuration. Differences are reported, and can be corrected automatically, so a tenant cannot quietly drift away from the agreed standard.",
+    "docsDescription": "Compares the tenant's Teams configuration against a saved Teams policy template and optionally remediates drift. The template is captured from a reference tenant with AddTeamsPolicyTemplate and may cover any of the 48 Teams ConfigAPI policy types. Remediation writes only the properties that actually differ, then reads each policy back to confirm the write landed - the Teams ConfigAPI returns 204 whether or not it applied a change, so a write is never reported as successful on the status code alone.",
+    "addedComponent": [
+      {
+        "type": "autoComplete",
+        "required": true,
+        "multiple": false,
+        "creatable": false,
+        "name": "standards.TeamsPolicyTemplate.TemplateId",
+        "label": "Teams policy template",
+        "api": {
+          "url": "/api/ListTeamsPolicyTemplates",
+          "labelField": "name",
+          "valueField": "GUID",
+          "queryKey": "ListTeamsPolicyTemplates"
+        }
+      }
+    ],
+    "label": "Enforce a captured Teams policy template",
+    "impact": "High Impact",
+    "impactColour": "danger",
+    "addedDate": "2026-09-13",
+    "powershellEquivalent": "Get-CsTeamsMeetingPolicy / Set-CsTeamsMeetingPolicy (per policy type in the template)",
+    "recommendedBy": [],
+    "requiredCapabilities": ["MCOSTANDARD", "MCOEV", "MCOIMP", "TEAMS1", "Teams_Room_Standard"]
   }
 ]
