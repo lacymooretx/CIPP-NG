@@ -6333,6 +6333,94 @@
         "x-cipp-role": "Teams.Group.ReadWrite"
       }
     },
+    "/api/AddTeamsPolicyTemplate": {
+      "post": {
+        "summary": "AddTeamsPolicyTemplate",
+        "operationId": "AddTeamsPolicyTemplate",
+        "tags": [
+          "Teams-Sharepoint"
+        ],
+        "description": "Captures a tenant's live Teams policy configuration as a reusable template, or\nsaves a hand-built one. Templates are deployed to other tenants with\nExecTeamsPolicyTemplate.\n\nTwo modes.\n\nCapture from a live tenant (the usual case):\n  TenantFilter (required) - the tenant to read from\n  PolicyTypes  (required) - array of ConfigAPI types to capture, e.g.\n                            ['TeamsMeetingPolicy','TeamsMessagingPolicy'].\n                            Pass ['*'] to capture every type in the catalog.\n  Identity                - which instance to capture. Default 'Global'.\n  Name         (required) - template name\n  Description             - free text\n\nSave a supplied template:\n  Name         (required)\n  Description\n  Policies     (required) - array of { PolicyType, Identity, Parameters }\n\nThe capture strips the ConfigAPI scope/identity envelope (Key, ConfigId,\nConfigMetadata...) via ConvertTo-CIPPTeamsPolicyTemplate, so the result is\nportable. Types that fail to read are recorded on the template with their error\nrather than silently omitted - a template that quietly captured 3 of 5 policies\nwould deploy an incomplete baseline.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "Description": {
+                    "type": "string"
+                  },
+                  "Identity": {
+                    "type": "string"
+                  },
+                  "Name": {
+                    "type": "string"
+                  },
+                  "Policies": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "Identity": {
+                          "type": "string"
+                        },
+                        "Parameters": {
+                          "type": "string"
+                        },
+                        "PolicyType": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  },
+                  "PolicyTypes": {
+                    "type": "string"
+                  },
+                  "TenantFilter": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "Name",
+                  "TenantFilter"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardResults"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - missing required field or invalid input"
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cipp-role": "Teams.Config.ReadWrite"
+      }
+    },
     "/api/AddTenant": {
       "post": {
         "summary": "AddTenant",
@@ -36206,6 +36294,87 @@
         "x-cipp-role": "Teams.Config.ReadWrite"
       }
     },
+    "/api/ExecTeamsPolicyTemplate": {
+      "post": {
+        "summary": "ExecTeamsPolicyTemplate",
+        "operationId": "ExecTeamsPolicyTemplate",
+        "tags": [
+          "Teams-Sharepoint"
+        ],
+        "description": "Deploys a saved Teams policy template to one or many tenants, then READS EACH\nPOLICY BACK and reports per-property whether the write actually landed.\n\nThe read-back is not optional. The Teams ConfigAPI returns 204 on a PUT whether\nor not it applied the change, and CIPP has a documented history of endpoints\nreporting success while writing nothing (ExecEditCAPolicyFull). A deploy that\ntrusted the status code could silently leave a whole fleet unconfigured while\nreporting success, so every policy is verified and any property whose readback\nvalue does not match what was sent is reported as a mismatch.\n\nBody params:\n  TemplateId   (required) - GUID from ListTeamsPolicyTemplates\n  TenantFilter (required) - a tenant, an array of tenants, or 'AllTenants'\n  PolicyTypes             - restrict the deploy to these types from the template\n  WhatIf                  - true to report what WOULD change, writing nothing.\n                            Reads each target policy and diffs it against the\n                            template. Use this first.\n\nResult shape: one entry per tenant per policy, with Status of\nApplied | NoChange | Mismatch | Failed | WouldChange | WouldNotChange.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "PolicyTypes": {
+                    "type": "string"
+                  },
+                  "TemplateId": {
+                    "type": "string"
+                  },
+                  "TenantFilter": {
+                    "type": "string"
+                  },
+                  "WhatIf": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "TemplateId",
+                  "TenantFilter"
+                ]
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "WhatIf",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardResults"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - missing required field or invalid input"
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cipp-role": "Teams.Config.ReadWrite"
+      }
+    },
     "/api/ExecTeamsRequest": {
       "post": {
         "summary": "ExecTeamsRequest",
@@ -58744,19 +58913,22 @@
                   "type": "array",
                   "items": {
                     "type": "object",
-                    "description": "Derived from the fields the endpoint selects onto each record. The response may carry more; these are the ones known to exist.",
+                    "description": "Derived from the fields the endpoint selects onto each record, and the columns the CIPP UI renders. The response may carry more; these are the ones known to exist.",
                     "properties": {
                       "Category": {
-                        "x-cipp-field-source": "backend"
+                        "x-cipp-field-source": "backend,frontend"
                       },
                       "Count": {
                         "x-cipp-field-source": "backend"
                       },
                       "Description": {
-                        "x-cipp-field-source": "backend"
+                        "x-cipp-field-source": "backend,frontend"
                       },
                       "Error": {
                         "x-cipp-field-source": "backend"
+                      },
+                      "identity": {
+                        "x-cipp-field-source": "frontend"
                       },
                       "Instances": {
                         "x-cipp-field-source": "backend"
@@ -58765,7 +58937,10 @@
                         "x-cipp-field-source": "backend"
                       },
                       "Premium": {
-                        "x-cipp-field-source": "backend"
+                        "x-cipp-field-source": "backend,frontend"
+                      },
+                      "type": {
+                        "x-cipp-field-source": "frontend"
                       }
                     }
                   }
@@ -58792,6 +58967,117 @@
           }
         ],
         "x-cipp-role": "Teams.Config.Read"
+      }
+    },
+    "/api/ListTeamsPolicyTemplates": {
+      "get": {
+        "summary": "ListTeamsPolicyTemplates",
+        "operationId": "ListTeamsPolicyTemplates",
+        "tags": [
+          "Teams-Sharepoint"
+        ],
+        "description": "Lists saved Teams policy templates. Pass ID to return one template in full,\nincluding every captured policy and its parameters.\n\nWithout ID the policy bodies are omitted - a full baseline template carries\nthousands of properties and the list view only needs the summary.",
+        "parameters": [
+          {
+            "name": "ID",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "description": "Derived from the fields written into the storage table it reads, and the fields the endpoint selects onto each record. Fields taken from the storage writers may be omitted by this endpoint, and the response may carry computed fields not listed here.",
+                    "properties": {
+                      "capturedAt": {
+                        "x-cipp-field-source": "backend"
+                      },
+                      "capturedFrom": {
+                        "x-cipp-field-source": "backend"
+                      },
+                      "captureFailures": {
+                        "x-cipp-field-source": "backend"
+                      },
+                      "description": {
+                        "x-cipp-field-source": "backend"
+                      },
+                      "ETag": {
+                        "type": "string",
+                        "x-cipp-field-source": "storage"
+                      },
+                      "GUID": {
+                        "x-cipp-field-source": "storage,backend"
+                      },
+                      "JSON": {
+                        "x-cipp-field-source": "storage"
+                      },
+                      "name": {
+                        "x-cipp-field-source": "backend"
+                      },
+                      "Package": {
+                        "x-cipp-field-source": "storage"
+                      },
+                      "PartitionKey": {
+                        "x-cipp-field-source": "storage"
+                      },
+                      "Permissions": {
+                        "type": "string",
+                        "x-cipp-field-source": "storage"
+                      },
+                      "policyCount": {
+                        "x-cipp-field-source": "backend"
+                      },
+                      "policyTypes": {
+                        "x-cipp-field-source": "backend"
+                      },
+                      "RowKey": {
+                        "x-cipp-field-source": "storage"
+                      },
+                      "SHA": {
+                        "x-cipp-field-source": "storage"
+                      },
+                      "Source": {
+                        "x-cipp-field-source": "storage"
+                      },
+                      "TemplateName": {
+                        "x-cipp-field-source": "storage"
+                      },
+                      "Timestamp": {
+                        "type": "string",
+                        "x-cipp-field-source": "storage"
+                      },
+                      "UpdatedBy": {
+                        "x-cipp-field-source": "storage"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cipp-role": "Teams.Config.Read",
+        "x-cipp-any-tenant": true
       }
     },
     "/api/ListTeamsVoice": {
@@ -59305,13 +59591,16 @@
                   "type": "array",
                   "items": {
                     "type": "object",
-                    "description": "Derived from the fields the endpoint selects onto each record. The response may carry more; these are the ones known to exist.",
+                    "description": "Derived from the fields the endpoint selects onto each record, and the columns the CIPP UI renders. The response may carry more; these are the ones known to exist.",
                     "properties": {
                       "Category": {
-                        "x-cipp-field-source": "backend"
+                        "x-cipp-field-source": "backend,frontend"
                       },
                       "Count": {
                         "x-cipp-field-source": "backend"
+                      },
+                      "description": {
+                        "x-cipp-field-source": "frontend"
                       },
                       "Error": {
                         "x-cipp-field-source": "backend"
@@ -59319,11 +59608,17 @@
                       "Items": {
                         "x-cipp-field-source": "backend"
                       },
+                      "key": {
+                        "x-cipp-field-source": "frontend"
+                      },
                       "Path": {
-                        "x-cipp-field-source": "backend"
+                        "x-cipp-field-source": "backend,frontend"
                       },
                       "Route": {
                         "x-cipp-field-source": "backend"
+                      },
+                      "verified": {
+                        "x-cipp-field-source": "frontend"
                       }
                     }
                   }
@@ -65704,6 +65999,78 @@
           }
         ],
         "x-cipp-role": "Tenant.Standards.ReadWrite"
+      }
+    },
+    "/api/RemoveTeamsPolicyTemplate": {
+      "post": {
+        "summary": "RemoveTeamsPolicyTemplate",
+        "operationId": "RemoveTeamsPolicyTemplate",
+        "tags": [
+          "Teams-Sharepoint"
+        ],
+        "description": "Deletes a saved Teams policy template. Removes the template only - tenants it was\nalready deployed to keep their settings.\n\nBody/query: ID (required) - the template GUID.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "ID": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "ID"
+                ]
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "ID",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardResults"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - missing required field or invalid input"
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cipp-role": "Teams.Config.ReadWrite",
+        "x-cipp-any-tenant": true
       }
     },
     "/api/RemoveTenantAllowBlockList": {
