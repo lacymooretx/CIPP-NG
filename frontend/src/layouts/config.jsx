@@ -544,6 +544,7 @@ export const nativeMenuItems = [
       'Endpoint.MEM.*',
       'Endpoint.Device.*',
       'Endpoint.Device.Read',
+      'Endpoint.Printer.*',
     ],
     items: [
       {
@@ -592,6 +593,32 @@ export const nativeMenuItems = [
             title: 'Status Pages',
             path: '/endpoint/autopilot/list-status-pages',
             permissions: ['Endpoint.Autopilot.*'],
+          },
+        ],
+      },
+      {
+        title: 'Printers',
+        permissions: ['Endpoint.Printer.*'],
+        items: [
+          {
+            title: 'Printer Catalogue',
+            path: '/endpoint/printers/catalog',
+            permissions: ['Endpoint.Printer.*'],
+          },
+          {
+            title: 'Universal Print Printers',
+            path: '/endpoint/printers',
+            permissions: ['Endpoint.Printer.*'],
+          },
+          {
+            title: 'Printer Shares',
+            path: '/endpoint/printers/shares',
+            permissions: ['Endpoint.Printer.*'],
+          },
+          {
+            title: 'Print Connectors',
+            path: '/endpoint/printers/connectors',
+            permissions: ['Endpoint.Printer.*'],
           },
         ],
       },

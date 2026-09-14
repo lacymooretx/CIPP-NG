@@ -81,7 +81,7 @@ function Invoke-AddIntuneTemplate {
     } catch {
         $StatusCode = [HttpStatusCode]::InternalServerError
         $ErrorMessage = Get-CippException -Exception $_
-        $Result = "Intune Template Deployment failed: $($ErrorMessage.NormalizedMessage)"
+        $Result = "Intune Template Deployment failed: $($ErrorMessage.NormalizedError)"
         Write-LogMessage -headers $Headers -API $APIName -tenant 'Global' -message $Result -Sev 'Error' -LogData $ErrorMessage
     }
 

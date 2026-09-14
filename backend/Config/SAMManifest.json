@@ -28,6 +28,26 @@
       "resourceAppId": "00000003-0000-0000-c000-000000000000",
       "resourceAccess": [
         {
+          "id": "3a736c8a-018e-460a-b60c-863b2683e8bf",
+          "type": "Scope"
+        },
+        {
+          "id": "89f66824-725f-4b8f-928e-e1c5258dc565",
+          "type": "Scope"
+        },
+        {
+          "id": "06ceea37-85e2-40d7-bec3-91337a46038f",
+          "type": "Scope"
+        },
+        {
+          "id": "d69c2d6d-4f72-4f99-a6b9-663e32f8cf68",
+          "type": "Scope"
+        },
+        {
+          "id": "9ccc526a-c51c-4e5c-a1fd-74726ef50b8f",
+          "type": "Scope"
+        },
+        {
           "id": "89b20d8a-76e2-4057-867b-9961f800b9a4",
           "type": "Role"
         },

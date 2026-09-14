@@ -73,6 +73,9 @@
       "name": "Endpoint > MEM"
     },
     {
+      "name": "Endpoint > Printers"
+    },
+    {
       "name": "Endpoint > Reports"
     },
     {
@@ -5118,6 +5121,117 @@
           }
         ],
         "x-cipp-role": "Endpoint.MEM.ReadWrite"
+      }
+    },
+    "/api/AddPrinterCatalogEntry": {
+      "post": {
+        "summary": "AddPrinterCatalogEntry",
+        "operationId": "AddPrinterCatalogEntry",
+        "tags": [
+          "Endpoint > Printers"
+        ],
+        "description": "Adds or updates a printer in a tenant's printer catalogue. Supply id to edit an existing entry. PrinterType must be UniversalPrint, DirectIP or ServerShare.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "AssignTo": {
+                    "$ref": "#/components/schemas/LabelValue"
+                  },
+                  "Comment": {
+                    "type": "string"
+                  },
+                  "DriverInfPath": {
+                    "type": "string"
+                  },
+                  "DriverName": {
+                    "type": "string"
+                  },
+                  "DriverSource": {
+                    "allOf": [
+                      {
+                        "$ref": "#/components/schemas/LabelValue"
+                      }
+                    ],
+                    "description": "A driver staged from an INF is useless without the path, and the failure would otherwise surface on the device rather than here."
+                  },
+                  "HostAddress": {
+                    "type": "string"
+                  },
+                  "id": {
+                    "type": "string",
+                    "description": "An id means edit in place; without one this is a new printer."
+                  },
+                  "Location": {
+                    "type": "string"
+                  },
+                  "Name": {
+                    "type": "string"
+                  },
+                  "PortNumber": {
+                    "type": "string"
+                  },
+                  "PrinterType": {
+                    "$ref": "#/components/schemas/LabelValue"
+                  },
+                  "ShareId": {
+                    "type": "string"
+                  },
+                  "ShareName": {
+                    "type": "string"
+                  },
+                  "tenantFilter": {
+                    "type": "string"
+                  },
+                  "UNCPath": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "tenantFilter"
+                ]
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/tenantFilter"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardResults"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - missing required field or invalid input"
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cipp-role": "Endpoint.Printer.ReadWrite"
       }
     },
     "/api/AddQuarantinePolicy": {
@@ -19710,6 +19824,83 @@
         "x-cipp-any-tenant": true
       }
     },
+    "/api/ExecDeployCatalogPrinter": {
+      "post": {
+        "summary": "ExecDeployCatalogPrinter",
+        "operationId": "ExecDeployCatalogPrinter",
+        "tags": [
+          "Endpoint > Printers"
+        ],
+        "description": "Deploys a catalogue printer to a tenant through Intune. Universal Print entries become a settings catalog policy; direct IP and print-server entries become an Intune platform script, because Intune has no configuration service provider for either.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "AssignTo": {
+                    "$ref": "#/components/schemas/LabelValue"
+                  },
+                  "id": {
+                    "type": "string"
+                  },
+                  "tenantFilter": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "tenantFilter"
+                ]
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/tenantFilter"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardResults"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - missing required field or invalid input"
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cipp-role": "Endpoint.Printer.ReadWrite"
+      }
+    },
     "/api/ExecDeviceAction": {
       "post": {
         "summary": "ExecDeviceAction",
@@ -30174,6 +30365,92 @@
           }
         ],
         "x-cipp-role": "Identity.Role.ReadWrite"
+      }
+    },
+    "/api/ExecPrinterShareAccess": {
+      "post": {
+        "summary": "ExecPrinterShareAccess",
+        "operationId": "ExecPrinterShareAccess",
+        "tags": [
+          "Endpoint > Printers"
+        ],
+        "description": "Grants or revokes access to a Universal Print printer share for a user or a group.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "Action": {
+                    "type": "string"
+                  },
+                  "PrincipalId": {
+                    "allOf": [
+                      {
+                        "$ref": "#/components/schemas/LabelValue"
+                      }
+                    ],
+                    "description": "The UI autocomplete posts a {label, value} object; a scripted caller posts a bare id."
+                  },
+                  "PrincipalName": {
+                    "type": "string"
+                  },
+                  "PrincipalType": {
+                    "type": "string",
+                    "enum": [
+                      "Group"
+                    ]
+                  },
+                  "ShareId": {
+                    "type": "string"
+                  },
+                  "tenantFilter": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "tenantFilter"
+                ]
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/tenantFilter"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardResults"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - missing required field or invalid input"
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cipp-role": "Endpoint.Printer.ReadWrite"
       }
     },
     "/api/ExecQuarantineManagement": {
@@ -56208,6 +56485,445 @@
         "x-cipp-role": "Endpoint.Application.Read"
       }
     },
+    "/api/ListPrintConnectors": {
+      "get": {
+        "summary": "ListPrintConnectors",
+        "operationId": "ListPrintConnectors",
+        "tags": [
+          "Endpoint > Printers"
+        ],
+        "description": "Lists the Universal Print connectors registered in a tenant, including their reported location and application version.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/tenantFilter"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "description": "Derived from the Microsoft Graph entity it queries, and the columns the CIPP UI renders. This endpoint returns the Graph response as-is without selecting fields, so these are the properties the entity CAN carry (x-cipp-field-source: graph-entity) rather than a proven projection - Graph returns a default subset unless asked otherwise.",
+                    "properties": {
+                      "appVersion": {
+                        "type": "string",
+                        "x-cipp-field-source": "graph-entity,frontend"
+                      },
+                      "displayName": {
+                        "type": "string",
+                        "x-cipp-field-source": "graph-entity,frontend"
+                      },
+                      "fullyQualifiedDomainName": {
+                        "type": "string",
+                        "x-cipp-field-source": "graph-entity,frontend"
+                      },
+                      "id": {
+                        "type": "string",
+                        "x-cipp-field-source": "graph-entity"
+                      },
+                      "location": {
+                        "type": "object",
+                        "x-cipp-field-source": "graph-entity"
+                      },
+                      "operatingSystem": {
+                        "type": "string",
+                        "x-cipp-field-source": "graph-entity,frontend"
+                      },
+                      "registeredDateTime": {
+                        "type": "string",
+                        "x-cipp-field-source": "graph-entity,frontend"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cipp-role": "Endpoint.Printer.Read"
+      }
+    },
+    "/api/ListPrinterCatalog": {
+      "get": {
+        "summary": "ListPrinterCatalog",
+        "operationId": "ListPrinterCatalog",
+        "tags": [
+          "Endpoint > Printers"
+        ],
+        "description": "Lists the printer catalogue for a tenant. The catalogue holds every printer CIPP manages for that customer, whether it is a Universal Print share, a direct IP printer or a mapped print-server queue.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/tenantFilter"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "description": "Derived from the fields written into the storage table it reads, and the fields the endpoint selects onto each record, and the columns the CIPP UI renders. Fields taken from the storage writers may be omitted by this endpoint, and the response may carry computed fields not listed here.",
+                    "properties": {
+                      "AssignTo": {
+                        "type": "string",
+                        "x-cipp-field-source": "storage,backend"
+                      },
+                      "Comment": {
+                        "type": "string",
+                        "x-cipp-field-source": "storage,backend"
+                      },
+                      "DriverInfPath": {
+                        "type": "string",
+                        "x-cipp-field-source": "storage,backend"
+                      },
+                      "DriverName": {
+                        "type": "string",
+                        "x-cipp-field-source": "storage,backend"
+                      },
+                      "DriverSource": {
+                        "type": "string",
+                        "x-cipp-field-source": "storage,backend"
+                      },
+                      "ETag": {
+                        "type": "string",
+                        "x-cipp-field-source": "storage"
+                      },
+                      "HostAddress": {
+                        "type": "string",
+                        "x-cipp-field-source": "storage,backend,frontend"
+                      },
+                      "id": {
+                        "x-cipp-field-source": "backend"
+                      },
+                      "LastDeployed": {
+                        "x-cipp-field-source": "storage,backend,frontend"
+                      },
+                      "Location": {
+                        "type": "string",
+                        "x-cipp-field-source": "storage,backend,frontend"
+                      },
+                      "Name": {
+                        "type": "string",
+                        "x-cipp-field-source": "storage,backend,frontend"
+                      },
+                      "PartitionKey": {
+                        "type": "string",
+                        "x-cipp-field-source": "storage"
+                      },
+                      "PortNumber": {
+                        "type": "string",
+                        "x-cipp-field-source": "storage,backend"
+                      },
+                      "PrinterType": {
+                        "type": "string",
+                        "x-cipp-field-source": "storage,backend,frontend"
+                      },
+                      "RowKey": {
+                        "type": "string",
+                        "x-cipp-field-source": "storage"
+                      },
+                      "ShareId": {
+                        "type": "string",
+                        "x-cipp-field-source": "storage,backend"
+                      },
+                      "ShareName": {
+                        "type": "string",
+                        "x-cipp-field-source": "storage,backend,frontend"
+                      },
+                      "Timestamp": {
+                        "type": "string",
+                        "x-cipp-field-source": "storage"
+                      },
+                      "UNCPath": {
+                        "type": "string",
+                        "x-cipp-field-source": "storage,backend,frontend"
+                      },
+                      "Updated": {
+                        "x-cipp-field-source": "backend"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cipp-role": "Endpoint.Printer.Read"
+      }
+    },
+    "/api/ListPrinters": {
+      "get": {
+        "summary": "ListPrinters",
+        "operationId": "ListPrinters",
+        "tags": [
+          "Endpoint > Printers"
+        ],
+        "description": "Lists the Universal Print printers registered in a tenant, including status, model and whether the printer is shared.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/tenantFilter"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "description": "Derived from the Microsoft Graph entity it queries, and the columns the CIPP UI renders. This endpoint returns the Graph response as-is without selecting fields, so these are the properties the entity CAN carry (x-cipp-field-source: graph-entity) rather than a proven projection - Graph returns a default subset unless asked otherwise.",
+                    "properties": {
+                      "capabilities": {
+                        "type": "object",
+                        "x-cipp-field-source": "graph-entity"
+                      },
+                      "defaults": {
+                        "type": "object",
+                        "x-cipp-field-source": "graph-entity"
+                      },
+                      "displayName": {
+                        "type": "string",
+                        "x-cipp-field-source": "graph-entity,frontend"
+                      },
+                      "hasPhysicalDevice": {
+                        "type": "boolean",
+                        "x-cipp-field-source": "graph-entity"
+                      },
+                      "id": {
+                        "type": "string",
+                        "x-cipp-field-source": "graph-entity"
+                      },
+                      "isAcceptingJobs": {
+                        "type": "boolean",
+                        "x-cipp-field-source": "graph-entity,frontend"
+                      },
+                      "isShared": {
+                        "type": "boolean",
+                        "x-cipp-field-source": "graph-entity,frontend"
+                      },
+                      "lastSeenDateTime": {
+                        "type": "string",
+                        "x-cipp-field-source": "graph-entity"
+                      },
+                      "location": {
+                        "type": "object",
+                        "x-cipp-field-source": "graph-entity"
+                      },
+                      "manufacturer": {
+                        "type": "string",
+                        "x-cipp-field-source": "graph-entity,frontend"
+                      },
+                      "model": {
+                        "type": "string",
+                        "x-cipp-field-source": "graph-entity,frontend"
+                      },
+                      "registeredDateTime": {
+                        "type": "string",
+                        "x-cipp-field-source": "graph-entity,frontend"
+                      },
+                      "status": {
+                        "type": "object",
+                        "x-cipp-field-source": "graph-entity,frontend"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cipp-role": "Endpoint.Printer.Read"
+      }
+    },
+    "/api/ListPrinterShares": {
+      "get": {
+        "summary": "ListPrinterShares",
+        "operationId": "ListPrinterShares",
+        "tags": [
+          "Endpoint > Printers"
+        ],
+        "description": "Lists Universal Print printer shares in a tenant. Pass ShareId to expand the users and groups allowed to print to a single share.",
+        "parameters": [
+          {
+            "name": "ShareId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/tenantFilter"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "description": "Derived from the Microsoft Graph entity it queries, and the columns the CIPP UI renders. This endpoint returns the Graph response as-is without selecting fields, so these are the properties the entity CAN carry (x-cipp-field-source: graph-entity) rather than a proven projection - Graph returns a default subset unless asked otherwise.",
+                    "properties": {
+                      "allowAllUsers": {
+                        "type": "boolean",
+                        "x-cipp-field-source": "graph-entity,frontend"
+                      },
+                      "capabilities": {
+                        "type": "object",
+                        "x-cipp-field-source": "graph-entity"
+                      },
+                      "createdDateTime": {
+                        "type": "string",
+                        "x-cipp-field-source": "graph-entity,frontend"
+                      },
+                      "defaults": {
+                        "type": "object",
+                        "x-cipp-field-source": "graph-entity"
+                      },
+                      "displayName": {
+                        "type": "string",
+                        "x-cipp-field-source": "graph-entity,frontend"
+                      },
+                      "id": {
+                        "type": "string",
+                        "x-cipp-field-source": "graph-entity"
+                      },
+                      "isAcceptingJobs": {
+                        "type": "boolean",
+                        "x-cipp-field-source": "graph-entity,frontend"
+                      },
+                      "location": {
+                        "type": "object",
+                        "x-cipp-field-source": "graph-entity"
+                      },
+                      "manufacturer": {
+                        "type": "string",
+                        "x-cipp-field-source": "graph-entity"
+                      },
+                      "model": {
+                        "type": "string",
+                        "x-cipp-field-source": "graph-entity"
+                      },
+                      "status": {
+                        "type": "object",
+                        "x-cipp-field-source": "graph-entity,frontend"
+                      },
+                      "viewPoint": {
+                        "type": "object",
+                        "x-cipp-field-source": "graph-entity"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cipp-role": "Endpoint.Printer.Read"
+      }
+    },
+    "/api/ListPrintSettings": {
+      "get": {
+        "summary": "ListPrintSettings",
+        "operationId": "ListPrintSettings",
+        "tags": [
+          "Endpoint > Printers"
+        ],
+        "description": "Retrieves the tenant-wide Universal Print service settings, such as whether document conversion is enabled.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/tenantFilter"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "description": "Not described statically: this endpoint returns the upstream response as-is, so its fields are determined by the upstream API rather than by CIPP. Call the endpoint to see the actual shape, or add a response schema in backend/Config/openapi-overrides."
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cipp-role": "Endpoint.Printer.Read"
+      }
+    },
     "/api/ListQuarantinePolicy": {
       "get": {
         "summary": "ListQuarantinePolicy",
@@ -69416,6 +70132,83 @@
           }
         ],
         "x-cipp-role": "Endpoint.MEM.ReadWrite"
+      }
+    },
+    "/api/RemovePrinterCatalogEntry": {
+      "post": {
+        "summary": "RemovePrinterCatalogEntry",
+        "operationId": "RemovePrinterCatalogEntry",
+        "tags": [
+          "Endpoint > Printers"
+        ],
+        "description": "Removes a printer from a tenant's printer catalogue. This only deletes the CIPP catalogue record; it does not remove printers already installed on devices.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "tenantFilter": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "tenantFilter"
+                ]
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/tenantFilter"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardResults"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - missing required field or invalid input"
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cipp-role": "Endpoint.Printer.ReadWrite"
       }
     },
     "/api/RemoveQuarantinePolicy": {
