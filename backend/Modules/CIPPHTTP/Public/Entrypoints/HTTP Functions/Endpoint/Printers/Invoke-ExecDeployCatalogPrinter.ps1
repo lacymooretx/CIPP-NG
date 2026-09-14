@@ -36,7 +36,10 @@ Function Invoke-ExecDeployCatalogPrinter {
         $Result = Set-CIPPCatalogPrinter -Printer $Printer -TenantFilter $TenantFilter -AssignTo $AssignTo -Headers $Headers -APIName $APIName
 
         # Stamp the catalogue so the UI can show what was last pushed and when.
-        $Printer.LastDeployed = (Get-Date).ToUniversalTime().ToString('o')
+        # Add-Member -Force, not assignment: a row written before this column existed has no
+        # LastDeployed property, and plain assignment throws "property cannot be found" - which
+        # made a deployment that had already succeeded report as a failure.
+        $Printer | Add-Member -NotePropertyName 'LastDeployed' -NotePropertyValue ((Get-Date).ToUniversalTime().ToString('o')) -Force
         $Table.Force = $true
         Add-CIPPAzDataTableEntity @Table -Entity $Printer -Force
 
