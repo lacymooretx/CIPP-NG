@@ -19,6 +19,12 @@ Function Invoke-ListPrintSettings {
     } catch {
         $ErrorMessage = Get-NormalizedError -Message $_.Exception.Message
         $StatusCode = [HttpStatusCode]::Forbidden
+        # Universal Print answers every authorization failure with the same "required security
+        # scopes" text, which sends people hunting for a missing permission that is already
+        # granted. Say what is actually wrong.
+        if ($ErrorMessage -match 'security scopes') {
+            $ErrorMessage = "$ErrorMessage -- Universal Print does not support partner delegated (GDAP) access: it is absent from the GDAP supported-workloads list, its Graph APIs publish no application permissions, and the GDAP identity is an external identity that cannot hold the Universal Print licence the service requires. Manage Universal Print printers in the customer tenant directly. CIPP can still DEPLOY Universal Print printers to users via the Intune settings catalog."
+        }
         $GraphRequest = $ErrorMessage
     }
 
