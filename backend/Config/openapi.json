@@ -56683,6 +56683,158 @@
         "x-cipp-role": "Endpoint.Printer.Read"
       }
     },
+    "/api/ListPrinterReport": {
+      "get": {
+        "summary": "ListPrinterReport",
+        "operationId": "ListPrinterReport",
+        "tags": [
+          "Endpoint > Printers"
+        ],
+        "description": "Universal Print readiness and usage per tenant: whether the tenant is licensed for Universal Print, how many printers, shares and connectors are registered, how many printers CIPP has catalogued, and pages printed over the reporting window. Pass tenantFilter=AllTenants for the cross-tenant view.",
+        "parameters": [
+          {
+            "name": "tenantFilter",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "description": "Derived from the fields written into the storage table it reads, and the columns the CIPP UI renders. Fields taken from the storage writers may be omitted by this endpoint, and the response may carry computed fields not listed here.",
+                    "properties": {
+                      "AssignTo": {
+                        "type": "string",
+                        "x-cipp-field-source": "storage"
+                      },
+                      "CatalogEntries": {
+                        "x-cipp-field-source": "frontend"
+                      },
+                      "Comment": {
+                        "type": "string",
+                        "x-cipp-field-source": "storage"
+                      },
+                      "ConnectorsRegistered": {
+                        "x-cipp-field-source": "frontend"
+                      },
+                      "DriverInfPath": {
+                        "type": "string",
+                        "x-cipp-field-source": "storage"
+                      },
+                      "DriverName": {
+                        "type": "string",
+                        "x-cipp-field-source": "storage"
+                      },
+                      "DriverSource": {
+                        "type": "string",
+                        "x-cipp-field-source": "storage"
+                      },
+                      "Errors": {
+                        "x-cipp-field-source": "frontend"
+                      },
+                      "ETag": {
+                        "type": "string",
+                        "x-cipp-field-source": "storage"
+                      },
+                      "HostAddress": {
+                        "type": "string",
+                        "x-cipp-field-source": "storage"
+                      },
+                      "LastDeployed": {
+                        "x-cipp-field-source": "storage"
+                      },
+                      "LicensedSeats": {
+                        "x-cipp-field-source": "frontend"
+                      },
+                      "Location": {
+                        "type": "string",
+                        "x-cipp-field-source": "storage"
+                      },
+                      "Name": {
+                        "type": "string",
+                        "x-cipp-field-source": "storage"
+                      },
+                      "PagesPrinted": {
+                        "x-cipp-field-source": "frontend"
+                      },
+                      "PartitionKey": {
+                        "type": "string",
+                        "x-cipp-field-source": "storage"
+                      },
+                      "PortNumber": {
+                        "type": "string",
+                        "x-cipp-field-source": "storage"
+                      },
+                      "PrintersRegistered": {
+                        "x-cipp-field-source": "frontend"
+                      },
+                      "PrinterType": {
+                        "type": "string",
+                        "x-cipp-field-source": "storage"
+                      },
+                      "RowKey": {
+                        "type": "string",
+                        "x-cipp-field-source": "storage"
+                      },
+                      "ShareId": {
+                        "type": "string",
+                        "x-cipp-field-source": "storage"
+                      },
+                      "ShareName": {
+                        "type": "string",
+                        "x-cipp-field-source": "storage"
+                      },
+                      "SharesRegistered": {
+                        "x-cipp-field-source": "frontend"
+                      },
+                      "Tenant": {
+                        "x-cipp-field-source": "frontend"
+                      },
+                      "Timestamp": {
+                        "type": "string",
+                        "x-cipp-field-source": "storage"
+                      },
+                      "UNCPath": {
+                        "type": "string",
+                        "x-cipp-field-source": "storage"
+                      },
+                      "UniversalPrintLicensed": {
+                        "x-cipp-field-source": "frontend"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cipp-role": "Endpoint.Printer.Read",
+        "x-cipp-any-tenant": true
+      }
+    },
     "/api/ListPrinters": {
       "get": {
         "summary": "ListPrinters",

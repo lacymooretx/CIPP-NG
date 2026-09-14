@@ -620,6 +620,12 @@ export const nativeMenuItems = [
             path: '/endpoint/printers/connectors',
             permissions: ['Endpoint.Printer.*'],
           },
+          {
+            title: 'Readiness & Usage',
+            path: '/endpoint/printers/report',
+            permissions: ['Endpoint.Printer.*'],
+            scope: 'global',
+          },
         ],
       },
       {

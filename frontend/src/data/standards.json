@@ -8888,5 +8888,26 @@
     "requiredCapabilities": [
       "AAD_PREMIUM_P2"
     ]
+  },
+  {
+    "name": "standards.PrinterCatalog",
+    "cat": "Intune Standards",
+    "tag": [],
+    "helpText": "Checks that every printer in the tenant's CIPP printer catalogue has been deployed to Intune, and optionally deploys the ones that are missing. Universal Print entries become a settings catalog policy; direct IP and print-server entries become an Intune platform script.",
+    "executiveText": "Ensures every printer the customer is supposed to have is actually published to their staff, so a new starter or a rebuilt laptop gets the right printers without a support call.",
+    "docsDescription": "Compares the tenant's CIPP printer catalogue against what is actually deployed in Intune and reports any printer that has no corresponding policy or script. Remediation deploys the missing ones using the same path as the Deploy action on the catalogue page. Printers are never removed by this standard.",
+    "addedComponent": [
+      {
+        "type": "switch",
+        "name": "standards.PrinterCatalog.AssignOnDeploy",
+        "label": "Apply the group assignment stored on each catalogue entry"
+      }
+    ],
+    "label": "Deploy the tenant's printer catalogue",
+    "impact": "Medium Impact",
+    "impactColour": "warning",
+    "addedDate": "2026-09-14",
+    "powershellEquivalent": "Portal or Graph API",
+    "recommendedBy": []
   }
 ]
