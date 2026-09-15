@@ -27,6 +27,17 @@ const Page = () => {
       relatedQueryKeys: "PrinterCatalog",
     },
     {
+      label: "Document in IT Glue",
+      type: "POST",
+      url: "/api/ExecPrinterCatalogToITGlue",
+      icon: <CippIcons.Share />,
+      data: {},
+      confirmText:
+        "Write this tenant's whole printer catalogue to IT Glue as the document 'Printers (CIPP-managed)'? Re-running updates the same document.",
+      multiPost: true,
+      hideBulk: false,
+    },
+    {
       label: "Edit",
       link: "/endpoint/printers/catalog/add?id=[id]",
       icon: <CippIcons.Edit />,

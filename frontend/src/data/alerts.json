@@ -820,5 +820,18 @@
       }
     ],
     "description": "Alerts when a user, group or service principal gains a permanent active admin role assignment (no end date) that is not in the approved list. On Entra ID P2 tenants time-bound and PIM-activated assignments are ignored; elsewhere every assignment counts as permanent. The first run only records the current state."
+  },
+  {
+    "name": "PrinterDeployFailure",
+    "label": "Alert on printers failing to install on devices",
+    "recommendedRunInterval": "1d",
+    "requiresInput": true,
+    "inputs": [
+      {
+        "inputType": "textField",
+        "inputLabel": "Only alert once the failure has stood for this many hours (default: 24). Intune retries on the next check-in, so a lower value will raise tickets for failures that fix themselves.",
+        "inputName": "PrinterDeployFailureHours"
+      }
+    ]
   }
 ]

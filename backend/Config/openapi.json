@@ -30367,6 +30367,69 @@
         "x-cipp-role": "Identity.Role.ReadWrite"
       }
     },
+    "/api/ExecPrinterCatalogToITGlue": {
+      "post": {
+        "summary": "ExecPrinterCatalogToITGlue",
+        "operationId": "ExecPrinterCatalogToITGlue",
+        "tags": [
+          "Endpoint > Printers"
+        ],
+        "description": "Writes a tenant's CIPP printer catalogue into IT Glue as a document, so the printers a client has are documented where the service desk already looks. Re-running updates the same document rather than creating another.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "tenantFilter": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "tenantFilter"
+                ]
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/tenantFilter"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardResults"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - missing required field or invalid input"
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cipp-role": "Endpoint.Printer.ReadWrite"
+      }
+    },
     "/api/ExecPrinterShareAccess": {
       "post": {
         "summary": "ExecPrinterShareAccess",
@@ -56614,7 +56677,7 @@
                         "x-cipp-field-source": "backend"
                       },
                       "LastDeployed": {
-                        "x-cipp-field-source": "storage,backend,frontend"
+                        "x-cipp-field-source": "backend,frontend"
                       },
                       "Location": {
                         "type": "string",
@@ -56657,6 +56720,119 @@
                         "x-cipp-field-source": "storage,backend,frontend"
                       },
                       "Updated": {
+                        "x-cipp-field-source": "backend"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cipp-role": "Endpoint.Printer.Read"
+      }
+    },
+    "/api/ListPrinterDeploymentStatus": {
+      "get": {
+        "summary": "ListPrinterDeploymentStatus",
+        "operationId": "ListPrinterDeploymentStatus",
+        "tags": [
+          "Endpoint > Printers"
+        ],
+        "description": "Per-device install status for the printers CIPP deploys as Intune platform scripts. Shows which devices have the printer, which failed, and the failure message from the device.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/tenantFilter"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "description": "Derived from the Microsoft Graph entity it queries, and the fields the endpoint selects onto each record, and the columns the CIPP UI renders. This endpoint returns the Graph response as-is without selecting fields, so these are the properties the entity CAN carry (x-cipp-field-source: graph-entity) rather than a proven projection - Graph returns a default subset unless asked otherwise.",
+                    "properties": {
+                      "createdDateTime": {
+                        "type": "string",
+                        "x-cipp-field-source": "graph-entity"
+                      },
+                      "description": {
+                        "type": "string",
+                        "x-cipp-field-source": "graph-entity"
+                      },
+                      "DeviceName": {
+                        "x-cipp-field-source": "backend,frontend"
+                      },
+                      "displayName": {
+                        "type": "string",
+                        "x-cipp-field-source": "graph-entity"
+                      },
+                      "enforceSignatureCheck": {
+                        "type": "boolean",
+                        "x-cipp-field-source": "graph-entity"
+                      },
+                      "ErrorCode": {
+                        "x-cipp-field-source": "backend,frontend"
+                      },
+                      "fileName": {
+                        "type": "string",
+                        "x-cipp-field-source": "graph-entity"
+                      },
+                      "id": {
+                        "type": "string",
+                        "x-cipp-field-source": "graph-entity"
+                      },
+                      "lastModifiedDateTime": {
+                        "type": "string",
+                        "x-cipp-field-source": "graph-entity"
+                      },
+                      "LastStateUpdate": {
+                        "x-cipp-field-source": "backend,frontend"
+                      },
+                      "Message": {
+                        "x-cipp-field-source": "backend,frontend"
+                      },
+                      "Printer": {
+                        "x-cipp-field-source": "backend,frontend"
+                      },
+                      "roleScopeTagIds": {
+                        "type": "array",
+                        "x-cipp-field-source": "graph-entity"
+                      },
+                      "runAs32Bit": {
+                        "type": "boolean",
+                        "x-cipp-field-source": "graph-entity"
+                      },
+                      "runAsAccount": {
+                        "type": "object",
+                        "x-cipp-field-source": "graph-entity"
+                      },
+                      "RunState": {
+                        "x-cipp-field-source": "backend,frontend"
+                      },
+                      "scriptContent": {
+                        "type": "string",
+                        "x-cipp-field-source": "graph-entity"
+                      },
+                      "ScriptId": {
                         "x-cipp-field-source": "backend"
                       }
                     }
@@ -56747,9 +56923,6 @@
                       },
                       "HostAddress": {
                         "type": "string",
-                        "x-cipp-field-source": "storage"
-                      },
-                      "LastDeployed": {
                         "x-cipp-field-source": "storage"
                       },
                       "LicensedSeats": {

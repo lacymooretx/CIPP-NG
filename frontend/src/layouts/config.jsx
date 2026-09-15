@@ -621,6 +621,11 @@ export const nativeMenuItems = [
             permissions: ['Endpoint.Printer.*'],
           },
           {
+            title: 'Deployment Status',
+            path: '/endpoint/printers/deployment-status',
+            permissions: ['Endpoint.Printer.*'],
+          },
+          {
             title: 'Readiness & Usage',
             path: '/endpoint/printers/report',
             permissions: ['Endpoint.Printer.*'],
