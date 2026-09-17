@@ -40,6 +40,7 @@ function Get-CIPPReportData {
         'SharingTracker' { return Get-CIPPSharingReportData -TenantFilter $TenantFilter }
         'SitePermissions' { return Get-CIPPSitePermissionsReportData -TenantFilter $TenantFilter }
         'Copilot' { return Get-CIPPCopilotReportData -TenantFilter $TenantFilter }
+        'AppConsent' { return Get-CIPPAppConsentReportData -TenantFilter $TenantFilter }
         default { throw "Unknown report type '$ReportType'." }
     }
 }

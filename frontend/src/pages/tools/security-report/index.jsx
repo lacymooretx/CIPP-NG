@@ -60,6 +60,7 @@ const REPORT_TYPES = [
   { label: "External Sharing Report", value: "SharingTracker" },
   { label: "Site Permissions Report", value: "SitePermissions" },
   { label: "Copilot Readiness Report", value: "Copilot" },
+  { label: "App Consent Posture Report", value: "AppConsent" },
 ].map((r) => ({ ...r, endpoint: ENDPOINT, command: COMMAND }));
 
 const tenantValue = (t) => (t && typeof t === "object" ? t.value : t);
