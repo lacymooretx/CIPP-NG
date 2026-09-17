@@ -305,8 +305,16 @@
   },
   {
     "name": "NewAppApproval",
-    "label": "Alert on new apps in the application approval list",
-    "recommendedRunInterval": "30m"
+    "label": "Alert on app consent requests awaiting admin approval",
+    "recommendedRunInterval": "30m",
+    "requiresInput": true,
+    "inputs": [
+      {
+        "inputType": "textField",
+        "inputLabel": "Maximum new pending requests to raise per run (default: 10). The excess is recorded as seen and will not re-surface; suppression is logged as a warning.",
+        "inputName": "AppApprovalMaxPerCycle"
+      }
+    ]
   },
   {
     "name": "SecDefaultsUpsell",
@@ -849,24 +857,6 @@
         "inputType": "textField",
         "inputLabel": "Maximum newly blocked applications to raise per run (default: 10). The excess is recorded as seen and will not re-surface; suppression is logged as a warning.",
         "inputName": "AppConsentBlockedMaxPerCycle"
-      }
-    ]
-  },
-  {
-    "name": "AppConsentRequestPending",
-    "label": "Alert on app consent requests waiting for admin review",
-    "recommendedRunInterval": "4h",
-    "requiresInput": true,
-    "inputs": [
-      {
-        "inputType": "textField",
-        "inputLabel": "Maximum new pending requests to raise per run (default: 10). The excess is recorded as seen and will not re-surface; suppression is logged as a warning.",
-        "inputName": "AppConsentRequestMaxPerCycle"
-      },
-      {
-        "inputType": "textField",
-        "inputLabel": "Maximum consent requests to inspect per run (default: 50). Each request needs its own call for status and requester, so this bounds the work on a tenant with a long history.",
-        "inputName": "AppConsentRequestMaxInspected"
       }
     ]
   },
