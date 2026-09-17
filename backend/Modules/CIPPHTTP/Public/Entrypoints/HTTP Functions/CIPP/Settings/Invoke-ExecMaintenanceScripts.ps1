@@ -5,7 +5,7 @@ Function Invoke-ExecMaintenanceScripts {
     .ROLE
         CIPP.AppSettings.Read
     .DESCRIPTION
-        Returns the maintenance scripts shipped with CIPP. Called without ScriptFile it lists the available scripts; with one it returns that script with the deployment's own tenant, subscription and resource details substituted in. MakeLink stores the result behind a one-time link instead.
+        Returns the maintenance scripts shipped with CIPP. Called without ScriptFile it lists the available scripts; with one it returns that script with the deployment's own tenant, subscription and resource details substituted in. (The MakeLink parameter was removed: it returned a link to an endpoint that never existed, and serving these scripts anonymously would disclose deployment details to anyone holding the GUID.)
     #>
     [CmdletBinding()]
     param($Request, $TriggerMetadata)
@@ -49,22 +49,22 @@ Function Invoke-ExecMaintenanceScripts {
 
             $ScriptContent = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($Script))
 
-            if ($Request.Query.MakeLink) {
-                $Table = Get-CippTable -TableName 'MaintenanceScripts'
-                $LinkGuid = ([guid]::NewGuid()).ToString()
-
-                $MaintenanceScriptRow = @{
-                    'RowKey'        = $LinkGuid
-                    'PartitionKey'  = 'Maintenance'
-                    'ScriptContent' = $ScriptContent
-                }
-                Add-CIPPAzDataTableEntity @Table -Entity $MaintenanceScriptRow -Force
-
-                Write-LogMessage -headers $Request.Headers -API $APIName -tenant 'Global' -message "Created one-time maintenance script link for $Filename" -Sev 'Info'
-                $Body = @{ Link = "/api/PublicScripts?guid=$LinkGuid" }
-            } else {
-                $Body = @{ ScriptContent = $ScriptContent }
-            }
+            # MakeLink removed. It returned "/api/PublicScripts?guid=<guid>", but no
+            # Invoke-PublicScripts exists in this fork OR upstream, so every link it produced was a
+            # 404 on arrival. Nothing in the frontend called it.
+            #
+            # It was not reinstated by writing the missing endpoint, because that endpoint would
+            # have to be ANONYMOUS to be useful, and these scripts carry the deployment's own
+            # tenant, subscription and resource details substituted in. That is unauthenticated
+            # disclosure of deployment detail to anyone holding a GUID - and GUIDs in URLs leak
+            # through browser history, proxy logs and referrers.
+            #
+            # Removing the branch also stops the table write it performed: every call persisted a
+            # substituted script to the MaintenanceScripts table, which nothing read and nothing
+            # expired, accumulating that same detail at rest indefinitely.
+            #
+            # Callers get the script content directly, which is what the non-link path always did.
+            $Body = @{ ScriptContent = $ScriptContent }
         }
     } catch {
         Write-LogMessage -headers $Request.Headers -API $APINAME -tenant $($tenantfilter) -message "Failed to retrieve maintenance scripts. Error: $($_.Exception.Message)" -Sev 'Error'

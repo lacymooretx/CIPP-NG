@@ -26489,16 +26489,8 @@
         "tags": [
           "CIPP > Settings"
         ],
-        "description": "Returns the maintenance scripts shipped with CIPP. Called without ScriptFile it lists the available scripts; with one it returns that script with the deployment's own tenant, subscription and resource details substituted in. MakeLink stores the result behind a one-time link instead.",
+        "description": "Returns the maintenance scripts shipped with CIPP. Called without ScriptFile it lists the available scripts; with one it returns that script with the deployment's own tenant, subscription and resource details substituted in. (The MakeLink parameter was removed: it returned a link to an endpoint that never existed, and serving these scripts anonymously would disclose deployment details to anyone holding the GUID.)",
         "parameters": [
-          {
-            "name": "MakeLink",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          },
           {
             "name": "ScriptFile",
             "in": "query",
