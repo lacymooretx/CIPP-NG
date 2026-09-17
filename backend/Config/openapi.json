@@ -47309,6 +47309,63 @@
         "x-cipp-role": "Identity.Device.Read"
       }
     },
+    "/api/ListDevicePolicyConflicts": {
+      "get": {
+        "summary": "ListDevicePolicyConflicts",
+        "operationId": "ListDevicePolicyConflicts",
+        "tags": [
+          "Endpoint > MEM"
+        ],
+        "description": "Surfaces the conflict state Intune actually computed for a device, rather than diffing\npolicies against each other (which is what ExecCompareIntunePolicy does, and is a different\nquestion).\n\nThree signals, in descending order of certainty:\n  1. Intune reported the setting as 'conflict' - its own computed verdict, not ours.\n  2. The setting state carries more than one entry in 'sources', i.e. Intune itself records\n     more than one policy claiming that setting.\n  3. The same setting key appears under more than one policy across the device's policy\n     states. This catches the case where each policy individually reports success but two\n     of them are writing the same CSP path, which is a conflict waiting to surface.\nSettings reported as 'error' are returned too, since \"the setting failed\" is the same\nquestion an operator is asking when they open this view.\n\nNOT built on deviceConfigurationConflictSummary. That tenant-wide endpoint was tested\nagainst four tenants on 2026-09-17 and returned HTTP 500 on two of them and an empty\ncollection on the other two - it produced usable data on none. It is still queried, as a\nbest-effort extra, but a failure there is reported and never allowed to fail the request.",
+        "parameters": [
+          {
+            "name": "DeviceId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/tenantFilter"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "description": "Not described statically: this endpoint returns the upstream response as-is, so its fields are determined by the upstream API rather than by CIPP. Call the endpoint to see the actual shape, or add a response schema in backend/Config/openapi-overrides."
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - missing required field or invalid input"
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cipp-role": "Endpoint.MEM.Read"
+      }
+    },
     "/api/ListDevices": {
       "get": {
         "summary": "ListDevices",
