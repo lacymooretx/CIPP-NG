@@ -61,6 +61,7 @@ const REPORT_TYPES = [
   { label: "Site Permissions Report", value: "SitePermissions" },
   { label: "Copilot Readiness Report", value: "Copilot" },
   { label: "App Consent Posture Report", value: "AppConsent" },
+  { label: "Windows Update Ring Health Report", value: "UpdateRingHealth" },
 ].map((r) => ({ ...r, endpoint: ENDPOINT, command: COMMAND }));
 
 const tenantValue = (t) => (t && typeof t === "object" ? t.value : t);
