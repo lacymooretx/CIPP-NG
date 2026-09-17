@@ -20,6 +20,14 @@ function Invoke-ExecGraphRequest {
           Body / GraphRequestBody - request body for write methods (object or JSON string)
           AsApp                   - $true to force an application token instead of delegated
           NoPagination / DisablePagination - $true to disable paging on GET
+
+        Writes: a 2xx from Graph is NOT proof the change applied. Graph returns 204 No Content for
+        an applied write, and for several resources it also ACCEPTS AND IGNORES properties it does
+        not recognise - same 204, nothing changed, no error. The usual cause is a body written for
+        one API version sent to the other: on authorizationPolicy, for example, beta exposes
+        `permissionGrantPolicyIdsAssignedToDefaultUserRole` at the top level while v1.0 exposes it
+        as `defaultUserRolePermissions.permissionGrantPoliciesAssigned`. Match the body to the
+        Version you pass, and always read the resource back to confirm a write landed.
     #>
     [CmdletBinding()]
     param($Request, $TriggerMetadata)
@@ -69,6 +77,23 @@ function Invoke-ExecGraphRequest {
             })
     }
 
+    # Serialize the body up front so a write with nothing to send can be rejected before it
+    # reaches Graph. A bodyless PATCH/POST/PUT is not a no-op that happens to be harmless: Graph
+    # answers it 2xx with no content, which is indistinguishable from an applied write, so the
+    # caller is told a change succeeded that was never even described. DELETE is excluded - it
+    # legitimately carries no body.
+    $WriteMethods = @('POST', 'PATCH', 'PUT')
+    $BodyJson = if ($null -ne $GraphBody -and $GraphBody -ne '') {
+        if ($GraphBody -is [string]) { $GraphBody } else { ConvertTo-Json -InputObject $GraphBody -Depth 20 -Compress }
+    } else { $null }
+
+    if ($Method -in $WriteMethods -and -not $BodyJson) {
+        return ([HttpResponseContext]@{
+                StatusCode = [HttpStatusCode]::BadRequest
+                Body       = [pscustomobject]@{ Results = "Method $Method requires a Body/GraphRequestBody." }
+            })
+    }
+
     # Build the full Graph URI. Allow a fully-qualified URL (e.g. a nextLink) to pass through.
     if ($Endpoint -match '^https?://') {
         $Uri = $Endpoint
@@ -88,10 +113,6 @@ function Invoke-ExecGraphRequest {
             if ($AsApp) { $GetParams.AsApp = $true }
             $Results = New-GraphGetRequest @GetParams
         } else {
-            $BodyJson = if ($null -ne $GraphBody -and $GraphBody -ne '') {
-                if ($GraphBody -is [string]) { $GraphBody } else { ConvertTo-Json -InputObject $GraphBody -Depth 20 -Compress }
-            } else { $null }
-
             $PostParams = @{
                 uri      = $Uri
                 tenantid = $TenantFilter
@@ -101,8 +122,11 @@ function Invoke-ExecGraphRequest {
             if ($AsApp) { $PostParams.AsApp = $true }
             $Results = New-GraphPOSTRequest @PostParams
 
-            # Audit every mutating call at Info so it shows in the CIPP log.
-            Write-LogMessage -headers $Headers -API $APIName -tenant $TenantFilter -message "Executed Graph $Method against $Endpoint" -Sev 'Info'
+            # Audit every mutating call at Info so it shows in the CIPP log. The body LENGTH is
+            # recorded, never the body itself - it can carry secrets - so that a write that sent
+            # nothing is visible in the log rather than reading as a successful change.
+            $BodyLength = if ($BodyJson) { $BodyJson.Length } else { 0 }
+            Write-LogMessage -headers $Headers -API $APIName -tenant $TenantFilter -message "Executed Graph $Method against $Endpoint (request body: $BodyLength chars)" -Sev 'Info'
         }
 
         $StatusCode = [HttpStatusCode]::OK

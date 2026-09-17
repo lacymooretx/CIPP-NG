@@ -49,12 +49,21 @@ function New-GraphPOSTRequest {
 
         # (F) Graph quirk: on beta, `authorizationPolicy` is exposed as a collection, so PATCHing the
         #     bare singleton `/beta/policies/authorizationPolicy` returns "Specified HTTP method is not
-        #     allowed for the request target". The v1.0 singleton accepts PATCH. Reroute bare-singleton
-        #     beta PATCHes to v1.0. The `/authorizationPolicy/authorizationPolicy` child form used by the
-        #     standards works on beta and is intentionally left untouched (only the bare path matches).
+        #     allowed for the request target". The `/authorizationPolicy/authorizationPolicy` child form
+        #     does accept PATCH on beta - it is what the standards already use - so bare-singleton beta
+        #     PATCHes are rerouted to it, staying on beta.
+        #
+        #     This previously rerouted to the *v1.0* singleton, which silently corrupted the request.
+        #     beta and v1.0 do not share a schema here: beta exposes
+        #     `permissionGrantPolicyIdsAssignedToDefaultUserRole` at the top level, while v1.0 exposes
+        #     the same data as `defaultUserRolePermissions.permissionGrantPoliciesAssigned`. Rewriting
+        #     the URL without translating the body handed v1.0 a property it does not know, and v1.0
+        #     *ignores* unknown properties instead of rejecting them - so Graph returned 204, CIPP
+        #     reported success, and nothing changed. Rerouting within beta keeps body and URL on one
+        #     schema, so a beta-shaped body means what the caller wrote.
         if ($type -eq 'PATCH' -and $uri -match '^https://graph\.microsoft\.com/beta/policies/authorizationPolicy(\?.*)?$') {
-            $uri = $uri -replace '^https://graph\.microsoft\.com/beta/', 'https://graph.microsoft.com/v1.0/'
-            Write-Information 'Rerouting authorizationPolicy PATCH from beta to v1.0 (beta rejects PATCH on the bare singleton).'
+            $uri = $uri -replace '^https://graph\.microsoft\.com/beta/policies/authorizationPolicy', 'https://graph.microsoft.com/beta/policies/authorizationPolicy/authorizationPolicy'
+            Write-Information 'Rerouting bare authorizationPolicy PATCH to the beta child form (beta rejects PATCH on the bare singleton).'
         }
 
         $RetryCount = 0
