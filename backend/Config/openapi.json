@@ -46510,7 +46510,7 @@
         "tags": [
           "Endpoint > MEM"
         ],
-        "description": "Lists Microsoft Defender antivirus state and detected threats for Intune-managed devices in a tenant.",
+        "description": "Lists Microsoft Defender antivirus state and detected threats for Intune-managed devices in a tenant.\n\nIncludeMalware=true additionally expands detectedMalwareState, the per-device malware detail\nunderneath windowsProtectionState: what was found, its severity, its execution state and\nwhether it was actually remediated. The state alone says \"Defender is healthy\"; this says\nwhether anything was caught and what happened to it.\n\nIt is a NESTED expand on the same request, not a per-device fan-out - verified honoured\nagainst live Graph rather than assumed, since Graph silently ignores expands it does not\nsupport. Off by default so the existing lighter query is unchanged for callers that only\nwant protection state.",
         "parameters": [
           {
             "name": "DeviceID",
@@ -46518,6 +46518,14 @@
             "required": false,
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "IncludeMalware",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean"
             }
           },
           {

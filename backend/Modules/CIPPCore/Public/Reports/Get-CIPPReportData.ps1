@@ -42,6 +42,7 @@ function Get-CIPPReportData {
         'Copilot' { return Get-CIPPCopilotReportData -TenantFilter $TenantFilter }
         'AppConsent' { return Get-CIPPAppConsentReportData -TenantFilter $TenantFilter }
         'UpdateRingHealth' { return Get-CIPPUpdateRingHealthReportData -TenantFilter $TenantFilter }
+        'StaleDevices' { return Get-CIPPStaleDeviceReportData -TenantFilter $TenantFilter }
         default { throw "Unknown report type '$ReportType'." }
     }
 }
