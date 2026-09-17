@@ -56480,6 +56480,79 @@
         "x-cipp-any-tenant": true
       }
     },
+    "/api/ListPolicyTargets": {
+      "get": {
+        "summary": "ListPolicyTargets",
+        "operationId": "ListPolicyTargets",
+        "tags": [
+          "Endpoint > MEM"
+        ],
+        "description": "Reverse assignment lookup: given a device, user or group, returns every Intune policy that\ntargets it, and whether an exclusion cancels that targeting.\n\nCIPP can already answer \"what does this policy target\". This answers the inverse - \"what\nlands on this object\" - which is the question asked when a device behaves unexpectedly, and\nthe one that previously required reading every policy's assignments by hand.\n\nMatching covers all four target forms Intune actually uses:\n  - group assignment, matched on the object's TRANSITIVE group membership, so a policy\n    assigned to a parent group is found even though the object is only a nested member\n  - All Devices / All Users / All Licensed Users virtual targets, applied only to the object\n    type they can apply to\n  - the exclusion forms of each, which cancel an include\n\nEXCLUSION WINS. Intune resolves an exclusion over an include, so a policy that is both\nincluded and excluded is reported as NOT effective. It is still listed, with both reasons,\nbecause \"assigned but excluded\" is a different problem from \"not assigned\" and silently\ndropping it hides the more confusing of the two.\n\nParameters (query or body):\n  TenantFilter (required)\n  DeviceId   - Intune managedDevice id, or the Entra device object id\n  UserId     - Entra user object id or UPN\n  GroupId    - Entra group object id\nExactly one of DeviceId / UserId / GroupId is required.",
+        "parameters": [
+          {
+            "name": "DeviceId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "GroupId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/tenantFilter"
+          },
+          {
+            "name": "UserId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "description": "Not described statically: this endpoint returns the upstream response as-is, so its fields are determined by the upstream API rather than by CIPP. Call the endpoint to see the actual shape, or add a response schema in backend/Config/openapi-overrides."
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - missing required field or invalid input"
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cipp-role": "Endpoint.MEM.Read"
+      }
+    },
     "/api/ListPotentialApps": {
       "post": {
         "summary": "ListPotentialApps",
