@@ -39,7 +39,12 @@ function Invoke-CIPPStandardUndoOauth {
         return
     }
 
-    $StateIsCorrect = ($CurrentState.permissionGrantPolicyIdsAssignedToDefaultUserRole -eq 'ManagePermissionGrantsForSelf.microsoft-user-default-legacy')
+    # -contains, not -eq. This property is an ARRAY, and `$array -eq 'x'` returns the matching
+    # ELEMENT (an Object[]), not a boolean - so the later `if ($StateIsCorrect -eq $true)` compared a
+    # string against 'True' and was never satisfied. The consequences were that the "already
+    # disabled" branch never ran (so a compliant tenant was re-PATCHed on every cycle) and the alert
+    # and report always claimed the standard was not applied.
+    $StateIsCorrect = (@($CurrentState.permissionGrantPolicyIdsAssignedToDefaultUserRole) -contains 'ManagePermissionGrantsForSelf.microsoft-user-default-legacy')
 
     if ($Settings.remediate -eq $true) {
         if ($StateIsCorrect -eq $true) {
@@ -55,7 +60,30 @@ function Invoke-CIPPStandardUndoOauth {
                     Body        = '{"permissionGrantPolicyIdsAssignedToDefaultUserRole":["ManagePermissionGrantsForSelf.microsoft-user-default-legacy"]}'
                 }
                 New-GraphPostRequest @GraphRequest
-                Write-LogMessage -API 'Standards' -tenant $tenant -message 'Application Consent Mode has been disabled.' -sev Info
+
+                # Read back before claiming success. A tenant in Microsoft-managed consent mode
+                # ("Let Microsoft manage your consent settings") accepts this PATCH, returns 204 and
+                # discards it - Microsoft owns the assignment there, so the property is effectively
+                # read-only. Without this check the standard reported success, and $StateIsCorrect
+                # below still held its PRE-remediation value, so the alert and report agreed with it.
+                # See docs/todo-cipp-bugs.md 5b.
+                $PostState = New-GraphGetRequest -tenantid $Tenant -Uri 'https://graph.microsoft.com/beta/policies/authorizationPolicy/authorizationPolicy?$select=permissionGrantPolicyIdsAssignedToDefaultUserRole'
+                $Assigned = @($PostState.permissionGrantPolicyIdsAssignedToDefaultUserRole)
+                $StateIsCorrect = ($Assigned -contains 'ManagePermissionGrantsForSelf.microsoft-user-default-legacy')
+
+                if ($StateIsCorrect) {
+                    Write-LogMessage -API 'Standards' -tenant $tenant -message 'Application Consent Mode has been disabled.' -sev Info
+                } else {
+                    # The pair below is the fingerprint of Microsoft-managed consent mode.
+                    $ManagedMode = ($Assigned -contains 'ManagePermissionGrantsForSelf.microsoft-user-default-recommended') -and
+                                   ($Assigned -contains 'ManagePermissionGrantsForSelf.microsoft-user-default-allow-consent-apps')
+                    $Reason = if ($ManagedMode) {
+                        'the tenant is in Microsoft-managed consent mode, where Microsoft owns this assignment and silently discards writes to it. Resolve individual applications with per-app admin consent instead.'
+                    } else {
+                        'the write was accepted but the value did not change.'
+                    }
+                    Write-LogMessage -API 'Standards' -tenant $tenant -message "Application Consent Mode could NOT be disabled: $Reason Current value: $($Assigned -join ', ')" -sev Error
+                }
             } catch {
                 Write-LogMessage -API 'Standards' -tenant $tenant -message 'Failed to set Application Consent Mode to disabled.' -sev Error -LogData $_
             }

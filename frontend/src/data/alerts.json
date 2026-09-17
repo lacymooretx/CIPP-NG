@@ -869,5 +869,10 @@
         "inputName": "AppConsentRequestMaxInspected"
       }
     ]
+  },
+  {
+    "name": "NewRole",
+    "label": "Alert on changes to directory role membership",
+    "recommendedRunInterval": "1d"
   }
 ]

@@ -135,7 +135,23 @@ function Invoke-CIPPStandardOauthConsent {
                 }
             }
 
-            Write-LogMessage -API 'Standards' -tenant $tenant -message 'Application Consent Mode has been enabled.' -sev Info
+            # The success line is conditional on the post-remediation read above. It used to be
+            # unconditional, so a tenant in Microsoft-managed consent mode - where Microsoft owns
+            # this assignment and silently discards writes to it - logged success while nothing
+            # changed. See docs/todo-cipp-bugs.md 5b.
+            if ($StateIsCorrect) {
+                Write-LogMessage -API 'Standards' -tenant $tenant -message 'Application Consent Mode has been enabled.' -sev Info
+            } else {
+                $Assigned = @($State.permissionGrantPolicyIdsAssignedToDefaultUserRole)
+                $ManagedMode = ($Assigned -contains 'ManagePermissionGrantsForSelf.microsoft-user-default-recommended') -and
+                               ($Assigned -contains 'ManagePermissionGrantsForSelf.microsoft-user-default-allow-consent-apps')
+                $Reason = if ($ManagedMode) {
+                    'the tenant is in Microsoft-managed consent mode, where Microsoft owns this assignment and silently discards writes to it. Resolve individual applications with per-app admin consent instead.'
+                } else {
+                    'the write was accepted but the value did not change.'
+                }
+                Write-LogMessage -API 'Standards' -tenant $tenant -message "Application Consent Mode could NOT be enabled: $Reason Current value: $($Assigned -join ', ')" -sev Error
+            }
         } catch {
             $ErrorMessage = Get-NormalizedError -Message $_.Exception.Message
             Write-LogMessage -API 'Standards' -tenant $tenant -message "Failed to apply Application Consent Mode Error: $ErrorMessage" -sev Error
