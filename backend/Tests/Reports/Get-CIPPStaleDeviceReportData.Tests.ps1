@@ -31,10 +31,10 @@ BeforeAll {
             operatingSystem = 'Windows'; userPrincipalName = $Upn }
     }
     function New-Entra {
-        param($Name = 'PC1', $DeviceId = 'aad-1', $SignInDaysAgo = 1, $Enabled = $true)
+        param($Name = 'PC1', $DeviceId = 'aad-1', $SignInDaysAgo = 1, $Enabled = $true, $TrustType = 'AzureAd')
         [pscustomobject]@{ id = "dir-$Name"; deviceId = $DeviceId; displayName = $Name; accountEnabled = $Enabled
             approximateLastSignInDateTime = $(if ($null -ne $SignInDaysAgo) { (Get-Date).ToUniversalTime().AddDays(-$SignInDaysAgo).ToString('o') } else { $null })
-            operatingSystem = 'Windows' }
+            operatingSystem = 'Windows'; trustType = $TrustType }
     }
     # Return the SECTION (a hashtable, which PowerShell does not enumerate on return) and index
     # .Rows inline. Returning the row collection from a function unrolls it: a single row is itself
@@ -126,6 +126,54 @@ Describe 'Get-CIPPStaleDeviceReportData' {
         $script:EntraDevices = @(New-Entra -Name 'DeadEntra' -DeviceId 'solo' -SignInDaysAgo 400)
 
         (Get-Actions (Get-CIPPStaleDeviceReportData -TenantFilter 'contoso.com'))['DeadEntra'][0] | Should -Be 'DELETE'
+    }
+
+    Context 'trustType decides whether DELETE is even safe' {
+        It 'never DELETEs a stale HYBRID device - the Entra object is owned by AD Connect' {
+            # Deleting it re-syncs straight back, or breaks the device identity and its CA.
+            $script:EntraDevices = @(New-Entra -Name 'HybridPC' -DeviceId 'solo' -SignInDaysAgo 400 -TrustType 'ServerAd')
+
+            $m = Get-CIPPStaleDeviceReportData -TenantFilter 'contoso.com'
+            $Row = (Get-Actions $m)['HybridPC']
+
+            $Row[0] | Should -Be 'REVIEW'
+            $Row[2] | Should -Be 'Entra only (hybrid)'
+            $Row[6] | Should -Match 'on-premises AD'
+        }
+
+        It 'never DELETEs a disabled hybrid device either' {
+            $script:EntraDevices = @(New-Entra -Name 'HybridOff' -DeviceId 'solo' -SignInDaysAgo 1 -Enabled $false -TrustType 'ServerAd')
+
+            (Get-Actions (Get-CIPPStaleDeviceReportData -TenantFilter 'contoso.com'))['HybridOff'][0] | Should -Be 'REVIEW'
+        }
+
+        It 'never DELETEs a stale REGISTERED (BYOD) device' {
+            # Not being Intune-enrolled is expected for BYOD; deleting forces re-registration.
+            $script:EntraDevices = @(New-Entra -Name 'Phone' -DeviceId 'solo' -SignInDaysAgo 400 -TrustType 'Workplace')
+
+            $Row = (Get-Actions (Get-CIPPStaleDeviceReportData -TenantFilter 'contoso.com'))['Phone']
+
+            $Row[0] | Should -Be 'REVIEW'
+            $Row[2] | Should -Be 'Entra only (registered)'
+            $Row[6] | Should -Match 'BYOD'
+        }
+
+        It 'DOES DELETE a stale cloud-joined device that was never enrolled' {
+            $script:EntraDevices = @(New-Entra -Name 'CloudOrphan' -DeviceId 'solo' -SignInDaysAgo 400 -TrustType 'AzureAd')
+
+            (Get-Actions (Get-CIPPStaleDeviceReportData -TenantFilter 'contoso.com'))['CloudOrphan'][0] | Should -Be 'DELETE'
+        }
+
+        It 'MONITORs an active hybrid or registered device rather than reviewing it' {
+            $script:EntraDevices = @(
+                (New-Entra -Name 'LiveHybrid' -DeviceId 's1' -SignInDaysAgo 2 -TrustType 'ServerAd')
+                (New-Entra -Name 'LivePhone' -DeviceId 's2' -SignInDaysAgo 2 -TrustType 'Workplace'))
+
+            $A = Get-Actions (Get-CIPPStaleDeviceReportData -TenantFilter 'contoso.com')
+
+            $A['LiveHybrid'][0] | Should -Be 'MONITOR'
+            $A['LivePhone'][0] | Should -Be 'MONITOR'
+        }
     }
 
     It 'does not double-report a device present on both sides' {

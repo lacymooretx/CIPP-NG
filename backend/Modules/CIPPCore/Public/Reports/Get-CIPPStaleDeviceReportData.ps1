@@ -61,7 +61,7 @@ function Get-CIPPStaleDeviceReportData {
     $Managed = @()
     $EntraDevices = @()
     try { $Managed = @(New-GraphGetRequest -uri "$GraphBeta/deviceManagement/managedDevices?`$select=id,deviceName,azureADDeviceId,lastSyncDateTime,operatingSystem,userPrincipalName,managementAgent" -tenantid $TenantFilter) } catch {}
-    try { $EntraDevices = @(New-GraphGetRequest -uri "$GraphBeta/devices?`$select=id,deviceId,displayName,accountEnabled,approximateLastSignInDateTime,operatingSystem,isManaged" -tenantid $TenantFilter) } catch {}
+    try { $EntraDevices = @(New-GraphGetRequest -uri "$GraphBeta/devices?`$select=id,deviceId,displayName,accountEnabled,approximateLastSignInDateTime,operatingSystem,isManaged,trustType" -tenantid $TenantFilter) } catch {}
 
     # Join on the ENTRA deviceId. The Intune managed device id is a different identifier; joining on
     # it matches nothing and every device reads as orphaned.
@@ -111,9 +111,39 @@ function Get-CIPPStaleDeviceReportData {
             if ($DevId -and $IntuneByAadId.ContainsKey($DevId)) { continue }   # covered above
             $Age = Get-Age $Device.approximateLastSignInDateTime
 
+            # trustType decides whether DELETE is even a safe recommendation, so it is read before
+            # the staleness rules rather than after:
+            #   ServerAd  - hybrid domain-joined. The Entra object is owned by AD Connect. Deleting
+            #               it either re-syncs straight back or breaks the device's Entra identity
+            #               and its Conditional Access. The fix belongs in on-prem AD.
+            #   Workplace - registered / BYOD. Never Intune-enrolled BY DESIGN, so "not enrolled" is
+            #               not evidence of anything wrong. Deleting forces the user to re-register.
+            #   AzureAd   - cloud-joined and never enrolled is a genuine orphan.
+            $Trust = [string]$Device.trustType
+            $Source = switch ($Trust) {
+                'ServerAd' { 'Entra only (hybrid)' }
+                'Workplace' { 'Entra only (registered)' }
+                default { 'Entra only' }
+            }
+
             $Action = $null; $Reason = $null
-            if ($null -ne $Age -and $Age -ge $StaleDays) {
-                $Action = 'DELETE'; $Reason = "Entra device never enrolled in Intune and no sign-in for $Age days"
+            if ($Trust -eq 'ServerAd') {
+                # Never DELETE: the record is a projection of an on-prem AD object.
+                if (($null -ne $Age -and $Age -ge $StaleDays) -or -not $Device.accountEnabled) {
+                    $Action = 'REVIEW'
+                    $Reason = "Hybrid-joined and quiet$(if ($null -ne $Age) { " for $Age days" }). Managed by AD Connect - remove it from on-premises AD, not from Entra; deleting the Entra object here will re-sync or break the device's identity."
+                } else {
+                    $Action = 'MONITOR'; $Reason = 'Hybrid-joined and active, but not enrolled in Intune'
+                }
+            } elseif ($Trust -eq 'Workplace') {
+                if ($null -ne $Age -and $Age -ge $StaleDays) {
+                    $Action = 'REVIEW'
+                    $Reason = "Registered (BYOD) device, no sign-in for $Age days. Not being Intune-enrolled is expected for this type; deleting it forces the user to re-register."
+                } else {
+                    $Action = 'MONITOR'; $Reason = 'Registered (BYOD) device, active'
+                }
+            } elseif ($null -ne $Age -and $Age -ge $StaleDays) {
+                $Action = 'DELETE'; $Reason = "Cloud-joined, never enrolled in Intune and no sign-in for $Age days"
             } elseif (-not $Device.accountEnabled) {
                 $Action = 'DELETE'; $Reason = 'Entra device object is disabled and not enrolled'
             } else {
@@ -122,7 +152,7 @@ function Get-CIPPStaleDeviceReportData {
             }
 
             $Counts[$Action]++
-            $r.Add(@($Action, [string]$Device.displayName, 'Entra only', [string]$Device.operatingSystem, $(if ($null -ne $Age) { "$Age d" } else { 'never' }), '', $Reason))
+            $r.Add(@($Action, [string]$Device.displayName, $Source, [string]$Device.operatingSystem, $(if ($null -ne $Age) { "$Age d" } else { 'never' }), '', $Reason))
         }
 
         $Columns = @('Action', 'Device', 'Source', 'OS', 'Last Seen', 'Owner', 'Reason')
@@ -148,7 +178,7 @@ function Get-CIPPStaleDeviceReportData {
 
         if ($Counts.DELETE -gt 0) { Add-Finding 'Orphaned device records' 'warn' "$($Counts.DELETE) record(s) exist in only one directory and cannot be managed." }
         if ($Counts.RETIRE -gt 0) { Add-Finding 'Devices no longer checking in' 'warn' "$($Counts.RETIRE) Intune device(s) have not synced in $StaleDays days or more." }
-        if ($Counts.REVIEW -gt 0) { Add-Finding 'Devices with a disabled or unknown owner' 'warn' "$($Counts.REVIEW) device(s) need an owner decision." }
+        if ($Counts.REVIEW -gt 0) { Add-Finding 'Devices needing a human decision' 'warn' "$($Counts.REVIEW) device(s) need review: a disabled owner, or a hybrid/registered record that must not simply be deleted from Entra." }
         if ($Counts.MONITOR -gt 0) { Add-Finding 'Unenrolled active devices' 'warn' "$($Counts.MONITOR) active Entra device(s) are not enrolled in Intune." }
         if (($Counts.Values | Measure-Object -Sum).Sum -eq 0) { Add-Finding 'Device records are clean' 'pass' 'Intune and Entra agree, and every device is checking in.' }
     }
