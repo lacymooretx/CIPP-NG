@@ -130,8 +130,13 @@ function Get-CIPPUpdateRingHealthReportData {
 
         $Columns = @('Ring', 'Managed By', 'Quality', 'Feature', 'Quality Deadline', 'Grace', 'Drivers', 'Assignments')
         if ($Rings.Count -eq 0) {
-            Add-Section 'Update Rings' 'warn' 'No Windows Update for Business rings are configured.' $Columns (New-RowList) 'No update rings found. Devices fall back to Windows defaults.'
-            Add-Finding 'No update rings configured' 'warn' 'This tenant has no Windows Update for Business rings, so update behaviour is unmanaged.'
+            # States the observation and stops. An earlier version concluded "update behaviour is
+            # unmanaged", which is an inference this report cannot support: it sees Intune through
+            # Graph and has no visibility of third-party patch managers. Most of this estate is
+            # patched by Action1, where having no WUfB rings is the intended architecture rather
+            # than a gap - so the old wording reported healthy tenants as a patching failure.
+            Add-Section 'Update Rings' 'warn' 'No Windows Update for Business rings are configured.' $Columns (New-RowList) 'No Windows Update for Business rings found. If patching is handled by another tool (for example Action1), this is expected.'
+            Add-Finding 'No Windows Update for Business rings' 'warn' 'This tenant has no WUfB rings. Confirm patching is handled elsewhere - this report only sees Intune, so it cannot tell an intentional third-party patching setup from an actual gap.'
         } else {
             Add-Section 'Update Rings' 'pass' "$($Rings.Count) ring(s); $ManagedCount managed by Windows Autopatch and excluded from the findings below." $Columns $r $null
         }

@@ -183,12 +183,20 @@ Describe 'Get-CIPPUpdateRingHealthReportData' {
         }
     }
 
-    It 'warns when the tenant has no update rings at all' {
+    It 'reports no WUfB rings as an observation, NOT as "patching is unmanaged"' {
+        # This report sees Intune through Graph and cannot see a third-party patch manager. Most of
+        # this estate is patched by Action1, where having no WUfB rings is the intended
+        # architecture - an earlier wording called that "unmanaged" and reported healthy tenants as
+        # a patching failure.
         $script:Rings = @()
 
         $m = Get-CIPPUpdateRingHealthReportData -TenantFilter 'contoso.com'
+        $Finding = $m.Findings | Where-Object { $_.Title -match 'No Windows Update for Business rings' }
 
         (Get-Section $m 'Update Rings').Status | Should -Be 'warn'
-        ($m.Findings | Where-Object { $_.Title -match 'No update rings' }).Status | Should -Be 'warn'
+        $Finding.Status | Should -Be 'warn'
+        $Finding.Detail | Should -Match 'Confirm patching is handled elsewhere'
+        $Finding.Detail | Should -Not -Match 'unmanaged'
+        (Get-Section $m 'Update Rings').Empty | Should -Match 'another tool'
     }
 }
