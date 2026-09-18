@@ -15,6 +15,15 @@ function Invoke-ListIntuneDeploymentStatus {
                          scripts but never their results.
         Type=Policies  - deviceConfiguration deviceStatusOverview: success / error / conflict /
                          pending / not-applicable counts per profile.
+        Type=FeatureUpdates - per-device alerts against each Windows Feature Update profile, via the
+                         Intune reports surface. The obvious endpoint,
+                         windowsFeatureUpdateProfiles/{id}/deviceUpdateStates, DOES NOT EXIST - the
+                         $expand form says so outright ("Could not find a property named
+                         'deviceUpdateStates' on type 'microsoft.graph.windowsFeatureUpdateProfile'").
+                         getWindowsUpdateAlertsPerPolicyPerDeviceReport is the real route: a POST,
+                         requiring a PolicyId restriction filter, returning a Schema/Values table
+                         rather than objects. Reporting ALERTS rather than raw state is also the more
+                         useful answer - it names the devices a profile is failing on.
 
         COVERAGE LIMIT, verified live 2026-09-17 rather than assumed: deviceStatusOverview exists on
         deviceConfigurations but NOT on configurationPolicies - a settings-catalog policy returns
@@ -34,14 +43,98 @@ function Invoke-ListIntuneDeploymentStatus {
     if (-not $TenantFilter) {
         return ([HttpResponseContext]@{ StatusCode = [HttpStatusCode]::BadRequest; Body = @{ Results = 'TenantFilter is required.' } })
     }
-    if ($Type -notin @('Scripts', 'Policies')) {
-        return ([HttpResponseContext]@{ StatusCode = [HttpStatusCode]::BadRequest; Body = @{ Results = "Invalid Type '$Type'. Allowed: Scripts, Policies." } })
+    if ($Type -notin @('Scripts', 'Policies', 'FeatureUpdates')) {
+        return ([HttpResponseContext]@{ StatusCode = [HttpStatusCode]::BadRequest; Body = @{ Results = "Invalid Type '$Type'. Allowed: Scripts, Policies, FeatureUpdates." } })
     }
 
     $GraphBeta = 'https://graph.microsoft.com/beta'
 
     try {
         $Notes = [System.Collections.Generic.List[string]]::new()
+
+        if ($Type -eq 'FeatureUpdates') {
+            $Profiles = @(New-GraphGetRequest -uri "$GraphBeta/deviceManagement/windowsFeatureUpdateProfiles?`$select=id,displayName" -tenantid $TenantFilter)
+            if ($Profiles.Count -eq 0) {
+                return ([HttpResponseContext]@{ StatusCode = [HttpStatusCode]::OK; Body = @{ Results = @(); Metadata = @{ Type = $Type; Count = 0; Notes = @('No Windows Feature Update profiles exist in this tenant.') } } })
+            }
+
+            $Results = [System.Collections.Generic.List[object]]::new()
+            $Unavailable = 0
+
+            foreach ($UpdateProfile in $Profiles) {
+                $Name = [string]$UpdateProfile.displayName
+                try {
+                    # POST, and the PolicyId restriction filter is mandatory - without it the
+                    # service answers "One or more required filters are not set".
+                    $ReportBody = @{ filter = "(PolicyId eq '$($UpdateProfile.id)')"; top = 500 } | ConvertTo-Json -Compress
+                    $Report = New-GraphPOSTRequest -uri "$GraphBeta/deviceManagement/reports/getWindowsUpdateAlertsPerPolicyPerDeviceReport" -tenantid $TenantFilter -type 'POST' -body $ReportBody
+                } catch {
+                    # Unknown, never zero - zero would read as "no devices are failing".
+                    $Unavailable++
+                    $Results.Add([PSCustomObject]@{ Id = [string]$UpdateProfile.id; Name = $Name; StatusAvailable = $false })
+                    continue
+                }
+
+                # Schema/Values is a table: column definitions plus rows as positional arrays.
+                $Columns = @($Report.Schema.Column)
+                $Devices = [System.Collections.Generic.List[object]]::new()
+                # Indexed, NOT `foreach ($Row in @($Report.Values))`. Values is an array of arrays,
+                # and wrapping that in @() flattens a single row into its individual cells - the row
+                # then reads as N one-cell rows and every field comes out empty.
+                $RowCount = if ($null -ne $Report.Values) { @($Report.Values).Count } else { 0 }
+                if ($null -ne $Report.Values -and $Report.Values.Count) { $RowCount = $Report.Values.Count }
+                for ($rw = 0; $rw -lt $RowCount; $rw++) {
+                    $Row = $Report.Values[$rw]
+                    $Cells = $Row
+                    $Item = @{}
+                    for ($i = 0; $i -lt $Columns.Count -and $i -lt $Cells.Count; $i++) { $Item[$Columns[$i]] = $Cells[$i] }
+                    $Devices.Add([PSCustomObject]@{
+                            DeviceName = [string]$Item['DeviceName']
+                            UPN        = [string]$Item['UPN']
+                            # The _loc columns carry human-readable text; the bare ones are ids.
+                            Alert      = [string]($Item['AlertMessage_loc'] ?? $Item['AlertMessage'])
+                            Detail     = [string]($Item['AlertMessageDescription_loc'] ?? $Item['AlertMessageDescription'])
+                        })
+                }
+
+                $Results.Add([PSCustomObject]@{
+                        Id              = [string]$UpdateProfile.id
+                        Name            = $Name
+                        StatusAvailable = $true
+                        AlertCount      = [int]$Report.TotalRowCount
+                        # Counted with an explicit loop: member enumeration over a generic List
+                        # does not behave like it does over an array, and silently yields nothing.
+                        DevicesAffected = $(
+                            $Seen = [System.Collections.Generic.HashSet[string]]::new()
+                            for ($d = 0; $d -lt $Devices.Count; $d++) {
+                                $Dn = [string]$Devices[$d].DeviceName
+                                if ($Dn) { $null = $Seen.Add($Dn) }
+                            }
+                            $Seen.Count
+                        )
+                        Devices         = $Devices
+                        LastUpdated     = [string]$Report.LastUpdatedTime
+                        Unhealthy       = ([int]$Report.TotalRowCount -gt 0)
+                    })
+            }
+
+            $FuNotes = [System.Collections.Generic.List[string]]::new()
+            if ($Unavailable -gt 0) { $FuNotes.Add("$Unavailable profile(s) did not return a report and are reported as unknown, not zero.") }
+
+            return ([HttpResponseContext]@{
+                    StatusCode = [HttpStatusCode]::OK
+                    Body       = @{
+                        Results  = @($Results | Sort-Object @{ Expression = { -not $_.Unhealthy } }, Name)
+                        Metadata = @{
+                            Type           = $Type
+                            Count          = $Results.Count
+                            UnhealthyCount = @($Results | Where-Object { $_.Unhealthy }).Count
+                            Unavailable    = $Unavailable
+                            Notes          = @($FuNotes)
+                        }
+                    }
+                })
+        }
 
         if ($Type -eq 'Scripts') {
             $Parents = @(New-GraphGetRequest -uri "$GraphBeta/deviceManagement/deviceHealthScripts?`$select=id,displayName,publisher" -tenantid $TenantFilter)
