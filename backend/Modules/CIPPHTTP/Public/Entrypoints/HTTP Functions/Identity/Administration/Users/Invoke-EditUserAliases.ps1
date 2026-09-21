@@ -25,6 +25,10 @@ Function Invoke-EditUserAliases {
     }
 
     $Results = [System.Collections.Generic.List[object]]::new()
+    # Messages are staged here and only promoted to $Results once Set-Mailbox has returned
+    # without throwing. Reporting success before the write runs is how this endpoint came to
+    # answer 200 "Success..." for calls that never reached Exchange.
+    $PendingResults = [System.Collections.Generic.List[object]]::new()
     $Aliases = if ($UserObj.AddedAliases) { ($UserObj.AddedAliases -split ',').ForEach({ $_.Trim() }) }
     $RemoveAliases = if ($UserObj.RemovedAliases) { ($UserObj.RemovedAliases -split ',').ForEach({ $_.Trim() }) }
 
@@ -82,7 +86,7 @@ Function Invoke-EditUserAliases {
                 $NewProxyAddresses = @($PrimaryAddress) + $NewProxyAddresses
 
                 Write-LogMessage -API $APIName -tenant $TenantFilter -headers $Headers -message "Set primary address for $($CurrentMailbox.DisplayName)" -Sev Info
-                $Results.Add('Success. Set new primary address.')
+                $PendingResults.Add('Success. Set new primary address.')
             }
 
             # Remove specified aliases
@@ -98,7 +102,7 @@ Function Invoke-EditUserAliases {
                     }
                 }
                 Write-LogMessage -API $ApiName -tenant $TenantFilter -headers $Headers -message "Removed Aliases from $($CurrentMailbox.DisplayName)" -Sev Info
-                $Results.Add('Success. Removed specified aliases from user.')
+                $PendingResults.Add('Success. Removed specified aliases from user.')
             }
 
             # Add new aliases
@@ -117,7 +121,7 @@ Function Invoke-EditUserAliases {
                 if ($AliasesToAdd.Count -gt 0) {
                     $NewProxyAddresses = $NewProxyAddresses + $AliasesToAdd
                     Write-LogMessage -API $ApiName -tenant ($TenantFilter) -headers $Headers -message "Added Aliases to $($CurrentMailbox.DisplayName)" -Sev Info
-                    $Results.Add('Success. Added new aliases to user.')
+                    $PendingResults.Add('Success. Added new aliases to user.')
                 }
             }
 
@@ -127,12 +131,23 @@ Function Invoke-EditUserAliases {
                 EmailAddresses = $NewProxyAddresses
             }
             $null = New-ExoRequest -tenantid $TenantFilter -cmdlet 'Set-Mailbox' -cmdParams $Params -UseSystemMailbox $true
+
+            # The write returned without throwing - only now is the success wording earned.
+            foreach ($Message in $PendingResults) { $Results.Add($Message) }
+            $PendingResults.Clear()
+            # Exchange Online is not read-your-write consistent: Get-Mailbox can serve the
+            # pre-write address list for minutes afterwards, and Graph proxyAddresses lags
+            # longer still. A read-back immediately after this call is expected to look
+            # unchanged; that is staleness, not a failed write.
+            $Results.Add('Note: Exchange may take several minutes to reflect this change. An immediate read-back of EmailAddresses/proxyAddresses can still show the previous values.')
         } else {
             $Results.Add('No alias changes specified.')
         }
     } catch {
         $ErrorMessage = Get-CippException -Exception $_
         Write-LogMessage -API $ApiName -tenant ($TenantFilter) -headers $Headers -message "Alias management failed. $($ErrorMessage.NormalizedError)" -Sev Error -LogData $ErrorMessage
+        # Drop anything staged: the Set-Mailbox that would have justified it did not complete.
+        $PendingResults.Clear()
         $Results.Add("Failed to manage aliases: $($ErrorMessage.NormalizedError)")
     }
 
