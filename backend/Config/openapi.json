@@ -17555,6 +17555,137 @@
         "x-cipp-any-tenant": true
       }
     },
+    "/api/ExecCloudPCAction": {
+      "post": {
+        "summary": "ExecCloudPCAction",
+        "operationId": "ExecCloudPCAction",
+        "tags": [
+          "Endpoint > CloudPC"
+        ],
+        "description": "Runs a lifecycle action against a single Windows 365 Cloud PC.\n\nThree of these destroy data and one deletes the machine:\n\n  reprovision     rebuilds the Cloud PC from its policy image. THE LOCAL DISK IS WIPED.\n                  Anything not in OneDrive, a roaming profile or the user's mailbox is gone.\n  endGracePeriod  ends the grace period immediately, which DEPROVISIONS the Cloud PC.\n                  This is a deletion, not a pause.\n  restore         rolls back to a snapshot. Everything written since that snapshot is lost.\n  resize          moves the Cloud PC to a different SKU. User data is retained, but the\n                  machine restarts and is unavailable while it happens.\n\nProtections, deliberately awkward in proportion to what the action does:\n\n1. ONE Cloud PC per call. CloudPcId must be a single id - an array is refused outright.\n   There is no bulk reprovision here and that is on purpose: the blast radius of getting a\n   filter wrong is every desk in the tenant.\n2. The three destructive actions require ConfirmText to EXACTLY match the Cloud PC's own\n   displayName. Not a checkbox, not \"yes\" - the name of the specific machine, which means\n   the operator had to read the row they are about to destroy. The name is fetched from\n   Graph, not taken from the caller, so a stale UI cannot satisfy it.\n3. resize requires Confirm=true plus a TargetServicePlanId.\n4. The Cloud PC's state before the action is written to the audit log, because after a\n   reprovision there is nothing left to tell you what was there.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "Action": {
+                    "type": "string"
+                  },
+                  "CloudPcId": {
+                    "type": "string"
+                  },
+                  "Confirm": {
+                    "type": "string"
+                  },
+                  "ConfirmText": {
+                    "type": "string"
+                  },
+                  "SnapshotId": {
+                    "type": "string"
+                  },
+                  "TargetServicePlanId": {
+                    "type": "string"
+                  },
+                  "tenantFilter": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "SnapshotId",
+                  "TargetServicePlanId",
+                  "tenantFilter"
+                ]
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "Action",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "CloudPcId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/tenantFilter"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Derived from the Microsoft Graph entity it queries, and the fields the endpoint selects onto each record. The fields taken from Graph are the ones this endpoint selects, so they are what the response actually carries.",
+                  "properties": {
+                    "Action": {
+                      "x-cipp-field-source": "backend"
+                    },
+                    "CloudPcId": {
+                      "x-cipp-field-source": "backend"
+                    },
+                    "displayName": {
+                      "type": "string",
+                      "x-cipp-field-source": "graph,backend"
+                    },
+                    "managedDeviceName": {
+                      "type": "string",
+                      "x-cipp-field-source": "graph,backend"
+                    },
+                    "PreviousState": {
+                      "x-cipp-field-source": "backend"
+                    },
+                    "Results": {
+                      "x-cipp-field-source": "backend"
+                    },
+                    "servicePlanName": {
+                      "type": "string",
+                      "x-cipp-field-source": "graph,backend"
+                    },
+                    "status": {
+                      "type": "object",
+                      "x-cipp-field-source": "graph,backend"
+                    },
+                    "userPrincipalName": {
+                      "type": "string",
+                      "x-cipp-field-source": "graph,backend"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - missing required field or invalid input"
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cipp-role": "Endpoint.MEM.ReadWrite"
+      }
+    },
     "/api/ExecCloudPCProvisioningPolicyAssign": {
       "post": {
         "summary": "ExecCloudPCProvisioningPolicyAssign",
