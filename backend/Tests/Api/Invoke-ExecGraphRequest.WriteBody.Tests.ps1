@@ -35,6 +35,79 @@ BeforeAll {
     }
 }
 
+Describe 'Invoke-ExecGraphRequest verb-parameter guard' {
+    # Reported from another session 2026-09-21 as "the ExecGraphRequest POST bug is still live":
+    # a POST to an /assign endpoint came back "No OData route exists ... with http verb GET".
+    # It was not a CIPP bug - the caller sent `Type: POST`, which this endpoint never read, so the
+    # verb fell through to the GET default. Verified live the same day on one endpoint: Type sent
+    # the policy list back (a GET), Method returned 400 from Graph body validation (a real POST).
+    #
+    # The silent fallback is the actual defect. Where GET is invalid it merely confuses; where GET
+    # is VALID the caller asking for a write gets 200 and data and thinks the write landed.
+
+    BeforeEach {
+        $script:LastPost = $null
+        $script:LastGet = $null
+        $script:Logs = @()
+    }
+
+    It 'refuses <_> used in place of Method instead of silently running a GET' -ForEach @('Type', 'Verb', 'HttpMethod', 'RequestMethod') {
+        $Request = [pscustomobject]@{
+            Params  = @{ CIPPEndpoint = 'ExecGraphRequest' }
+            Headers = @{}
+            Query   = [pscustomobject]@{}
+            Body    = [pscustomobject]@{
+                TenantFilter     = 'contoso.com'
+                Endpoint         = 'deviceManagement/virtualEndpoint/provisioningPolicies'
+                GraphRequestBody = '{"probe":true}'
+            }
+        }
+        $Request.Body | Add-Member -NotePropertyName $_ -NotePropertyValue 'POST'
+
+        $Response = Invoke-ExecGraphRequest -Request $Request
+
+        $Response.StatusCode | Should -Be ([System.Net.HttpStatusCode]::BadRequest)
+        $Response.Body.Results | Should -Match "the HTTP verb goes in 'Method'"
+        # The point of the guard: no Graph call of any kind was made.
+        $script:LastGet | Should -BeNullOrEmpty
+        $script:LastPost | Should -BeNullOrEmpty
+    }
+
+    It 'still honours an explicit Method even when a stray Type is also present' {
+        $Request = [pscustomobject]@{
+            Params  = @{ CIPPEndpoint = 'ExecGraphRequest' }
+            Headers = @{}
+            Query   = [pscustomobject]@{}
+            Body    = [pscustomobject]@{
+                TenantFilter     = 'contoso.com'
+                Endpoint         = 'policies/authorizationPolicy'
+                Method           = 'POST'
+                Type             = 'whatever'
+                GraphRequestBody = '{"probe":true}'
+            }
+        }
+
+        $Response = Invoke-ExecGraphRequest -Request $Request
+
+        $Response.StatusCode | Should -Not -Be ([System.Net.HttpStatusCode]::BadRequest)
+        $script:LastPost | Should -Not -BeNullOrEmpty
+    }
+
+    It 'leaves a plain GET with no verb parameter alone' {
+        $Request = [pscustomobject]@{
+            Params  = @{ CIPPEndpoint = 'ExecGraphRequest' }
+            Headers = @{}
+            Query   = [pscustomobject]@{}
+            Body    = [pscustomobject]@{ TenantFilter = 'contoso.com'; Endpoint = 'organization' }
+        }
+
+        $Response = Invoke-ExecGraphRequest -Request $Request
+
+        $Response.StatusCode | Should -Not -Be ([System.Net.HttpStatusCode]::BadRequest)
+        $script:LastGet | Should -Not -BeNullOrEmpty
+    }
+}
+
 Describe 'Invoke-ExecGraphRequest write body guard' {
     BeforeEach {
         $script:LastPost = $null

@@ -57,6 +57,27 @@ function Invoke-ExecGraphRequest {
 
     $ValidMethods = @('GET', 'POST', 'PATCH', 'PUT', 'DELETE')
 
+    # A caller that names the verb in the wrong parameter used to be answered with a silent GET.
+    # `Type` is the obvious wrong guess - it is what New-GraphPOSTRequest calls its verb - and
+    # nothing here ever read it, so `Type: POST` fell through to the 'GET' default. Against an
+    # endpoint where GET is invalid that surfaces as a confusing Graph error ("No OData route
+    # exists ... with http verb GET") that reads like a CIPP write-path bug. Against an endpoint
+    # where GET IS valid it is far worse: the caller asking for a write gets 200 and a payload,
+    # and believes the write happened. Same false-success class as the bodyless-write guard below.
+    # Refuse it and say which parameter to use.
+    $VerbAliases = @('Type', 'Verb', 'HttpMethod', 'RequestMethod')
+    foreach ($Alias in $VerbAliases) {
+        $AliasValue = $Request.Body.$Alias ?? $Request.Query.$Alias
+        if ($null -ne $AliasValue -and "$AliasValue" -ne '') {
+            if (-not ($Request.Body.Method ?? $Request.Query.Method)) {
+                return ([HttpResponseContext]@{
+                        StatusCode = [HttpStatusCode]::BadRequest
+                        Body       = [pscustomobject]@{ Results = "'$Alias' is not a parameter of ExecGraphRequest - the HTTP verb goes in 'Method'. Received $Alias='$AliasValue' with no Method, which would previously have been executed as a GET. Resend as Method='$AliasValue'." }
+                    })
+            }
+        }
+    }
+
     # Validation
     if (-not $TenantFilter) {
         return ([HttpResponseContext]@{
