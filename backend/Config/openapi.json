@@ -1222,6 +1222,228 @@
         "x-cipp-any-tenant": true
       }
     },
+    "/api/AddCloudPCProvisioningPolicy": {
+      "post": {
+        "summary": "AddCloudPCProvisioningPolicy",
+        "operationId": "AddCloudPCProvisioningPolicy",
+        "tags": [
+          "Endpoint > CloudPC"
+        ],
+        "description": "Creates a Windows 365 provisioning policy - the template Cloud PCs are built from.\n\nCreating the policy provisions nothing on its own. A Cloud PC is only created once the\npolicy is assigned to a group whose members hold Windows 365 licences, which is a separate,\ndeliberate step (ExecCloudPCProvisioningPolicyAssign). That separation is why this endpoint\ndoes not take a group: 'create' and 'start building machines for people' should not be one\nclick.\n\nDomain join is either Entra-only (azureADJoin, needs a region) or hybrid\n(hybridAzureADJoin, needs an on-premises network connection). Supplying the wrong\ncompanion field is the usual way this call fails, so both are validated here rather than\nsurfaced as a Graph schema error.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "CloudPcNamingTemplate": {
+                    "type": "string"
+                  },
+                  "Description": {
+                    "type": "string"
+                  },
+                  "DisplayName": {
+                    "type": "string"
+                  },
+                  "DomainJoinType": {
+                    "type": "string"
+                  },
+                  "EnableSingleSignOn": {
+                    "type": "string"
+                  },
+                  "ImageId": {
+                    "type": "string"
+                  },
+                  "ImageType": {
+                    "type": "string"
+                  },
+                  "Locale": {
+                    "type": "string"
+                  },
+                  "OnPremisesConnectionId": {
+                    "type": "string"
+                  },
+                  "ProvisioningType": {
+                    "type": "string"
+                  },
+                  "RegionGroup": {
+                    "type": "string"
+                  },
+                  "RegionName": {
+                    "type": "string"
+                  },
+                  "tenantFilter": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "DisplayName",
+                  "ImageId",
+                  "tenantFilter"
+                ]
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/tenantFilter"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Derived from the Microsoft Graph entity it queries, and the fields the endpoint selects onto each record. This endpoint returns the Graph response as-is without selecting fields, so these are the properties the entity CAN carry (x-cipp-field-source: graph-entity) rather than a proven projection - Graph returns a default subset unless asked otherwise.",
+                  "properties": {
+                    "alternateResourceUrl": {
+                      "type": "string",
+                      "x-cipp-field-source": "graph-entity"
+                    },
+                    "autopatch": {
+                      "type": "object",
+                      "x-cipp-field-source": "graph-entity"
+                    },
+                    "autopilotConfiguration": {
+                      "type": "object",
+                      "x-cipp-field-source": "graph-entity"
+                    },
+                    "cloudPcGroupDisplayName": {
+                      "type": "string",
+                      "x-cipp-field-source": "graph-entity"
+                    },
+                    "cloudPcNamingTemplate": {
+                      "type": "string",
+                      "x-cipp-field-source": "graph-entity"
+                    },
+                    "createdBy": {
+                      "type": "string",
+                      "x-cipp-field-source": "graph-entity"
+                    },
+                    "createdDateTime": {
+                      "type": "string",
+                      "x-cipp-field-source": "graph-entity"
+                    },
+                    "description": {
+                      "type": "string",
+                      "x-cipp-field-source": "graph-entity"
+                    },
+                    "displayName": {
+                      "type": "string",
+                      "x-cipp-field-source": "graph-entity"
+                    },
+                    "domainJoinConfigurations": {
+                      "type": "array",
+                      "x-cipp-field-source": "graph-entity"
+                    },
+                    "enableSingleSignOn": {
+                      "type": "boolean",
+                      "x-cipp-field-source": "graph-entity"
+                    },
+                    "gracePeriodInHours": {
+                      "type": "integer",
+                      "x-cipp-field-source": "graph-entity"
+                    },
+                    "id": {
+                      "type": "string",
+                      "x-cipp-field-source": "graph-entity"
+                    },
+                    "imageDisplayName": {
+                      "type": "string",
+                      "x-cipp-field-source": "graph-entity"
+                    },
+                    "imageId": {
+                      "type": "string",
+                      "x-cipp-field-source": "graph-entity"
+                    },
+                    "imageType": {
+                      "type": "object",
+                      "x-cipp-field-source": "graph-entity"
+                    },
+                    "lastModifiedBy": {
+                      "type": "string",
+                      "x-cipp-field-source": "graph-entity"
+                    },
+                    "lastModifiedDateTime": {
+                      "type": "string",
+                      "x-cipp-field-source": "graph-entity"
+                    },
+                    "localAdminEnabled": {
+                      "type": "boolean",
+                      "x-cipp-field-source": "graph-entity"
+                    },
+                    "managedBy": {
+                      "type": "object",
+                      "x-cipp-field-source": "graph-entity"
+                    },
+                    "microsoftManagedDesktop": {
+                      "type": "object",
+                      "x-cipp-field-source": "graph-entity"
+                    },
+                    "Policy": {
+                      "x-cipp-field-source": "backend"
+                    },
+                    "PolicyId": {
+                      "x-cipp-field-source": "backend"
+                    },
+                    "provisioningType": {
+                      "type": "object",
+                      "x-cipp-field-source": "graph-entity"
+                    },
+                    "Results": {
+                      "x-cipp-field-source": "backend"
+                    },
+                    "scopeIds": {
+                      "type": "array",
+                      "x-cipp-field-source": "graph-entity"
+                    },
+                    "snapshotResetMode": {
+                      "type": "object",
+                      "x-cipp-field-source": "graph-entity"
+                    },
+                    "userExperienceType": {
+                      "type": "object",
+                      "x-cipp-field-source": "graph-entity"
+                    },
+                    "userSettingsPersistenceConfiguration": {
+                      "type": "object",
+                      "x-cipp-field-source": "graph-entity"
+                    },
+                    "windowsSetting": {
+                      "type": "object",
+                      "x-cipp-field-source": "graph-entity"
+                    },
+                    "windowsSettings": {
+                      "type": "object",
+                      "x-cipp-field-source": "graph-entity"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - missing required field or invalid input"
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cipp-role": "Endpoint.MEM.ReadWrite"
+      }
+    },
     "/api/AddConnectionFilter": {
       "post": {
         "summary": "AddConnectionFilter",
@@ -17331,6 +17553,214 @@
         ],
         "x-cipp-role": "CIPP.Core.ReadWrite",
         "x-cipp-any-tenant": true
+      }
+    },
+    "/api/ExecCloudPCProvisioningPolicyAssign": {
+      "post": {
+        "summary": "ExecCloudPCProvisioningPolicyAssign",
+        "operationId": "ExecCloudPCProvisioningPolicyAssign",
+        "tags": [
+          "Endpoint > CloudPC"
+        ],
+        "description": "Assigns a Windows 365 provisioning policy to one or more Entra groups.\n\nTHE THING TO UNDERSTAND BEFORE CHANGING THIS: Graph's\nPOST provisioningPolicies/{id}/assign is REPLACE-mode. The assignments array you send\nbecomes the entire assignment set - anything omitted is unassigned. Sending one group to a\npolicy that already serves five detaches the other four, and detaching a provisioning\npolicy from the group whose users own Cloud PCs is not a paperwork change.\n\nSo this endpoint defaults to ADD, not replace: it reads the current assignments and sends\ntheir union with the requested groups. Replace is available but must be asked for by name,\nand clearing every assignment additionally requires AllowRemoveAll - because\n'Replace with an empty list' is indistinguishable, in a request body, from a caller whose\nGroupIds array failed to serialize.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "AllowRemoveAll": {
+                    "type": "string"
+                  },
+                  "AssignmentMode": {
+                    "type": "string"
+                  },
+                  "GroupIds": {
+                    "type": "string"
+                  },
+                  "PolicyId": {
+                    "type": "string"
+                  },
+                  "tenantFilter": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "PolicyId",
+                  "tenantFilter"
+                ]
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "PolicyId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/tenantFilter"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Derived from the Microsoft Graph entity it queries, and the fields the endpoint selects onto each record. This endpoint returns the Graph response as-is without selecting fields, so these are the properties the entity CAN carry (x-cipp-field-source: graph-entity) rather than a proven projection - Graph returns a default subset unless asked otherwise.",
+                  "properties": {
+                    "alternateResourceUrl": {
+                      "type": "string",
+                      "x-cipp-field-source": "graph-entity"
+                    },
+                    "AssignedGroups": {
+                      "x-cipp-field-source": "backend"
+                    },
+                    "autopatch": {
+                      "type": "object",
+                      "x-cipp-field-source": "graph-entity"
+                    },
+                    "autopilotConfiguration": {
+                      "type": "object",
+                      "x-cipp-field-source": "graph-entity"
+                    },
+                    "cloudPcGroupDisplayName": {
+                      "type": "string",
+                      "x-cipp-field-source": "graph-entity"
+                    },
+                    "cloudPcNamingTemplate": {
+                      "type": "string",
+                      "x-cipp-field-source": "graph-entity"
+                    },
+                    "createdBy": {
+                      "type": "string",
+                      "x-cipp-field-source": "graph-entity"
+                    },
+                    "createdDateTime": {
+                      "type": "string",
+                      "x-cipp-field-source": "graph-entity"
+                    },
+                    "description": {
+                      "type": "string",
+                      "x-cipp-field-source": "graph-entity"
+                    },
+                    "displayName": {
+                      "type": "string",
+                      "x-cipp-field-source": "graph-entity"
+                    },
+                    "domainJoinConfigurations": {
+                      "type": "array",
+                      "x-cipp-field-source": "graph-entity"
+                    },
+                    "enableSingleSignOn": {
+                      "type": "boolean",
+                      "x-cipp-field-source": "graph-entity"
+                    },
+                    "gracePeriodInHours": {
+                      "type": "integer",
+                      "x-cipp-field-source": "graph-entity"
+                    },
+                    "id": {
+                      "type": "string",
+                      "x-cipp-field-source": "graph-entity"
+                    },
+                    "imageDisplayName": {
+                      "type": "string",
+                      "x-cipp-field-source": "graph-entity"
+                    },
+                    "imageId": {
+                      "type": "string",
+                      "x-cipp-field-source": "graph-entity"
+                    },
+                    "imageType": {
+                      "type": "object",
+                      "x-cipp-field-source": "graph-entity"
+                    },
+                    "lastModifiedBy": {
+                      "type": "string",
+                      "x-cipp-field-source": "graph-entity"
+                    },
+                    "lastModifiedDateTime": {
+                      "type": "string",
+                      "x-cipp-field-source": "graph-entity"
+                    },
+                    "localAdminEnabled": {
+                      "type": "boolean",
+                      "x-cipp-field-source": "graph-entity"
+                    },
+                    "managedBy": {
+                      "type": "object",
+                      "x-cipp-field-source": "graph-entity"
+                    },
+                    "microsoftManagedDesktop": {
+                      "type": "object",
+                      "x-cipp-field-source": "graph-entity"
+                    },
+                    "Mode": {
+                      "x-cipp-field-source": "backend"
+                    },
+                    "PreviousGroups": {
+                      "x-cipp-field-source": "backend"
+                    },
+                    "provisioningType": {
+                      "type": "object",
+                      "x-cipp-field-source": "graph-entity"
+                    },
+                    "Results": {
+                      "x-cipp-field-source": "backend"
+                    },
+                    "scopeIds": {
+                      "type": "array",
+                      "x-cipp-field-source": "graph-entity"
+                    },
+                    "snapshotResetMode": {
+                      "type": "object",
+                      "x-cipp-field-source": "graph-entity"
+                    },
+                    "userExperienceType": {
+                      "type": "object",
+                      "x-cipp-field-source": "graph-entity"
+                    },
+                    "userSettingsPersistenceConfiguration": {
+                      "type": "object",
+                      "x-cipp-field-source": "graph-entity"
+                    },
+                    "windowsSetting": {
+                      "type": "object",
+                      "x-cipp-field-source": "graph-entity"
+                    },
+                    "windowsSettings": {
+                      "type": "object",
+                      "x-cipp-field-source": "graph-entity"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - missing required field or invalid input"
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cipp-role": "Endpoint.MEM.ReadWrite"
       }
     },
     "/api/ExecClrImmId": {
@@ -38321,7 +38751,8 @@
                     "type": "string"
                   },
                   "ListAll": {
-                    "type": "string"
+                    "type": "string",
+                    "description": "Coerce loosely-typed flags (query values arrive as strings) without throwing."
                   },
                   "Method": {
                     "type": "string"
@@ -38387,6 +38818,7 @@
           {
             "name": "ListAll",
             "in": "query",
+            "description": "Coerce loosely-typed flags (query values arrive as strings) without throwing.",
             "required": false,
             "schema": {
               "type": "string"
@@ -44382,6 +44814,143 @@
         ],
         "x-cipp-role": "CIPP.SuperAdmin.Read",
         "x-cipp-any-tenant": true
+      }
+    },
+    "/api/ListCloudPCGalleryImages": {
+      "get": {
+        "summary": "ListCloudPCGalleryImages",
+        "operationId": "ListCloudPCGalleryImages",
+        "tags": [
+          "Endpoint > CloudPC"
+        ],
+        "description": "Lists the Windows 365 gallery images a provisioning policy can be built from, so the\npolicy form can offer real image IDs instead of asking an operator to type one.\n\nDefaults to supported images only. An unsupported or soon-to-expire image still provisions\nbut stops receiving updates, so offering the full list by default invites picking one by\naccident; pass IncludeUnsupported=true to see them.",
+        "parameters": [
+          {
+            "name": "IncludeUnsupported",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/tenantFilter"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "description": "Derived from the fields the endpoint selects onto each record. The response may carry more; these are the ones known to exist.",
+                    "properties": {
+                      "cloudPcState": {
+                        "x-cipp-field-source": "backend"
+                      },
+                      "cloudPcStateMessage": {
+                        "x-cipp-field-source": "backend"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cipp-role": "Endpoint.MEM.Read"
+      }
+    },
+    "/api/ListCloudPCOnPremisesConnections": {
+      "get": {
+        "summary": "ListCloudPCOnPremisesConnections",
+        "operationId": "ListCloudPCOnPremisesConnections",
+        "tags": [
+          "Endpoint > CloudPC"
+        ],
+        "description": "Lists the Azure network connections a Windows 365 provisioning policy can join Cloud PCs\nthrough: the subscription, vNet, subnet, region and the connection's health check status.\n\nhealthCheckStatus is the field that matters operationally - a connection that is not\n'passed' will fail provisioning, so it is surfaced as a first-class column rather than\nburied in the detail pane.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/tenantFilter"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "description": "Derived from the fields the endpoint selects onto each record, and the columns the CIPP UI renders. The response may carry more; these are the ones known to exist.",
+                    "properties": {
+                      "adDomainName": {
+                        "x-cipp-field-source": "frontend"
+                      },
+                      "cloudPcState": {
+                        "x-cipp-field-source": "backend"
+                      },
+                      "cloudPcStateMessage": {
+                        "x-cipp-field-source": "backend"
+                      },
+                      "connectionType": {
+                        "x-cipp-field-source": "frontend"
+                      },
+                      "displayName": {
+                        "x-cipp-field-source": "frontend"
+                      },
+                      "healthCheckStatus": {
+                        "x-cipp-field-source": "frontend"
+                      },
+                      "organizationalUnit": {
+                        "x-cipp-field-source": "frontend"
+                      },
+                      "subscriptionName": {
+                        "x-cipp-field-source": "frontend"
+                      },
+                      "virtualNetworkLocation": {
+                        "x-cipp-field-source": "frontend"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cipp-role": "Endpoint.MEM.Read"
       }
     },
     "/api/ListCloudPCProvisioningPolicies": {

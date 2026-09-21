@@ -658,6 +658,11 @@ export const nativeMenuItems = [
             path: '/endpoint/windows365/provisioning-policies',
             permissions: ['Endpoint.MEM.*'],
           },
+          {
+            title: 'Network Connections',
+            path: '/endpoint/windows365/connections',
+            permissions: ['Endpoint.MEM.*'],
+          },
         ],
       },
       {
