@@ -70,6 +70,9 @@
       "name": "Endpoint > Autopilot"
     },
     {
+      "name": "Endpoint > CloudPC"
+    },
+    {
       "name": "Endpoint > MEM"
     },
     {
@@ -44379,6 +44382,174 @@
         ],
         "x-cipp-role": "CIPP.SuperAdmin.Read",
         "x-cipp-any-tenant": true
+      }
+    },
+    "/api/ListCloudPCProvisioningPolicies": {
+      "get": {
+        "summary": "ListCloudPCProvisioningPolicies",
+        "operationId": "ListCloudPCProvisioningPolicies",
+        "tags": [
+          "Endpoint > CloudPC"
+        ],
+        "description": "Lists a tenant's Windows 365 provisioning policies - the templates Cloud PCs are created\nfrom: gallery or custom image, naming template, single sign-on, domain-join type and the\non-premises network connection each one uses.\n\nReads deviceManagement/virtualEndpoint/provisioningPolicies app-only, with the same\nlicence-versus-access handling as ListCloudPCs.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/tenantFilter"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "description": "Derived from the fields the endpoint selects onto each record, and the columns the CIPP UI renders. The response may carry more; these are the ones known to exist.",
+                    "properties": {
+                      "cloudPcNamingTemplate": {
+                        "x-cipp-field-source": "frontend"
+                      },
+                      "cloudPcState": {
+                        "x-cipp-field-source": "backend"
+                      },
+                      "cloudPcStateMessage": {
+                        "x-cipp-field-source": "backend"
+                      },
+                      "displayName": {
+                        "x-cipp-field-source": "frontend"
+                      },
+                      "domainJoinType": {
+                        "x-cipp-field-source": "frontend"
+                      },
+                      "enableSingleSignOn": {
+                        "x-cipp-field-source": "frontend"
+                      },
+                      "imageDisplayName": {
+                        "x-cipp-field-source": "frontend"
+                      },
+                      "imageType": {
+                        "x-cipp-field-source": "frontend"
+                      },
+                      "lastModifiedDateTime": {
+                        "x-cipp-field-source": "frontend"
+                      },
+                      "managedBy": {
+                        "x-cipp-field-source": "frontend"
+                      },
+                      "provisioningType": {
+                        "x-cipp-field-source": "frontend"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cipp-role": "Endpoint.MEM.Read"
+      }
+    },
+    "/api/ListCloudPCs": {
+      "get": {
+        "summary": "ListCloudPCs",
+        "operationId": "ListCloudPCs",
+        "tags": [
+          "Endpoint > CloudPC"
+        ],
+        "description": "Lists a tenant's Windows 365 Cloud PCs: who each one belongs to, its SKU, provisioning\npolicy, status, disk encryption state and grace period.\n\nReads deviceManagement/virtualEndpoint/cloudPCs app-only. This tree cannot be read with a\ndelegated token at all, so ListGraphRequest is not an alternative.\n\nA tenant with no Windows 365 licence is reported as NotLicensed with an empty list rather\nthan as an error - the Graph API returns an access denial in that case, which is\nindistinguishable from a real permission fault. See Get-CIPPCloudPCCollection.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/tenantFilter"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "description": "Derived from the fields the endpoint selects onto each record, and the columns the CIPP UI renders. The response may carry more; these are the ones known to exist.",
+                    "properties": {
+                      "cloudPcState": {
+                        "x-cipp-field-source": "backend"
+                      },
+                      "cloudPcStateMessage": {
+                        "x-cipp-field-source": "backend"
+                      },
+                      "diskEncryptionState": {
+                        "x-cipp-field-source": "frontend"
+                      },
+                      "displayName": {
+                        "x-cipp-field-source": "frontend"
+                      },
+                      "gracePeriodEndDateTime": {
+                        "x-cipp-field-source": "frontend"
+                      },
+                      "imageDisplayName": {
+                        "x-cipp-field-source": "frontend"
+                      },
+                      "lastModifiedDateTime": {
+                        "x-cipp-field-source": "frontend"
+                      },
+                      "managedDeviceName": {
+                        "x-cipp-field-source": "frontend"
+                      },
+                      "provisioningPolicyName": {
+                        "x-cipp-field-source": "frontend"
+                      },
+                      "provisioningType": {
+                        "x-cipp-field-source": "frontend"
+                      },
+                      "servicePlanName": {
+                        "x-cipp-field-source": "frontend"
+                      },
+                      "status": {
+                        "x-cipp-field-source": "frontend"
+                      },
+                      "userPrincipalName": {
+                        "x-cipp-field-source": "frontend"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cipp-role": "Endpoint.MEM.Read"
       }
     },
     "/api/ListCommunityRepos": {

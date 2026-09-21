@@ -645,6 +645,22 @@ export const nativeMenuItems = [
         ],
       },
       {
+        title: 'Windows 365',
+        permissions: ['Endpoint.MEM.*'],
+        items: [
+          {
+            title: 'Cloud PCs',
+            path: '/endpoint/windows365',
+            permissions: ['Endpoint.MEM.*'],
+          },
+          {
+            title: 'Provisioning Policies',
+            path: '/endpoint/windows365/provisioning-policies',
+            permissions: ['Endpoint.MEM.*'],
+          },
+        ],
+      },
+      {
         title: 'Device Management',
         permissions: ['Endpoint.MEM.*', 'Endpoint.Device.*'],
         items: [
