@@ -39,8 +39,7 @@ function Invoke-ExecTeamsPolicyTemplate {
     $TemplateId = $Request.Body.TemplateId
     $TenantFilter = $Request.Body.TenantFilter
     $PolicyTypes = $Request.Body.PolicyTypes
-    $TruthyValues = @($true, 'true', 'True', 1, '1', 'yes', 'on')
-    $WhatIf = ($Request.Body.WhatIf ?? $Request.Query.WhatIf) -in $TruthyValues
+    $WhatIf = ConvertTo-CIPPBoolean -Value ($Request.Body.WhatIf ?? $Request.Query.WhatIf)
 
     if (-not $TemplateId) {
         return ([HttpResponseContext]@{

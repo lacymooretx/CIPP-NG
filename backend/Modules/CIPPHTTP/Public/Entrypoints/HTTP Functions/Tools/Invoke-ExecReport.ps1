@@ -20,9 +20,8 @@ function Invoke-ExecReport {
 
     $TenantFilter = $Request.Body.TenantFilter ?? $Request.Query.TenantFilter
     $ReportType = $Request.Body.ReportType ?? $Request.Query.ReportType ?? 'Security'
-    $TruthyValues = @($true, 'true', 'True', 1, '1', 'yes', 'on')
-    $Download = ($Request.Body.Download ?? $Request.Query.Download) -in $TruthyValues
-    $ConnectWiseTicket = ($Request.Body.ConnectWiseTicket ?? $Request.Query.ConnectWiseTicket) -in $TruthyValues
+    $Download = ConvertTo-CIPPBoolean -Value ($Request.Body.Download ?? $Request.Query.Download)
+    $ConnectWiseTicket = ConvertTo-CIPPBoolean -Value ($Request.Body.ConnectWiseTicket ?? $Request.Query.ConnectWiseTicket)
 
     if (-not $TenantFilter) {
         return ([HttpResponseContext]@{

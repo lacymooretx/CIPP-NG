@@ -21,8 +21,7 @@ function Invoke-ExecSecurityReport {
     Write-LogMessage -headers $Headers -API $APIName -message 'Accessed the Security Report endpoint' -Sev 'Debug'
 
     $TenantFilter = $Request.Body.TenantFilter ?? $Request.Query.TenantFilter
-    $TruthyValues = @($true, 'true', 'True', 1, '1', 'yes', 'on')
-    $Download = ($Request.Body.Download ?? $Request.Query.Download) -in $TruthyValues
+    $Download = ConvertTo-CIPPBoolean -Value ($Request.Body.Download ?? $Request.Query.Download)
 
     if (-not $TenantFilter) {
         return ([HttpResponseContext]@{

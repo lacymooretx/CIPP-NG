@@ -41,8 +41,7 @@ function Invoke-ExecTeamsVoiceApp {
     $Identity = $Request.Body.Identity ?? $Request.Query.Identity
     $PayloadBody = $Request.Body.Body ?? $Request.Body.TeamsRequestBody
 
-    $TruthyValues = @($true, 'true', 'True', 1, '1', 'yes', 'on')
-    $AsApp = ($Request.Body.AsApp ?? $Request.Query.AsApp) -in $TruthyValues
+    $AsApp = ConvertTo-CIPPBoolean -Value ($Request.Body.AsApp ?? $Request.Query.AsApp)
 
     $ValidMethods = @('POST', 'PUT', 'PATCH', 'DELETE')
 

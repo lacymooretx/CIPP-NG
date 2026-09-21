@@ -32,9 +32,8 @@ function Invoke-ExecExoRequest {
     $Anchor = $Request.Body.Anchor ?? $Request.Query.Anchor
     $Select = $Request.Body.Select ?? $Request.Query.Select
 
-    $TruthyValues = @($true, 'true', 'True', 1, '1', 'yes', 'on')
-    $UseSystemMailbox = ($Request.Body.UseSystemMailbox ?? $Request.Query.UseSystemMailbox) -in $TruthyValues
-    $Compliance = ($Request.Body.Compliance ?? $Request.Query.Compliance) -in $TruthyValues
+    $UseSystemMailbox = ConvertTo-CIPPBoolean -Value ($Request.Body.UseSystemMailbox ?? $Request.Query.UseSystemMailbox)
+    $Compliance = ConvertTo-CIPPBoolean -Value ($Request.Body.Compliance ?? $Request.Query.Compliance)
 
     # Validation
     if (-not $TenantFilter) {

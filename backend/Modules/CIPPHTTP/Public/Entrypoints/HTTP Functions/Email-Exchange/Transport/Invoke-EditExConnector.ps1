@@ -33,7 +33,6 @@ function Invoke-EditExConnector {
     $ConnectorState = $Request.Query.State ?? $Request.Body.State
 
     # Loose truthy coercion for query/body flags (query values arrive as strings).
-    $TruthyValues = @($true, 'true', 'True', 1, '1', 'yes', 'on')
 
     # Normalize a value that may be an array (JSON body) or a delimited string (query) to string[].
     $ToEFArray = {
@@ -63,8 +62,8 @@ function Invoke-EditExConnector {
         }
 
         if ($HasEFChange) {
-            if ($null -ne $EFSkipLastIPRaw) { $Params.EFSkipLastIP = ($EFSkipLastIPRaw -in $TruthyValues) }
-            if ($null -ne $EFTestModeRaw) { $Params.EFTestMode = ($EFTestModeRaw -in $TruthyValues) }
+            if ($null -ne $EFSkipLastIPRaw) { $Params.EFSkipLastIP = (ConvertTo-CIPPBoolean -Value $EFSkipLastIPRaw) }
+            if ($null -ne $EFTestModeRaw) { $Params.EFTestMode = (ConvertTo-CIPPBoolean -Value $EFTestModeRaw) }
             # EFSkipIPs and EFSkipLastIP are mutually exclusive in EXO; setting explicit IPs
             # requires EFSkipLastIP=$false. Apply that automatically when the caller didn't specify.
             if ($null -ne $EFSkipIPs) {

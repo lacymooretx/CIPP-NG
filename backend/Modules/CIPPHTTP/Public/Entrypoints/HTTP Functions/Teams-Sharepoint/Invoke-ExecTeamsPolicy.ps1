@@ -44,9 +44,8 @@ function Invoke-ExecTeamsPolicy {
     $Identity = $Request.Body.Identity ?? $Request.Query.Identity ?? 'Global'
     $Parameters = $Request.Body.Parameters
 
-    $TruthyValues = @($true, 'true', 'True', 1, '1', 'yes', 'on')
-    $NoRead = ($Request.Body.NoRead ?? $Request.Query.NoRead) -in $TruthyValues
-    $AsApp = ($Request.Body.AsApp ?? $Request.Query.AsApp) -in $TruthyValues
+    $NoRead = ConvertTo-CIPPBoolean -Value ($Request.Body.NoRead ?? $Request.Query.NoRead)
+    $AsApp = ConvertTo-CIPPBoolean -Value ($Request.Body.AsApp ?? $Request.Query.AsApp)
 
     $ValidActions = @('Set', 'New', 'Remove')
 

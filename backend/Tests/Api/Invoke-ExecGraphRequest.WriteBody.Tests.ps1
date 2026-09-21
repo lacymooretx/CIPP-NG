@@ -20,6 +20,8 @@ BeforeAll {
     function Write-LogMessage { param($headers, $API, $tenant, $message, $Sev, $LogData) $script:Logs += $message }
     function Get-NormalizedError { param($Message) $Message }
 
+    # The entrypoint calls ConvertTo-CIPPBoolean; the compiled module has it, a dot-sourced test does not.
+    . (Join-Path $RepoRoot 'Modules/CIPPCore/Public/Tools/ConvertTo-CIPPBoolean.ps1')
     . $FunctionPath
 
     function New-TestRequest {

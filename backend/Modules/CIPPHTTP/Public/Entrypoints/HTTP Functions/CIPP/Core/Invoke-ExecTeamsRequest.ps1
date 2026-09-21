@@ -77,11 +77,10 @@ function Invoke-ExecTeamsRequest {
     $AdditionalHeaders = $Request.Body.AdditionalHeaders
 
     # Coerce loosely-typed flags (query values arrive as strings) without throwing.
-    $TruthyValues = @($true, 'true', 'True', 1, '1', 'yes', 'on')
-    $ListAll = ($Request.Body.ListAll ?? $Request.Query.ListAll) -in $TruthyValues
-    $NoRead = ($Request.Body.NoRead ?? $Request.Query.NoRead) -in $TruthyValues
-    $AsApp = ($Request.Body.AsApp ?? $Request.Query.AsApp) -in $TruthyValues
-    $UseServiceDiscovery = ($Request.Body.UseServiceDiscovery ?? $Request.Query.UseServiceDiscovery) -in $TruthyValues
+    $ListAll = ConvertTo-CIPPBoolean -Value ($Request.Body.ListAll ?? $Request.Query.ListAll)
+    $NoRead = ConvertTo-CIPPBoolean -Value ($Request.Body.NoRead ?? $Request.Query.NoRead)
+    $AsApp = ConvertTo-CIPPBoolean -Value ($Request.Body.AsApp ?? $Request.Query.AsApp)
+    $UseServiceDiscovery = ConvertTo-CIPPBoolean -Value ($Request.Body.UseServiceDiscovery ?? $Request.Query.UseServiceDiscovery)
 
     $ValidActions = @('Get', 'Set', 'New', 'Remove')
     $ValidMethods = @('GET', 'POST', 'PUT', 'PATCH', 'DELETE')

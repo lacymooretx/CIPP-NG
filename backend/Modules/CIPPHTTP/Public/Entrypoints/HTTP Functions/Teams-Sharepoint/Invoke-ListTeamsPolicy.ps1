@@ -35,9 +35,8 @@ function Invoke-ListTeamsPolicy {
     $Identity = $Request.Body.Identity ?? $Request.Query.Identity
     $Category = $Request.Body.Category ?? $Request.Query.Category
 
-    $TruthyValues = @($true, 'true', 'True', 1, '1', 'yes', 'on')
-    $Catalog = ($Request.Body.Catalog ?? $Request.Query.Catalog) -in $TruthyValues
-    $AsApp = ($Request.Body.AsApp ?? $Request.Query.AsApp) -in $TruthyValues
+    $Catalog = ConvertTo-CIPPBoolean -Value ($Request.Body.Catalog ?? $Request.Query.Catalog)
+    $AsApp = ConvertTo-CIPPBoolean -Value ($Request.Body.AsApp ?? $Request.Query.AsApp)
 
     # Static catalog of known ConfigAPI types. Also lets the UI enumerate what exists
     # without making a single tenant call.

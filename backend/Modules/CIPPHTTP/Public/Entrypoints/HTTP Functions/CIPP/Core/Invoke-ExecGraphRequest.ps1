@@ -51,9 +51,8 @@ function Invoke-ExecGraphRequest {
     $GraphBody = $Request.Body.GraphRequestBody ?? $Request.Body.Body
 
     # Coerce loosely-typed flags (query values arrive as strings) without throwing.
-    $TruthyValues = @($true, 'true', 'True', 1, '1', 'yes', 'on')
-    $AsApp = $AsAppRaw -in $TruthyValues
-    $NoPagination = $NoPaginationRaw -in $TruthyValues
+    $AsApp = ConvertTo-CIPPBoolean -Value $AsAppRaw
+    $NoPagination = ConvertTo-CIPPBoolean -Value $NoPaginationRaw
 
     $ValidMethods = @('GET', 'POST', 'PATCH', 'PUT', 'DELETE')
 
