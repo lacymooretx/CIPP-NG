@@ -11,7 +11,7 @@ function Invoke-ExecSecurityReport {
     .FUNCTIONALITY
         Entrypoint
     .ROLE
-        CIPP.Core.ReadWrite
+        CIPP.ReportBuilder.ReadWrite
     #>
     [CmdletBinding()]
     param($Request, $TriggerMetadata)

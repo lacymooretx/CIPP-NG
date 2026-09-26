@@ -8,7 +8,7 @@ function Invoke-ListReportHistory {
     .FUNCTIONALITY
         Entrypoint
     .ROLE
-        CIPP.Core.Read
+        CIPP.ReportBuilder.Read
     #>
     [CmdletBinding()]
     param($Request, $TriggerMetadata)
