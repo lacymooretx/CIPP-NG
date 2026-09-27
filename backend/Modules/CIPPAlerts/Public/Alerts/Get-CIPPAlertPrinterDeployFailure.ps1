@@ -1,5 +1,15 @@
 function Get-CIPPAlertPrinterDeployFailure {
     <#
+    .SYNOPSIS
+        Alert on CIPP printer deployments that have been failing on a device for a sustained period.
+    .DESCRIPTION
+        Dedup is the AlertLifecycle (CIPP 11.0), keyed on printer + device (the item's Id). The
+        Message carries "failing for N hours", which changes every run; without a stable Id it would
+        be the hash key and every run would notify again. Each successful run reconciles the full
+        set, so a device that starts succeeding resolves, and it notifies again if it fails again.
+        When a script's run states cannot be read, the run appends instead of resolving what it
+        could not see. The first reconcile after the upgrade seeds the failures it finds silently -
+        the pre-lifecycle trace re-alerted them daily, so they are already known.
     .FUNCTIONALITY
         Entrypoint
     #>
@@ -28,15 +38,15 @@ function Get-CIPPAlertPrinterDeployFailure {
         return
     }
 
-    if ($Scripts.Count -eq 0) { return }
-
-    $Failures = foreach ($Script in $Scripts) {
+    $Partial = $false
+    $Failures = @(foreach ($Script in $Scripts) {
         $PrinterName = $Script.displayName -replace '^CIPP: Printer - ', ''
         try {
             $States = @(New-GraphGetRequest -uri "https://graph.microsoft.com/beta/deviceManagement/deviceManagementScripts/$($Script.id)/deviceRunStates?`$expand=managedDevice(`$select=deviceName)" -tenantid $TenantFilter)
         } catch {
             # A script whose states cannot be read is reported as a log entry, not as a device
             # failure - inventing a device-level failure would be worse than saying nothing.
+            $Partial = $true
             Write-LogMessage -API 'Alerts' -tenant $TenantFilter -message "Printer deployment alert: unable to read run states for '$PrinterName'." -sev Info
             continue
         }
@@ -52,6 +62,8 @@ function Get-CIPPAlertPrinterDeployFailure {
 
             $HoursFailing = [math]::Round(((Get-Date).ToUniversalTime() - $LastUpdate.ToUniversalTime()).TotalHours)
             [PSCustomObject]@{
+                # Lifecycle identity (Get-AlertContentHash keys on Id before Message).
+                Id           = "$PrinterName|$($State.managedDevice.deviceName)"
                 Message      = "Printer '$PrinterName' has failed to install on $($State.managedDevice.deviceName) for $HoursFailing hours (error code $($State.errorCode))."
                 Printer      = $PrinterName
                 DeviceName   = $State.managedDevice.deviceName
@@ -60,9 +72,13 @@ function Get-CIPPAlertPrinterDeployFailure {
                 Tenant       = $TenantFilter
             }
         }
-    }
+    })
 
-    if ($Failures) {
-        Write-AlertTrace -cmdletName $MyInvocation.MyCommand -tenantFilter $TenantFilter -data $Failures
-    }
+    $CmdletName = [string]$MyInvocation.MyCommand
+    Initialize-CIPPAlertLifecycleBaseline -CmdletName $CmdletName -TenantFilter $TenantFilter `
+        -BaselinePartition 'PrinterDeployFailureLifecycle' -CurrentItems $Failures `
+        -KnownItemsFromBaseline { param($Ids) }
+
+    # Reconcile every successful run, including an empty one, so fixed devices resolve.
+    Write-AlertTrace -cmdletName $CmdletName -tenantFilter $TenantFilter -data $Failures -Append:$Partial
 }

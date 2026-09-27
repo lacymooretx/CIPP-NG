@@ -17,13 +17,20 @@ function Get-CIPPAlertNewAppApproval {
           - CippURL: the CIPP App Consent Requests page, which lists every pending request for the
             tenant with the same one-click "Approve in Entra" action.
 
-        Guards against re-ticketing, added after this alert was found to re-fire on every run for as
-        long as a request stayed pending:
-          - a delta baseline keyed on the user consent request id, so each request is reported once
-          - back-fill mode, so the first run on a tenant records a baseline and surfaces nothing
-          - a per-cycle cap, with the excess still recorded as seen so it cannot arrive later
-        These mirror the ControlR ingest flood (tickets #57308-#57357), where replaying an
-        unprocessed backlog in one cycle opened 50 tickets at once.
+        Re-ticketing is handled by the AlertLifecycle (CIPP 11.0): every successful run reconciles the
+        FULL set of pending requests, keyed on the user consent request id (the item's Id), so each
+        request notifies once, a second person requesting the same app is still reported, and a
+        request that is approved/denied/expires resolves. This replaced the fork's own DeltaCompare
+        baseline; Initialize-CIPPAlertLifecycleBaseline hands that baseline over once, so requests
+        that were already known are not ticketed again, and a never-baselined tenant still surfaces
+        nothing on its first run.
+
+        A per-cycle cap on NEW notifications remains as a flood backstop; the excess is recorded as
+        Open by the reconcile, so it cannot arrive later. This mirrors the ControlR ingest flood
+        (tickets #57308-#57357), where replaying an unprocessed backlog opened 50 tickets at once.
+
+        If some requests cannot be read, the run reconciles with -Append so unread requests are not
+        wrongly resolved (and then re-notified when they are read again).
     .FUNCTIONALITY
         Entrypoint
     #>
@@ -40,103 +47,82 @@ function Get-CIPPAlertNewAppApproval {
 
     try {
         $Approvals = @(New-GraphGetRequest -Uri "https://graph.microsoft.com/beta/identityGovernance/appConsent/appConsentRequests?`$top=100&`$filter=userConsentRequests/any(u:u/status eq 'InProgress')" -tenantid $TenantFilter)
-        if ($Approvals.Count -eq 0) { return }
-
-        $TenantGUID = (Get-Tenants -TenantFilter $TenantFilter -SkipDomains).customerId
-
-        # Deep link to the CIPP page that lists these, so the ticket offers the queue as well as the
-        # single request. Degrades to an empty string rather than failing the alert.
-        $CippUrl = ''
-        try {
-            $CippConfigTable = Get-CIPPTable -tablename 'Config'
-            $CippConfig = Get-CIPPAzDataTableEntity @CippConfigTable -Filter "PartitionKey eq 'InstanceProperties' and RowKey eq 'CIPPURL'"
-            if ($CippConfig.Value) {
-                $CippUrl = 'https://{0}/tenant/administration/app-consent-requests?tenantFilter={1}' -f $CippConfig.Value, $TenantFilter
-            }
-        } catch {}
 
         $Pending = [System.Collections.Generic.List[object]]::new()
-        foreach ($App in $Approvals) {
+        $Partial = $false
+        if ($Approvals.Count -gt 0) {
+            $TenantGUID = (Get-Tenants -TenantFilter $TenantFilter -SkipDomains).customerId
+
+            # Deep link to the CIPP page that lists these, so the ticket offers the queue as well as the
+            # single request. Degrades to an empty string rather than failing the alert.
+            $CippUrl = ''
             try {
-                $UserConsentRequests = @(New-GraphGetRequest -Uri "https://graph.microsoft.com/v1.0/identityGovernance/appConsent/appConsentRequests/$($App.id)/userConsentRequests" -tenantid $TenantFilter)
-            } catch {
-                # One unreadable request must not discard the rest.
-                Write-LogMessage -API 'Alerts' -tenant $TenantFilter -message "App approval alert: could not read user requests for '$($App.appDisplayName)'." -sev Info
-                continue
-            }
+                $CippConfigTable = Get-CIPPTable -tablename 'Config'
+                $CippConfig = Get-CIPPAzDataTableEntity @CippConfigTable -Filter "PartitionKey eq 'InstanceProperties' and RowKey eq 'CIPPURL'"
+                if ($CippConfig.Value) {
+                    $CippUrl = 'https://{0}/tenant/administration/app-consent-requests?tenantFilter={1}' -f $CippConfig.Value, $TenantFilter
+                }
+            } catch {}
 
-            $ConsentUrl = if ($App.consentType -eq 'Static') {
-                # if something is going wrong here you've probably stumbled on a fourth variation - rvdwegen
-                "https://login.microsoftonline.com/$($TenantFilter)/adminConsent?client_id=$($App.appId)&bf_id=$($App.id)&redirect_uri=https://entra.microsoft.com/TokenAuthorize"
-            } elseif ($App.pendingScopes.displayName) {
-                "https://login.microsoftonline.com/$($TenantFilter)/v2.0/adminConsent?client_id=$($App.appId)&scope=$($App.pendingScopes.displayName -Join(' '))&bf_id=$($App.id)&redirect_uri=https://entra.microsoft.com/TokenAuthorize"
-            } else {
-                "https://login.microsoftonline.com/$($TenantFilter)/adminConsent?client_id=$($App.appId)&bf_id=$($App.id)&redirect_uri=https://entra.microsoft.com/TokenAuthorize"
-            }
+            foreach ($App in $Approvals) {
+                try {
+                    $UserConsentRequests = @(New-GraphGetRequest -Uri "https://graph.microsoft.com/v1.0/identityGovernance/appConsent/appConsentRequests/$($App.id)/userConsentRequests" -tenantid $TenantFilter)
+                } catch {
+                    # One unreadable request must not discard the rest.
+                    $Partial = $true
+                    Write-LogMessage -API 'Alerts' -tenant $TenantFilter -message "App approval alert: could not read user requests for '$($App.appDisplayName)'." -sev Info
+                    continue
+                }
 
-            foreach ($UserRequest in $UserConsentRequests) {
-                # The top-level filter matches an app when ANY of its userConsentRequests is
-                # InProgress, but this per-app list returns ALL of them - including Completed, Denied
-                # and Expired - so without this guard already-resolved requests were alerted on.
-                if ($UserRequest.status -ne 'InProgress') { continue }
+                $ConsentUrl = if ($App.consentType -eq 'Static') {
+                    # if something is going wrong here you've probably stumbled on a fourth variation - rvdwegen
+                    "https://login.microsoftonline.com/$($TenantFilter)/adminConsent?client_id=$($App.appId)&bf_id=$($App.id)&redirect_uri=https://entra.microsoft.com/TokenAuthorize"
+                } elseif ($App.pendingScopes.displayName) {
+                    "https://login.microsoftonline.com/$($TenantFilter)/v2.0/adminConsent?client_id=$($App.appId)&scope=$($App.pendingScopes.displayName -Join(' '))&bf_id=$($App.id)&redirect_uri=https://entra.microsoft.com/TokenAuthorize"
+                } else {
+                    "https://login.microsoftonline.com/$($TenantFilter)/adminConsent?client_id=$($App.appId)&bf_id=$($App.id)&redirect_uri=https://entra.microsoft.com/TokenAuthorize"
+                }
 
-                $Pending.Add([PSCustomObject]@{
-                        RequestId   = [string]$UserRequest.id
-                        AppName     = [string]$App.appDisplayName
-                        RequestUser = [string]$UserRequest.createdBy.user.userPrincipalName
-                        Reason      = [string]$UserRequest.reason
-                        RequestDate = $UserRequest.createdDateTime
-                        Status      = [string]$UserRequest.status
-                        AppId       = [string]$App.appId
-                        Scopes      = ($App.pendingScopes.displayName -join ', ')
-                        ConsentURL  = $ConsentUrl
-                        CippURL     = $CippUrl
-                        Tenant      = $TenantFilter
-                        TenantId    = $TenantGUID
-                    })
-            }
-        }
+                foreach ($UserRequest in $UserConsentRequests) {
+                    # The top-level filter matches an app when ANY of its userConsentRequests is
+                    # InProgress, but this per-app list returns ALL of them - including Completed, Denied
+                    # and Expired - so without this guard already-resolved requests were alerted on.
+                    if ($UserRequest.status -ne 'InProgress') { continue }
 
-        if ($Pending.Count -eq 0) { return }
-
-        # Baseline of every request id ever surfaced, append-only. Keyed on the USER consent request
-        # id rather than the app, so a second person requesting the same app is still reported.
-        $DeltaTable = Get-CIPPTable -Table DeltaCompare
-        $EscapedTenant = $TenantFilter -replace "'", "''"
-        $Filter = "PartitionKey eq 'AppApprovalDelta' and RowKey eq '{0}'" -f $EscapedTenant
-        $PreviousRow = Get-CIPPAzDataTableEntity @DeltaTable -Filter $Filter
-
-        $SeenRequests = @{}
-        if ($PreviousRow.delta) {
-            foreach ($Id in @($PreviousRow.delta | ConvertFrom-Json -ErrorAction SilentlyContinue)) {
-                if ($Id) { $SeenRequests[[string]$Id] = $true }
+                    $Pending.Add([PSCustomObject]@{
+                            # Lifecycle identity (Get-AlertContentHash keys on Id): one row per user request.
+                            Id          = [string]$UserRequest.id
+                            RequestId   = [string]$UserRequest.id
+                            AppName     = [string]$App.appDisplayName
+                            RequestUser = [string]$UserRequest.createdBy.user.userPrincipalName
+                            Reason      = [string]$UserRequest.reason
+                            RequestDate = $UserRequest.createdDateTime
+                            Status      = [string]$UserRequest.status
+                            AppId       = [string]$App.appId
+                            Scopes      = ($App.pendingScopes.displayName -join ', ')
+                            ConsentURL  = $ConsentUrl
+                            CippURL     = $CippUrl
+                            Tenant      = $TenantFilter
+                            TenantId    = $TenantGUID
+                        })
+                }
             }
         }
 
-        $NewRequests = @($Pending | Where-Object { -not $SeenRequests.ContainsKey($_.RequestId) })
+        $CmdletName = [string]$MyInvocation.MyCommand
+        Initialize-CIPPAlertLifecycleBaseline -CmdletName $CmdletName -TenantFilter $TenantFilter `
+            -BaselinePartition 'AppApprovalDelta' -CurrentItems @($Pending) `
+            -KnownItemsFromBaseline { param($Ids) foreach ($Id in $Ids) { @{ Id = [string]$Id } } }
 
-        # Record everything seen this cycle BEFORE deciding what to surface, so a suppressed item is
-        # never re-surfaced later.
-        $AllSeen = @(@($SeenRequests.Keys) + @($Pending.RequestId) | Sort-Object -Unique)
-        Add-CIPPAzDataTableEntity @DeltaTable -Entity @{
-            PartitionKey = 'AppApprovalDelta'
-            RowKey       = [string]$TenantFilter
-            delta        = [string](ConvertTo-Json -InputObject $AllSeen -Compress)
-        } -Force
+        # Every successful run reconciles, including an empty one, so approved/denied/expired
+        # requests resolve. A partial read appends instead of resolving what it could not see.
+        $New = @(Write-AlertTrace -cmdletName $CmdletName -tenantFilter $TenantFilter -data @($Pending) -Append:$Partial | Where-Object { $_ })
+        if ($New.Count -eq 0) { return }
 
-        if (-not $PreviousRow) {
-            Write-LogMessage -API 'Alerts' -tenant $TenantFilter -message "App approval alert: baseline established for $($AllSeen.Count) pending request(s); nothing surfaced on first run." -sev Info
-            return
+        if ($New.Count -gt $MaxSurfacedPerCycle) {
+            Write-LogMessage -API 'Alerts' -tenant $TenantFilter -message "App approval alert: $($New.Count) new pending requests exceeded the per-cycle cap of $MaxSurfacedPerCycle; surfaced $MaxSurfacedPerCycle. The remainder are recorded as open and will not re-surface." -sev Warning
         }
-
-        if ($NewRequests.Count -eq 0) { return }
-
-        $Surfaced = @($NewRequests | Select-Object -First $MaxSurfacedPerCycle)
-        if ($NewRequests.Count -gt $MaxSurfacedPerCycle) {
-            Write-LogMessage -API 'Alerts' -tenant $TenantFilter -message "App approval alert: $($NewRequests.Count) new pending requests exceeded the per-cycle cap of $MaxSurfacedPerCycle; surfaced $($Surfaced.Count). The remainder are recorded as seen and will not re-surface." -sev Warning
-        }
-
-        Write-AlertTrace -cmdletName $MyInvocation.MyCommand -tenantFilter $TenantFilter -data $Surfaced
+        $New | Select-Object -First $MaxSurfacedPerCycle
     } catch {
         # Previously an empty catch, which hid every failure including a broken query.
         $ErrorMessage = Get-CippException -Exception $_

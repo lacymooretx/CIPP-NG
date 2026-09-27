@@ -4,8 +4,8 @@ function Get-CIPPAlertAppConsentBlocked {
         Alert when a user is blocked from signing in to an app because consent is required
     .DESCRIPTION
         Sweeps the sign-in logs for consent failures - 65001 (user or admin has not consented) and
-        90094 (admin consent required) - and raises one alert per application that has never been
-        seen blocked in this tenant before.
+        90094 (admin consent required) - and raises one alert per application per blocking
+        episode.
 
         WHY THE SIGN-IN LOG AND NOT THE CONSENT REQUEST QUEUE: the obvious source would be
         identityGovernance/appConsent/appConsentRequests, but that queue is only populated when the
@@ -19,6 +19,13 @@ function Get-CIPPAlertAppConsentBlocked {
         The alert carries the admin consent URL so the ticket is actionable without further lookup.
 
         Grouping is per application, not per user: ten people blocked on one app is one problem.
+
+        Dedup is the AlertLifecycle (CIPP 11.0) in -Append (event stream) mode, keyed on the app id:
+        an app notifies once, stays Open while it keeps being blocked, and resolves as stale after
+        30 days without a failure - so a later block is a new episode and notifies once more. (The
+        fork's earlier DeltaCompare baseline never re-notified an app, even months later.)
+        Initialize-CIPPAlertLifecycleBaseline hands that baseline over once, so every app it already
+        knew stays quiet, and a never-baselined tenant still surfaces nothing on its first run.
     .FUNCTIONALITY
         Entrypoint
     #>
@@ -32,8 +39,8 @@ function Get-CIPPAlertAppConsentBlocked {
     )
 
     # Lookback is bounded because this filter is expensive: a 30-day window timed out against a
-    # busy tenant during testing. The alert runs on a schedule, and the delta baseline below means
-    # a short window loses nothing - an app blocked today is still new to the baseline today.
+    # busy tenant during testing. The alert runs on a schedule, and the lifecycle below means a
+    # short window loses nothing - an app blocked today is still new to the lifecycle today.
     $LookbackHours = if ($InputValue.AppConsentBlockedLookbackHours) { [int]$InputValue.AppConsentBlockedLookbackHours } else { 24 }
     # Backstop against a first-ever run on a tenant with a long history, or a sudden burst. The
     # excess is still recorded as seen so it cannot re-surface later and arrive as a second flood.
@@ -75,69 +82,41 @@ function Get-CIPPAlertAppConsentBlocked {
             $Entry.Count++
         }
 
-        # A window with no consent failures must not clear the baseline - that would make every
-        # previously-seen app new again on the next failure and re-ticket the whole set.
-        if ($Blocked.Count -eq 0) { return }
+        $AlertData = @(foreach ($AppId in $Blocked.Keys) {
+                $Info = $Blocked[$AppId]
+                $ConsentUrl = if ($CustomerId) { "https://login.microsoftonline.com/$CustomerId/adminconsent?client_id=$AppId" } else { 'unavailable - could not resolve tenant id' }
+                [PSCustomObject]@{
+                    # Lifecycle identity (Get-AlertContentHash keys on Id): one row per application.
+                    'Id'                = $Info.AppId
+                    'Application'       = $Info.AppName
+                    'Application Id'    = $Info.AppId
+                    'Resource'          = $Info.Resource
+                    'Users Blocked'     = $Info.Users.Count
+                    'Users'             = (@($Info.Users) | Sort-Object) -join ', '
+                    'Error Codes'       = (@($Info.ErrorCodes) | Sort-Object) -join ', '
+                    'Attempts'          = $Info.Count
+                    'First Seen'        = $Info.FirstSeen.ToString('u')
+                    'Last Seen'         = $Info.LastSeen.ToString('u')
+                    'Admin Consent URL' = $ConsentUrl
+                    'Tenant'            = $TenantFilter
+                }
+            })
 
-        # Baseline of every app EVER seen blocked in this tenant, append-only.
-        $DeltaTable = Get-CIPPTable -Table DeltaCompare
-        $EscapedTenant = $TenantFilter -replace "'", "''"
-        $Filter = "PartitionKey eq 'AppConsentBlockedDelta' and RowKey eq '{0}'" -f $EscapedTenant
-        $PreviousRow = Get-CIPPAzDataTableEntity @DeltaTable -Filter $Filter
+        $CmdletName = [string]$MyInvocation.MyCommand
+        Initialize-CIPPAlertLifecycleBaseline -CmdletName $CmdletName -TenantFilter $TenantFilter `
+            -BaselinePartition 'AppConsentBlockedDelta' -CurrentItems $AlertData `
+            -KnownItemsFromBaseline { param($Ids) foreach ($Id in $Ids) { @{ Id = [string]$Id } } }
 
-        $SeenApps = @{}
-        if ($PreviousRow.delta) {
-            foreach ($Id in @($PreviousRow.delta | ConvertFrom-Json -ErrorAction SilentlyContinue)) {
-                if ($Id) { $SeenApps[[string]$Id] = $true }
-            }
-        }
+        # -Append: the sign-in window is a stream of events, not the full picture, so an app absent
+        # from this window is not "fixed". Open rows unseen for 30 days are resolved as stale.
+        $New = @(Write-AlertTrace -cmdletName $CmdletName -tenantFilter $TenantFilter -data $AlertData -Append | Where-Object { $_ })
+        if ($New.Count -eq 0) { return }
 
-        $NewAppIds = @($Blocked.Keys | Where-Object { -not $SeenApps.ContainsKey($_) })
-
-        # Record everything seen this cycle BEFORE deciding what to surface, so a suppressed item
-        # is never re-surfaced later.
-        $AllSeen = @(@($SeenApps.Keys) + @($Blocked.Keys) | Sort-Object -Unique)
-        Add-CIPPAzDataTableEntity @DeltaTable -Entity @{
-            PartitionKey = 'AppConsentBlockedDelta'
-            RowKey       = [string]$TenantFilter
-            delta        = [string](ConvertTo-Json -InputObject $AllSeen -Compress)
-        } -Force
-
-        # Back-fill mode: the first run on a tenant establishes the baseline and surfaces nothing.
-        # Without this, enabling the alert replays the entire retained sign-in history across every
-        # tenant into the ticket queue in one cycle.
-        if (-not $PreviousRow) {
-            Write-LogMessage -API 'Alerts' -tenant $TenantFilter -message "App consent alert: baseline established for $($AllSeen.Count) application(s); nothing surfaced on first run." -sev Info
-            return
-        }
-
-        if ($NewAppIds.Count -eq 0) { return }
-
-        $Surfaced = @($NewAppIds | Select-Object -First $MaxSurfacedPerCycle)
-        if ($NewAppIds.Count -gt $MaxSurfacedPerCycle) {
+        if ($New.Count -gt $MaxSurfacedPerCycle) {
             # Suppression is never silent - a swallowed burst looks identical to a working alert.
-            Write-LogMessage -API 'Alerts' -tenant $TenantFilter -message "App consent alert: $($NewAppIds.Count) newly blocked applications exceeded the per-cycle cap of $MaxSurfacedPerCycle; surfaced $($Surfaced.Count). The remainder are recorded as seen and will not re-surface." -sev Warning
+            Write-LogMessage -API 'Alerts' -tenant $TenantFilter -message "App consent alert: $($New.Count) newly blocked applications exceeded the per-cycle cap of $MaxSurfacedPerCycle; surfaced $MaxSurfacedPerCycle. The remainder are recorded as open and will not re-surface." -sev Warning
         }
-
-        $AlertData = foreach ($AppId in $Surfaced) {
-            $Info = $Blocked[$AppId]
-            $ConsentUrl = if ($CustomerId) { "https://login.microsoftonline.com/$CustomerId/adminconsent?client_id=$AppId" } else { 'unavailable - could not resolve tenant id' }
-            [PSCustomObject]@{
-                'Application'   = $Info.AppName
-                'Application Id' = $Info.AppId
-                'Resource'      = $Info.Resource
-                'Users Blocked' = $Info.Users.Count
-                'Users'         = (@($Info.Users) | Sort-Object) -join ', '
-                'Error Codes'   = (@($Info.ErrorCodes) | Sort-Object) -join ', '
-                'Attempts'      = $Info.Count
-                'First Seen'    = $Info.FirstSeen.ToString('u')
-                'Last Seen'     = $Info.LastSeen.ToString('u')
-                'Admin Consent URL' = $ConsentUrl
-                'Tenant'        = $TenantFilter
-            }
-        }
-
-        Write-AlertTrace -cmdletName $MyInvocation.MyCommand -tenantFilter $TenantFilter -data $AlertData
+        $New | Select-Object -First $MaxSurfacedPerCycle
     } catch {
         $ErrorMessage = Get-CippException -Exception $_
         Write-LogMessage -API 'Alerts' -tenant $TenantFilter -message "Could not check for blocked app consent for $($TenantFilter): $($ErrorMessage.NormalizedError)" -sev Error -LogData $ErrorMessage

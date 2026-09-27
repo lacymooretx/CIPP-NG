@@ -12,10 +12,12 @@ function Get-CIPPAlertStorageQuota {
            the agreement rather than a list somebody has to remember to update. An
            unmanaged client generates no alert and no ticket.
 
-        2. CROSS-DAY SUPPRESSION. CIPP's Write-AlertTrace keys on the calendar date, so an
-           unchanged finding re-alerts every morning. A mailbox at 94% for three weeks
-           becomes twenty-one tickets. Findings here are notified once and then held until
-           they cross a band (85 -> 90 -> 95) or the re-notify window elapses.
+        2. BANDED NOTIFICATION. Findings are notified once and then held until they cross a
+           band (85 -> 90 -> 95) or the re-notify window elapses (Select-CIPPStorageAlertToNotify).
+           The AlertLifecycle added in CIPP 11.0 cannot express bands or reminders, so it does
+           not decide notifications here. It is still reconciled silently every run with the
+           full at-risk set (keyed on UserPrincipalName), so the alert-management page shows
+           the true state, and a snooze set there suppresses this alert's notifications too.
 
         3. JUDGED ON THE HARD QUOTA. issueWarningQuota is not always rescaled when a
            mailbox moves to a larger plan - on 3E NDT it sits at 45 GB on a 100 GB mailbox -
@@ -39,10 +41,13 @@ function Get-CIPPAlertStorageQuota {
     $ReNotifyDays = if ($InputValue.StorageReNotifyDays) { [int]$InputValue.StorageReNotifyDays } else { 14 }
 
     # ---- managed gate ----------------------------------------------------------------
+    $CmdletName = [string]$MyInvocation.MyCommand
     $Managed = Test-CIPPTenantManaged -TenantFilter $TenantFilter
     if (-not $Managed.IsManaged) {
         # Silent. A log line per unmanaged tenant per run is its own kind of noise, and the
-        # scope decision is already visible in the tenant group.
+        # scope decision is already visible in the tenant group. Out of scope is a real
+        # "clear", so anything left open from when it was managed resolves.
+        $null = Write-AlertTrace -cmdletName $CmdletName -tenantFilter $TenantFilter -data @()
         return
     }
 
@@ -103,11 +108,24 @@ function Get-CIPPAlertStorageQuota {
             -message "Storage quota alert: could not persist suppression state; findings may repeat. $($_.Exception.Message)"
     }
 
+    # Honest lifecycle state, reconciled silently: notifications are decided by the bands above.
+    $CurrentItems = @(foreach ($M in @($Risk.AtRisk)) {
+            [PSCustomObject]@{
+                UserPrincipalName = $M.Upn
+                PercentUsed       = $M.PercentUsed
+                Message           = "$($M.Upn) is $($M.PercentUsed)% full."
+            }
+        })
+    $null = Write-AlertTrace -cmdletName $CmdletName -tenantFilter $TenantFilter -data $CurrentItems
+
     if (@($Decision.Notify).Count -eq 0) { return }
 
-    $AlertData = foreach ($N in $Decision.Notify) {
+    $Snoozes = @{}
+    try { $Snoozes = Get-CIPPActiveAlertSnoozes -CmdletName $CmdletName -TenantFilter $TenantFilter } catch {}
+
+    foreach ($N in $Decision.Notify) {
         $M = @($Risk.AtRisk) | Where-Object { "Mailbox:$($_.Upn)" -eq $N.Key } | Select-Object -First 1
-        [PSCustomObject]@{
+        $Item = [PSCustomObject]@{
             Message            = $N.Message
             UserPrincipalName  = $M.Upn
             PercentUsed        = $M.PercentUsed
@@ -118,7 +136,7 @@ function Get-CIPPAlertStorageQuota {
             RecipientType      = $M.RecipientType
             Notified           = $N.Reason
         }
+        if ($Snoozes -and $Snoozes.ContainsKey((Get-AlertContentHash -AlertItem $Item).ContentHash)) { continue }
+        $Item
     }
-
-    Write-AlertTrace -cmdletName $MyInvocation.MyCommand -tenantFilter $TenantFilter -data @($AlertData)
 }
