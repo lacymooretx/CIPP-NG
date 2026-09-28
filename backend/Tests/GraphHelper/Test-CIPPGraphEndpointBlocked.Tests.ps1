@@ -4,6 +4,9 @@ using namespace System.Net
 BeforeAll {
     $RepoRoot = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $PSCommandPath))
     $env:CIPPRootPath = $RepoRoot
+    # Aspendora fork: this file tests upstream's blocklist as shipped; the fork's exemptions are covered in
+    # Test-CIPPGraphEndpointBlocked.Exemptions.Tests.ps1.
+    $env:CIPP_GRAPH_BLOCKLIST_EXEMPTIONS_DISABLED = 'true'
     $script:CippGraphEndpointBlocklist = $null
 
     if (-not ('HttpResponseContext' -as [type])) {
@@ -11,6 +14,10 @@ BeforeAll {
     }
 
     . (Join-Path $RepoRoot 'Modules/CIPPCore/Public/GraphHelper/Test-CIPPGraphEndpointBlocked.ps1')
+}
+
+AfterAll {
+    Remove-Item Env:CIPP_GRAPH_BLOCKLIST_EXEMPTIONS_DISABLED -ErrorAction SilentlyContinue
 }
 
 Describe 'Test-CIPPGraphEndpointBlocked' {

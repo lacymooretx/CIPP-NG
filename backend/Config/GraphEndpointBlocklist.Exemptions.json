@@ -1,0 +1,14 @@
+{
+    "_comment": "Aspendora fork. Narrow exemptions to GraphEndpointBlocklist.json (upstream's file, left untouched so syncs merge cleanly). An exemption applies only when its pattern matches the WHOLE normalised candidate path; it then skips just the block ids in 'exempts' for that path. Every other block rule still runs. Set CIPP_GRAPH_BLOCKLIST_EXEMPTIONS_DISABLED=true to turn all of these off without a rebuild.",
+    "exemptions": [
+        {
+            "id": "mailbox-read",
+            "reason": "Operator decision 2026-09-28: CIPP must be able to read client mailboxes (delivery/folder triage, e.g. CW #58844). Covers user mailbox messages and their attachment metadata only. Teams getAllMessages, chats, MIME $value and attachment /content downloads remain blocked by their own rules.",
+            "exempts": [
+                "mail-messages",
+                "mail-attachments"
+            ],
+            "pattern": "^(users[/(][^/]+|me)/(mailFolders[/(][^/]*/(childFolders[/(][^/]*/)*)?(\\$expand/)?messages([/(][^/]*)?(/(\\$expand/)?attachments([/(][^/]*)?)?$"
+        }
+    ]
+}

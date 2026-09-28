@@ -121,10 +121,39 @@ function Test-CIPPGraphEndpointBlocked {
             throw "Graph endpoint blocklist at $BlocklistPath has no patterns"
         }
         $script:CippGraphEndpointBlocklist = $Entries
+
+        # Aspendora fork: narrow, path-scoped exemptions (GraphEndpointBlocklist.Exemptions.json). Loaded with the
+        # blocklist so anything that resets the cache resets both. A malformed file throws rather than failing open.
+        $script:CippGraphEndpointExemptions = @()
+        $ExemptionsPath = Join-Path -Path $env:CIPPRootPath -ChildPath 'Config\GraphEndpointBlocklist.Exemptions.json'
+        $ExemptionsDisabled = "$env:CIPP_GRAPH_BLOCKLIST_EXEMPTIONS_DISABLED" -match '^(1|true|yes)$'
+        if (-not $ExemptionsDisabled -and [System.IO.File]::Exists($ExemptionsPath)) {
+            $Exemptions = [System.IO.File]::ReadAllText($ExemptionsPath) | ConvertFrom-Json
+            $script:CippGraphEndpointExemptions = @(
+                foreach ($Exemption in @($Exemptions.exemptions)) {
+                    if (-not $Exemption.pattern -or -not $Exemption.exempts) { continue }
+                    [pscustomobject]@{
+                        id      = $Exemption.id
+                        exempts = @($Exemption.exempts)
+                        Regex   = [regex]::new($Exemption.pattern, $RegexOptions, $MatchTimeout)
+                    }
+                }
+            )
+        }
     }
 
     foreach ($Candidate in $Candidates) {
+        $ExemptIds = @(
+            foreach ($Exemption in @($script:CippGraphEndpointExemptions)) {
+                try {
+                    if ($Exemption.Regex.IsMatch($Candidate)) { $Exemption.exempts }
+                } catch {
+                    # Match timeout: no exemption (fail closed).
+                }
+            }
+        )
         foreach ($Entry in $script:CippGraphEndpointBlocklist) {
+            if ($Entry.id -in $ExemptIds) { continue }
             $Reason = $Entry.reason
             try {
                 $IsBlocked = $Entry.Regex.IsMatch($Candidate)
