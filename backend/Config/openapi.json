@@ -23106,7 +23106,7 @@
         "tags": [
           "CIPP > Core"
         ],
-        "description": "Generic Exchange Online cmdlet passthrough. Runs an arbitrary EXO/Compliance cmdlet\nagainst a single tenant via New-ExoRequest. The on-demand escape hatch for one-off\nEXO reads/writes (Set-* / Get-* / New-* / Remove-*) that lack a dedicated CIPP endpoint\n- e.g. ExternalInOutlook, connector Enhanced Filtering, transport tweaks. Every call is\naudited; the SAM/GDAP Exchange.ManageAsApp scope remains the real safety boundary.\n\nBody/query params:\n  TenantFilter (required)\n  Cmdlet       (required) - EXO cmdlet name, e.g. 'Set-InboundConnector'\n  CmdParams    - object of cmdlet parameters, e.g. { Identity: 'x', EFSkipLastIP: true }\n  UseSystemMailbox - bool, route via the system mailbox (needed by some Set-* cmdlets)\n  Compliance   - bool, run against the Security & Compliance PowerShell endpoint\n  Anchor       - optional UPN anchor mailbox\n  Select       - optional comma-separated property projection for reads",
+        "description": "Generic Exchange Online cmdlet passthrough. Runs an arbitrary EXO/Compliance cmdlet\nagainst a single tenant via New-ExoRequest. The on-demand escape hatch for one-off\nEXO reads/writes (Set-* / Get-* / New-* / Remove-*) that lack a dedicated CIPP endpoint\n- e.g. ExternalInOutlook, connector Enhanced Filtering, transport tweaks. Every call is\naudited; the SAM/GDAP Exchange.ManageAsApp scope remains the real safety boundary.\n\nBody/query params:\n  TenantFilter (required)\n  Cmdlet       (required) - EXO cmdlet name, e.g. 'Set-InboundConnector'\n  CmdParams    - object of cmdlet parameters, e.g. { Identity: 'x', EFSkipLastIP: true }\n  UseSystemMailbox - bool, route via the system mailbox (needed by some Set-* cmdlets)\n  Compliance   - bool, run against the Security & Compliance PowerShell endpoint\n  Anchor       - optional UPN anchor mailbox\n  Select       - optional comma-separated property projection for reads\n  VerifyWrite  - bool, default true. After a Set-* cmdlet, read the object back with the\n                 matching Get-* and report each requested property in `Verification`.\n\nExchange returns NOTHING for a successful Set-/Remove-/Enable-* cmdlet, so a write used to come\nback as {\"Results\":null} - indistinguishable from a silent no-op. Non-Get cmdlets now return a\ncompletion message, and Set-* adds Verification = { Status: Confirmed | Mismatch | Skipped,\nProperties: [{ Name, Requested, Observed, Match }], Note }. A Mismatch is reported, NOT failed:\nEXO reads can lag a write by minutes, and some properties (e.g. Set-CASMailbox\n-ActiveSyncDebugLogging) never show up in Get-*. The authoritative record of a write is the\nunified audit log: Search-UnifiedAuditLog -RecordType ExchangeAdmin (ObjectIds must be an\narray, and it matches the object's display name, not the UPN). Search-AdminAuditLog is\nnot usable through this API (403); use Search-UnifiedAuditLog instead.",
         "requestBody": {
           "required": true,
           "content": {
@@ -23133,6 +23133,9 @@
                     "type": "string"
                   },
                   "UseSystemMailbox": {
+                    "type": "string"
+                  },
+                  "VerifyWrite": {
                     "type": "string"
                   }
                 },
@@ -23187,6 +23190,14 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "VerifyWrite",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -23199,6 +23210,9 @@
                   "description": "Derived from the fields the endpoint selects onto each record. The response may carry more; these are the ones known to exist.",
                   "properties": {
                     "Results": {
+                      "x-cipp-field-source": "backend"
+                    },
+                    "Verification": {
                       "x-cipp-field-source": "backend"
                     }
                   }
@@ -25962,7 +25976,7 @@
         "tags": [
           "CIPP > Core"
         ],
-        "description": "Write-capable generic Microsoft Graph passthrough. Executes an arbitrary Graph\nrequest (GET/POST/PATCH/PUT/DELETE) against a single tenant. This is the on-demand\nescape hatch for one-off reads and writes that do not yet have a dedicated CIPP\nendpoint. Gated to CIPP.Core.ReadWrite (the write counterpart of ListGraphRequest's\nCIPP.Core.Read); every mutating call is audited. It can reach any Graph endpoint with\nany method, so the underlying SAM/GDAP permissions remain the real safety boundary.\n\nParameters may be supplied via query string (GET-style) or request body (POST-style):\n  TenantFilter (required) - tenant default domain or customer id\n  Endpoint     (required) - relative Graph path (e.g. 'users/{id}') or a full URL\n  Method                  - GET (default) | POST | PATCH | PUT | DELETE\n  Version                 - 'beta' (default) | 'v1.0'  (ignored if Endpoint is a full URL)\n  Body / GraphRequestBody - request body for write methods (object or JSON string)\n  AsApp                   - $true to force an application token instead of delegated\n  NoPagination / DisablePagination - $true to disable paging on GET\n\nWrites: a 2xx from Graph is NOT proof the change applied. Graph returns 204 No Content for\nan applied write, and for several resources it also ACCEPTS AND IGNORES properties it does\nnot recognise - same 204, nothing changed, no error. The usual cause is a body written for\none API version sent to the other: on authorizationPolicy, for example, beta exposes\n`permissionGrantPolicyIdsAssignedToDefaultUserRole` at the top level while v1.0 exposes it\nas `defaultUserRolePermissions.permissionGrantPoliciesAssigned`. Match the body to the\nVersion you pass, and always read the resource back to confirm a write landed.",
+        "description": "Write-capable generic Microsoft Graph passthrough. Executes an arbitrary Graph\nrequest (GET/POST/PATCH/PUT/DELETE) against a single tenant. This is the on-demand\nescape hatch for one-off reads and writes that do not yet have a dedicated CIPP\nendpoint. Gated to CIPP.Core.ReadWrite (the write counterpart of ListGraphRequest's\nCIPP.Core.Read); every mutating call is audited. It can reach any Graph endpoint with\nany method, so the underlying SAM/GDAP permissions remain the real safety boundary.\n\nParameters may be supplied via query string (GET-style) or request body (POST-style):\n  TenantFilter (required) - tenant default domain or customer id\n  Endpoint     (required) - relative Graph path (e.g. 'users/{id}') or a full URL\n  Method                  - GET (default) | POST | PATCH | PUT | DELETE\n  Version                 - 'beta' (default) | 'v1.0'  (ignored if Endpoint is a full URL)\n  Body / GraphRequestBody - request body for write methods (object or JSON string)\n  AsApp                   - $true to force an application token instead of delegated\n  NoPagination / DisablePagination - $true: return one page only. $false: follow\n                            @odata.nextLink. Default: one page when the Endpoint\n                            carries $top (the caller asked for N), otherwise follow.\n  MaxItems                - cap on items collected while paging (default 1000). Paging\n                            also stops after ~90 s so it can't hit the gateway timeout.\n\nCollection GETs return { Results: [...], Metadata: { Count, Pages, NextLink, Truncated } }.\nResults is always an array for a collection - an empty result is [], never null - and\nNextLink is set when more data exists (pass it back as Endpoint to page on). A Graph error\nis returned with Graph's own status code and message, never as a 200.\n\nWrites: a 2xx from Graph is NOT proof the change applied. Graph returns 204 No Content for\nan applied write, and for several resources it also ACCEPTS AND IGNORES properties it does\nnot recognise - same 204, nothing changed, no error. The usual cause is a body written for\none API version sent to the other: on authorizationPolicy, for example, beta exposes\n`permissionGrantPolicyIdsAssignedToDefaultUserRole` at the top level while v1.0 exposes it\nas `defaultUserRolePermissions.permissionGrantPoliciesAssigned`. Match the body to the\nVersion you pass, and always read the resource back to confirm a write landed.",
         "requestBody": {
           "required": true,
           "content": {
@@ -25984,6 +25998,9 @@
                     "type": "string"
                   },
                   "GraphRequestBody": {
+                    "type": "string"
+                  },
+                  "MaxItems": {
                     "type": "string"
                   },
                   "Method": {
@@ -26036,6 +26053,14 @@
             }
           },
           {
+            "name": "MaxItems",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "name": "Method",
             "in": "query",
             "required": false,
@@ -26073,6 +26098,9 @@
                   "type": "object",
                   "description": "Derived from the fields the endpoint selects onto each record. The response may carry more; these are the ones known to exist.",
                   "properties": {
+                    "Metadata": {
+                      "x-cipp-field-source": "backend"
+                    },
                     "Results": {
                       "x-cipp-field-source": "backend"
                     }

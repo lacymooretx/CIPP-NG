@@ -19,6 +19,18 @@ function Invoke-ExecExoRequest {
           Compliance   - bool, run against the Security & Compliance PowerShell endpoint
           Anchor       - optional UPN anchor mailbox
           Select       - optional comma-separated property projection for reads
+          VerifyWrite  - bool, default true. After a Set-* cmdlet, read the object back with the
+                         matching Get-* and report each requested property in `Verification`.
+
+        Exchange returns NOTHING for a successful Set-/Remove-/Enable-* cmdlet, so a write used to come
+        back as {"Results":null} - indistinguishable from a silent no-op. Non-Get cmdlets now return a
+        completion message, and Set-* adds Verification = { Status: Confirmed | Mismatch | Skipped,
+        Properties: [{ Name, Requested, Observed, Match }], Note }. A Mismatch is reported, NOT failed:
+        EXO reads can lag a write by minutes, and some properties (e.g. Set-CASMailbox
+        -ActiveSyncDebugLogging) never show up in Get-*. The authoritative record of a write is the
+        unified audit log: Search-UnifiedAuditLog -RecordType ExchangeAdmin (ObjectIds must be an
+        array, and it matches the object's display name, not the UPN). Search-AdminAuditLog is
+        not usable through this API (403); use Search-UnifiedAuditLog instead.
     #>
     [CmdletBinding()]
     param($Request, $TriggerMetadata)
@@ -34,6 +46,8 @@ function Invoke-ExecExoRequest {
 
     $UseSystemMailbox = ConvertTo-CIPPBoolean -Value ($Request.Body.UseSystemMailbox ?? $Request.Query.UseSystemMailbox)
     $Compliance = ConvertTo-CIPPBoolean -Value ($Request.Body.Compliance ?? $Request.Query.Compliance)
+    $VerifyWriteRaw = $Request.Body.VerifyWrite ?? $Request.Query.VerifyWrite
+    $VerifyWrite = if ($null -eq $VerifyWriteRaw -or "$VerifyWriteRaw" -eq '') { $true } else { ConvertTo-CIPPBoolean -Value $VerifyWriteRaw }
 
     # Validation
     if (-not $TenantFilter) {
@@ -74,13 +88,37 @@ function Invoke-ExecExoRequest {
             Write-LogMessage -headers $Headers -API $APIName -tenant $TenantFilter -message "Executed EXO cmdlet $Cmdlet" -Sev 'Info'
         }
 
+        $Verification = $null
+        if ($Cmdlet -notmatch '^Get-') {
+            if ($null -eq $Results) {
+                $Results = "$Cmdlet completed. Exchange returned no output, which is normal for a successful $(($Cmdlet -split '-')[0])- cmdlet."
+            }
+            if ($Cmdlet -match '^Set-' -and $VerifyWrite) {
+                $Verification = Get-ExoWriteVerification -Cmdlet $Cmdlet -ParamHash $ParamHash -ReadParams @{
+                    tenantid   = $TenantFilter
+                    Compliance = $Compliance
+                    Anchor     = $Anchor
+                }
+                if ($Verification.Status -eq 'Mismatch') {
+                    Write-LogMessage -headers $Headers -API $APIName -tenant $TenantFilter -message "EXO $Cmdlet read-back does not show the requested value(s) yet: $(($Verification.Properties | Where-Object { -not $_.Match }).Name -join ', ')" -Sev 'Warning'
+                }
+            }
+        }
+
         $StatusCode = [HttpStatusCode]::OK
-        $ResponseBody = [pscustomobject]@{ Results = $Results }
+        $ResponseBody = if ($Verification) {
+            [pscustomobject]@{ Results = $Results; Verification = $Verification }
+        } else {
+            [pscustomobject]@{ Results = $Results }
+        }
     } catch {
         $ErrorMessage = Get-CippException -Exception $_
         Write-LogMessage -headers $Headers -API $APIName -tenant $TenantFilter -message "EXO passthrough failed: $Cmdlet - $($ErrorMessage.NormalizedError)" -Sev 'Error' -LogData $ErrorMessage
         $StatusCode = [HttpStatusCode]::BadRequest
-        $ResponseBody = [pscustomobject]@{ Results = "EXO Error: $($ErrorMessage.NormalizedError) - Cmdlet: $Cmdlet" }
+        $Hint = if ($Cmdlet -in @('Search-AdminAuditLog', 'Search-MailboxAuditLog', 'New-AdminAuditLogSearch', 'New-MailboxAuditLogSearch')) {
+            " - $Cmdlet is not usable through the Exchange admin API; use Search-UnifiedAuditLog (e.g. RecordType ExchangeAdmin, ObjectIds as an array matching the display name)."
+        } else { '' }
+        $ResponseBody = [pscustomobject]@{ Results = "EXO Error: $($ErrorMessage.NormalizedError) - Cmdlet: $Cmdlet$Hint" }
     }
 
     return ([HttpResponseContext]@{

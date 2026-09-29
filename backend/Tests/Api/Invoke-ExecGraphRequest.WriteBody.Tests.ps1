@@ -15,7 +15,7 @@ BeforeAll {
         [object]$Body
     }
 
-    function New-GraphGetRequest { param($uri, $tenantid, $noPagination, $AsApp) $script:LastGet = @{ Uri = $uri }; return @{ ok = $true } }
+    function New-GraphGetRequest { param($uri, $tenantid, $noPagination, $AsApp, [switch]$ReturnRawResponse) $script:LastGet = @{ Uri = $uri }; return [pscustomobject]@{ StatusCode = 200; Content = [pscustomobject]@{ ok = $true } } }
     function New-GraphPOSTRequest { param($uri, $tenantid, $type, $body, $AsApp) $script:LastPost = @{ Uri = $uri; Type = $type; Body = $body }; return $null }
     function Write-LogMessage { param($headers, $API, $tenant, $message, $Sev, $LogData) $script:Logs += $message }
     function Get-NormalizedError { param($Message) $Message }

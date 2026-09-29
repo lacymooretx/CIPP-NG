@@ -19,7 +19,16 @@ function Invoke-ExecGraphRequest {
           Version                 - 'beta' (default) | 'v1.0'  (ignored if Endpoint is a full URL)
           Body / GraphRequestBody - request body for write methods (object or JSON string)
           AsApp                   - $true to force an application token instead of delegated
-          NoPagination / DisablePagination - $true to disable paging on GET
+          NoPagination / DisablePagination - $true: return one page only. $false: follow
+                                    @odata.nextLink. Default: one page when the Endpoint
+                                    carries $top (the caller asked for N), otherwise follow.
+          MaxItems                - cap on items collected while paging (default 1000). Paging
+                                    also stops after ~90 s so it can't hit the gateway timeout.
+
+        Collection GETs return { Results: [...], Metadata: { Count, Pages, NextLink, Truncated } }.
+        Results is always an array for a collection - an empty result is [], never null - and
+        NextLink is set when more data exists (pass it back as Endpoint to page on). A Graph error
+        is returned with Graph's own status code and message, never as a 200.
 
         Writes: a 2xx from Graph is NOT proof the change applied. Graph returns 204 No Content for
         an applied write, and for several resources it also ACCEPTS AND IGNORES properties it does
@@ -123,15 +132,89 @@ function Invoke-ExecGraphRequest {
 
     Write-LogMessage -headers $Headers -API $APIName -tenant $TenantFilter -message "Graph passthrough: $Method $Uri (AsApp: $AsApp)" -Sev 'Debug'
 
+    $ErrorStatus = $null
     try {
+        $Metadata = $null
         if ($Method -eq 'GET') {
-            $GetParams = @{
-                uri      = $Uri
-                tenantid = $TenantFilter
+            # Paging defaults. New-GraphGetRequest follows @odata.nextLink until the collection is
+            # exhausted, so a caller's `$top=5` against a 24k-item Inbox crawled the whole mailbox and
+            # timed out at the gateway. `$top` means "give me N": when present, and the caller hasn't
+            # said otherwise, return a single page. An explicit crawl is still bounded by MaxItems
+            # and a time budget so it returns partial data and a NextLink instead of timing out.
+            $PaginationExplicit = $null -ne $NoPaginationRaw -and "$NoPaginationRaw" -ne ''
+            $PaginationDefaulted = $false
+            if (-not $PaginationExplicit -and $Uri -match '[?&](\$|%24)top=\d+') {
+                $NoPagination = $true
+                $PaginationDefaulted = $true
             }
-            if ($NoPagination) { $GetParams.noPagination = $true }
+            $MaxItems = 1000
+            $MaxItemsRaw = $Request.Body.MaxItems ?? $Request.Query.MaxItems
+            if ($null -ne $MaxItemsRaw -and "$MaxItemsRaw" -match '^\d+$' -and [int]"$MaxItemsRaw" -gt 0) { $MaxItems = [int]"$MaxItemsRaw" }
+            $Deadline = (Get-Date).AddSeconds(90)
+
+            $GetParams = @{
+                tenantid          = $TenantFilter
+                ReturnRawResponse = $true
+            }
             if ($AsApp) { $GetParams.AsApp = $true }
-            $Results = New-GraphGetRequest @GetParams
+
+            # Raw mode gives us the status code and the envelope (value / @odata.nextLink) instead of
+            # an unwrapped value that is $null for BOTH an empty collection and a failed read.
+            $Items = [System.Collections.Generic.List[object]]::new()
+            $IsCollection = $false
+            $Single = $null
+            $Pages = 0
+            $NextUri = $Uri
+            do {
+                $Raw = $null
+                for ($Attempt = 1; $Attempt -le 4; $Attempt++) {
+                    $Raw = New-GraphGetRequest @GetParams -uri $NextUri
+                    if ($Raw.StatusCode -ne 429 -or $Attempt -eq 4) { break }
+                    $RetryAfter = 2
+                    try { $RetryAfter = [int]("$($Raw.Headers['Retry-After'])") } catch {}
+                    Start-Sleep -Seconds ([Math]::Min([Math]::Max($RetryAfter, 1), 10))
+                }
+                if ($null -eq $Raw) {
+                    # New-GraphGetRequest writes a non-terminating error and returns nothing when the
+                    # tenant is excluded or not in the tenant list.
+                    $ErrorStatus = [HttpStatusCode]::Forbidden
+                    throw "Tenant '$TenantFilter' is not authorised for Graph requests (excluded or not found)."
+                }
+                $Status = [int]$Raw.StatusCode
+                if ($Status -lt 200 -or $Status -ge 300) {
+                    $ErrorStatus = [HttpStatusCode]$Status
+                    $GraphError = $Raw.Content.error
+                    $GraphMessage = if ($GraphError.message) { $GraphError.message } elseif ($GraphError.code) { $GraphError.code } else { "$($Raw.Content)" }
+                    $GraphCode = if ($GraphError.code) { " ($($GraphError.code))" } else { '' }
+                    throw "HTTP $Status$GraphCode $GraphMessage"
+                }
+                $Pages++
+                $Content = $Raw.Content
+                if ($null -ne $Content -and $Content -isnot [string] -and $Content.PSObject.Properties.Name -contains 'value') {
+                    $IsCollection = $true
+                    foreach ($Item in @($Content.value)) { $Items.Add($Item) }
+                    $NextUri = $Content.'@odata.nextLink'
+                } else {
+                    $Single = $Content
+                    $NextUri = $null
+                }
+            } while ($NextUri -and -not $NoPagination -and $Items.Count -lt $MaxItems -and (Get-Date) -lt $Deadline)
+
+            if ($IsCollection) {
+                $Results = $Items.ToArray()
+                $Metadata = [pscustomobject]@{
+                    Count               = $Items.Count
+                    Pages               = $Pages
+                    NextLink            = $NextUri
+                    Truncated           = [bool]$NextUri
+                    PaginationDefaulted = $PaginationDefaulted
+                }
+                if ($NextUri -and -not $NoPagination) {
+                    Write-LogMessage -headers $Headers -API $APIName -tenant $TenantFilter -message "Graph passthrough stopped paging $Endpoint at $($Items.Count) items / $Pages pages (MaxItems $MaxItems or time budget)" -Sev 'Info'
+                }
+            } else {
+                $Results = $Single
+            }
         } else {
             $PostParams = @{
                 uri      = $Uri
@@ -150,11 +233,17 @@ function Invoke-ExecGraphRequest {
         }
 
         $StatusCode = [HttpStatusCode]::OK
-        $ResponseBody = [pscustomobject]@{ Results = $Results }
+        $ResponseBody = if ($Metadata) {
+            [pscustomobject]@{ Results = $Results; Metadata = $Metadata }
+        } else {
+            [pscustomobject]@{ Results = $Results }
+        }
     } catch {
         $ErrorMessage = Get-NormalizedError -Message $_.Exception.Message
         Write-LogMessage -headers $Headers -API $APIName -tenant $TenantFilter -message "Graph passthrough failed: $Method $Endpoint - $ErrorMessage" -Sev 'Error'
-        $StatusCode = [HttpStatusCode]::BadRequest
+        # GET failures carry Graph's own status (403, 404, ...) so a denied read can't be mistaken
+        # for an empty one. Write paths keep the historical 400.
+        $StatusCode = $ErrorStatus ?? [HttpStatusCode]::BadRequest
         $ResponseBody = [pscustomobject]@{ Results = "Graph Error: $ErrorMessage - Endpoint: $Endpoint" }
     }
 
