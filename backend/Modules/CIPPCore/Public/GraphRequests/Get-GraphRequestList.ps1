@@ -88,6 +88,23 @@ function Get-GraphRequestList {
     $SingleTenantThreshold = 8000
     $PagedAllTenants = $false
     Write-Information "Tenant: $TenantFilter"
+
+    # A query string written inside Endpoint (users/x/messages?$filter=...) used to be parsed into
+    # UriBuilder.Query and then overwritten by the query built from $Parameters below, so the
+    # filter was silently dropped and the whole collection paged. Move it into $Parameters instead;
+    # an explicit, non-empty parameter wins over the embedded one. Values are not URL-decoded again:
+    # the HTTP layer already decoded them once, and a second pass would turn '+' (UTC offsets) into
+    # spaces and eat '%defaultdomain%'-style replacement variables.
+    if ($Endpoint -match '\?') {
+        $Endpoint, $EmbeddedQuery = $Endpoint -split '\?', 2
+        foreach ($Pair in ($EmbeddedQuery -split '&')) {
+            $Key, $Value = $Pair -split '=', 2
+            if ([string]::IsNullOrWhiteSpace($Key)) { continue }
+            if (-not [string]::IsNullOrEmpty([string]$Parameters[$Key])) { continue }
+            $Parameters[$Key] = [string]$Value
+        }
+    }
+
     $TableName = ('cache{0}' -f ($Endpoint -replace '[^A-Za-z0-9]'))[0..62] -join ''
     $Endpoint = $Endpoint -replace '^/', ''
     $DisplayName = ($Endpoint -split '/')[0]
