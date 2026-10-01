@@ -23,10 +23,5 @@
     "label": "Custom",
     "path": "/dashboardv2/custom",
     "icon": "Apps"
-  },
-  {
-    "label": "Previous Dashboard Experience",
-    "path": "/dashboardv1",
-    "icon": "History"
   }
 ]
