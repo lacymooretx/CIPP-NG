@@ -848,6 +848,7 @@
     "label": "Alert on printers failing to install on devices",
     "recommendedRunInterval": "1d",
     "requiresInput": true,
+    "multipleInput": true,
     "inputs": [
       {
         "inputType": "textField",
@@ -861,6 +862,7 @@
     "label": "Alert when users are blocked from an app because admin consent is required",
     "recommendedRunInterval": "4h",
     "requiresInput": true,
+    "multipleInput": true,
     "inputs": [
       {
         "inputType": "textField",
@@ -884,6 +886,7 @@
     "label": "Alert on tenant-wide compromise patterns (device-code sign-ins, password spray, distributed brute force, MFA registered on dormant accounts)",
     "recommendedRunInterval": "4h",
     "requiresInput": true,
+    "multipleInput": true,
     "inputs": [
       {
         "inputType": "textField",
