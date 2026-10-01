@@ -318,6 +318,7 @@
     "label": "Alert on app consent requests awaiting admin approval",
     "recommendedRunInterval": "30m",
     "requiresInput": true,
+    "multipleInput": true,
     "inputs": [
       {
         "inputType": "textField",
