@@ -395,5 +395,60 @@
     "type": "DomainAnalyser",
     "friendlyName": "Domain Analyser",
     "description": "Domain Analyser results per domain: SPF, MX, DMARC, DKIM, DNSSEC, enrollment CNAMEs and the domain health score"
+  },
+  {
+    "type": "AzureSubscriptions",
+    "friendlyName": "Azure Subscriptions",
+    "description": "Azure subscriptions the CIPP-SAM app can read (needs a Reader grant per subscription)"
+  },
+  {
+    "type": "AzureResources",
+    "friendlyName": "Azure Resources",
+    "description": "Azure resources inspected by the Azure compliance tests (storage, Key Vault, network, compute, SQL, App Service, backup, monitoring)"
+  },
+  {
+    "type": "AzureRoleAssignments",
+    "friendlyName": "Azure Role Assignments",
+    "description": "Azure RBAC role assignments (active and PIM-eligible) with resolved principals"
+  },
+  {
+    "type": "AzureRoleDefinitions",
+    "friendlyName": "Azure Custom Roles",
+    "description": "Custom Azure RBAC role definitions"
+  },
+  {
+    "type": "AzureDefender",
+    "friendlyName": "Defender for Cloud Settings",
+    "description": "Defender for Cloud plans, security contacts and integrations per subscription"
+  },
+  {
+    "type": "AzureSecurityPosture",
+    "friendlyName": "Defender for Cloud Posture",
+    "description": "Defender for Cloud secure scores and unhealthy recommendations"
+  },
+  {
+    "type": "AzureActivityLogSettings",
+    "friendlyName": "Azure Activity Log Export",
+    "description": "Where each subscription's activity log is exported (diagnostic settings)"
+  },
+  {
+    "type": "AzurePolicy",
+    "friendlyName": "Azure Policy Assignments",
+    "description": "Azure Policy assignments with non-compliant resource counts"
+  },
+  {
+    "type": "AzureBackupItems",
+    "friendlyName": "Azure Backup Items",
+    "description": "Azure Backup protected items and their last backup result"
+  },
+  {
+    "type": "AzureResourceConfig",
+    "friendlyName": "Azure Resource Settings",
+    "description": "Per-resource settings not in Resource Graph (storage soft delete, Key Vault logging, SQL firewall/auditing, App Service TLS/FTP)"
+  },
+  {
+    "type": "Azure",
+    "friendlyName": "Azure (all types)",
+    "description": "Refreshes every Azure compliance cache type in order (subscriptions, resources, RBAC, Defender for Cloud, logging, policy, backup, resource settings)"
   }
 ]

@@ -139,6 +139,9 @@
       "name": "Tenant > AI"
     },
     {
+      "name": "Tenant > Azure"
+    },
+    {
       "name": "Tenant > Conditional"
     },
     {
@@ -45412,6 +45415,82 @@
         ],
         "x-cipp-role": "CIPP.Dashboard.Read",
         "x-cipp-any-tenant": true
+      }
+    },
+    "/api/ListAzureAccess": {
+      "get": {
+        "summary": "Azure subscription access per tenant for the Azure compliance suite",
+        "operationId": "ListAzureAccess",
+        "tags": [
+          "Tenant > Azure"
+        ],
+        "description": "Shows, per tenant, which Azure subscriptions the CIPP-SAM app can read (from the\nAzureSubscriptions cache, or live with Live=true for a single tenant) and the commands a\nsubscription Owner runs once to grant it Reader. Status is 'Onboarded' (at least one\nsubscription readable), 'NotOnboarded' (none readable: no Reader grant, or no Azure),\n'NotCollected' (no Azure collection has run yet) or 'Error' (live check failed).",
+        "parameters": [
+          {
+            "name": "Live",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/tenantFilter"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "description": "Derived from the fields written into the storage table it reads. Fields taken from the storage writers may be omitted by this endpoint, and the response may carry computed fields not listed here.",
+                    "properties": {
+                      "Data": {
+                        "type": "string",
+                        "x-cipp-field-source": "storage"
+                      },
+                      "ETag": {
+                        "x-cipp-field-source": "storage"
+                      },
+                      "PartitionKey": {
+                        "x-cipp-field-source": "storage"
+                      },
+                      "RowKey": {
+                        "x-cipp-field-source": "storage"
+                      },
+                      "Timestamp": {
+                        "type": "string",
+                        "x-cipp-field-source": "storage"
+                      },
+                      "Type": {
+                        "x-cipp-field-source": "storage"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - missing required field or invalid input"
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cipp-role": "Tenant.Reports.Read"
       }
     },
     "/api/ListAzureADConnectStatus": {

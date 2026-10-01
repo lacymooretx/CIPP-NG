@@ -17,6 +17,8 @@ function Invoke-CIPPDBCacheCollection {
         - Intune:               Managed devices, policies, app protection
         - DefenderForOffice365: Safe Links/Attachments, ATP, Teams protection (MDO P1/P2)
         - Defender:             Defender for Endpoint vulnerabilities (TVM/CVE)
+        - Azure:                Azure subscription posture via ARM/Resource Graph (needs a Reader grant
+                                to CIPP-SAM per subscription; returns empty, cheaply, without one)
 
     .PARAMETER CollectionType
         The group of cache functions to execute
@@ -33,7 +35,7 @@ function Invoke-CIPPDBCacheCollection {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]
-        [ValidateSet('Graph', 'ExchangeConfig', 'ExchangeData', 'ConditionalAccess', 'IdentityProtection', 'Intune', 'Compliance', 'CopilotUsage', 'SharePoint', 'Teams', 'DefenderForOffice365', 'Defender')]
+        [ValidateSet('Graph', 'ExchangeConfig', 'ExchangeData', 'ConditionalAccess', 'IdentityProtection', 'Intune', 'Compliance', 'CopilotUsage', 'SharePoint', 'Teams', 'DefenderForOffice365', 'Defender', 'Azure')]
         [string]$CollectionType,
 
         [Parameter(Mandatory = $true)]
@@ -210,6 +212,20 @@ function Invoke-CIPPDBCacheCollection {
             'ExoSafeAttachmentPolicies'
             'ExoAtpPolicyForO365'
             'ExoTeamsProtectionPolicy'
+        )
+        # Order matters: AzureSubscriptions feeds every other Azure collector, and
+        # AzureResourceConfig reads the AzureResources cache written just before it.
+        Azure              = @(
+            'AzureSubscriptions'
+            'AzureResources'
+            'AzureRoleAssignments'
+            'AzureRoleDefinitions'
+            'AzureDefender'
+            'AzureSecurityPosture'
+            'AzureActivityLogSettings'
+            'AzurePolicy'
+            'AzureBackupItems'
+            'AzureResourceConfig'
         )
     }
 
