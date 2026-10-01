@@ -30,6 +30,7 @@ function Invoke-ListTests {
         $IdentityTotal = 0
         $DevicesTotal = 0
         $CustomTotal = 0
+        $AzureTotal = 0
         $IdentityTests = @()
         $DevicesTests = @()
         $CustomTests = @()
@@ -83,6 +84,10 @@ function Invoke-ListTests {
                         $CustomTests = & $NormalizeTestIds $ReportContent.CustomTests
                         $CustomTotal = @($CustomTests).Count
                     }
+                    if ($ReportContent.AzureTests) {
+                        $AzureTests = & $NormalizeTestIds $ReportContent.AzureTests
+                        $AzureTotal = @($AzureTests).Count
+                    }
                     $ReportFound = $true
                 } catch {
                     Write-LogMessage -API $APIName -tenant $TenantFilter -message "Error reading report.json: $($_.Exception.Message)" -sev Warning
@@ -110,6 +115,11 @@ function Invoke-ListTests {
                         $CustomTests = & $NormalizeTestIds ($ReportTemplate.CustomTests | ConvertFrom-Json)
                         $CustomTotal = @($CustomTests).Count
                     }
+
+                    if ($ReportTemplate.AzureTests) {
+                        $AzureTests = & $NormalizeTestIds ($ReportTemplate.AzureTests | ConvertFrom-Json)
+                        $AzureTotal = @($AzureTests).Count
+                    }
                     $ReportFound = $true
                 } else {
                     Write-LogMessage -API $APIName -tenant $TenantFilter -message "Report template '$ReportId' not found" -sev Warning
@@ -118,7 +128,7 @@ function Invoke-ListTests {
 
             # Filter tests if report was found
             if ($ReportFound) {
-                $AllReportTests = @($IdentityTests) + @($DevicesTests) + @($CustomTests)
+                $AllReportTests = @($IdentityTests) + @($DevicesTests) + @($CustomTests) + @($AzureTests)
                 # Use HashSet for O(1) lookup performance
                 $TestLookup = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
                 foreach ($test in $AllReportTests) {
@@ -135,11 +145,13 @@ function Invoke-ListTests {
             $IdentityTotal = @($TestResultsData.TestResults | Where-Object { $_.TestType -eq 'Identity' }).Count
             $DevicesTotal = @($TestResultsData.TestResults | Where-Object { $_.TestType -eq 'Devices' }).Count
             $CustomTotal = @($TestResultsData.TestResults | Where-Object { $_.TestType -eq 'Custom' }).Count
+            $AzureTotal = @($TestResultsData.TestResults | Where-Object { $_.TestType -eq 'Azure' }).Count
         }
 
         $IdentityResults = $TestResultsData.TestResults | Where-Object { $_.TestType -eq 'Identity' }
         $DeviceResults = $TestResultsData.TestResults | Where-Object { $_.TestType -eq 'Devices' }
         $CustomResultsForCounts = $TestResultsData.TestResults | Where-Object { $_.TestType -eq 'Custom' }
+        $AzureResults = $TestResultsData.TestResults | Where-Object { $_.TestType -eq 'Azure' }
 
         if (-not $SummaryOnly) {
             # Build lookup of custom script metadata (latest version per ScriptGuid)
@@ -232,6 +244,14 @@ function Invoke-ListTests {
                 Skipped        = @($CustomResultsForCounts | Where-Object { $_.Status -eq 'Skipped' }).Count
                 Informational  = @($CustomResultsForCounts | Where-Object { $_.Status -in @('Informational', 'Unlicensed') }).Count
                 Total          = $CustomTotal
+            }
+            Azure    = @{
+                Passed         = @($AzureResults | Where-Object { $_.Status -eq 'Passed' }).Count
+                Failed         = @($AzureResults | Where-Object { $_.Status -eq 'Failed' }).Count
+                NeedsAttention = @($AzureResults | Where-Object { $_.Status -eq 'Investigate' }).Count
+                Skipped        = @($AzureResults | Where-Object { $_.Status -eq 'Skipped' }).Count
+                Informational  = @($AzureResults | Where-Object { $_.Status -eq 'Informational' }).Count
+                Total          = $AzureTotal
             }
         }
 

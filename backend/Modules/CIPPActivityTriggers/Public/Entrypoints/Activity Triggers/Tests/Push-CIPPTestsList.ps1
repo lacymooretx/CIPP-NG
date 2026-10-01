@@ -37,7 +37,7 @@ function Push-CIPPTestsList {
 
         # Emit one task per suite — suite names must match the ValidateSet in Invoke-CIPPTestCollection.
         # Function discovery happens inside Invoke-CIPPTestCollection via Get-Command (path-independent).
-        $Suites = @('ZTNA', 'ORCA', 'EIDSCA', 'CISA', 'CIS', 'SMB1001', 'CopilotReadiness', 'GenericTests', 'Custom', 'E8', 'SecuritySimulations')
+        $Suites = @('ZTNA', 'ORCA', 'EIDSCA', 'CISA', 'CIS', 'SMB1001', 'CopilotReadiness', 'GenericTests', 'Custom', 'E8', 'SecuritySimulations', 'Azure')
 
         # Optional caller-supplied suite filter (e.g. a Custom-only run). When present, restrict
         # the emitted suites to the requested subset so we don't spin up every suite unnecessarily.
@@ -49,6 +49,12 @@ function Push-CIPPTestsList {
                 return @()
             }
             Write-Information "Suite filter applied for $TenantFilter — running: $($Suites -join ', ')"
+        }
+
+        # Azure runs only for tenants with a readable subscription. Others get their old AZ_ results
+        # removed, so a revoked Reader grant doesn't leave a stale Azure tab behind.
+        if ($Suites -contains 'Azure' -and -not (Test-CIPPAzureTestsEnabled -TenantFilter $TenantFilter)) {
+            $Suites = @($Suites | Where-Object { $_ -ne 'Azure' })
         }
 
         $Tasks = foreach ($Suite in $Suites) {

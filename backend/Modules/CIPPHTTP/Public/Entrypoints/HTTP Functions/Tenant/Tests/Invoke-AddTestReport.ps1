@@ -30,6 +30,7 @@ function Invoke-AddTestReport {
         $IdentityTests = $Body.IdentityTests ? ($Body.IdentityTests | ConvertTo-Json -Compress) : '[]'
         $DevicesTests = $Body.DevicesTests ? ($Body.DevicesTests | ConvertTo-Json -Compress) : '[]'
         $CustomTests = $Body.CustomTests ? ($Body.CustomTests | ConvertTo-Json -Compress) : '[]'
+        $AzureTests = $Body.AzureTests ? ($Body.AzureTests | ConvertTo-Json -Compress) : '[]'
 
         $CreatedAt = [string](Get-Date).ToString('o')
         if ($IsUpdate) {
@@ -50,6 +51,7 @@ function Invoke-AddTestReport {
             IdentityTests = [string]$IdentityTests
             DevicesTests  = [string]$DevicesTests
             CustomTests   = [string]$CustomTests
+            AzureTests    = [string]$AzureTests
             CreatedAt     = $CreatedAt
             UpdatedAt     = [string](Get-Date).ToString('o')
         }

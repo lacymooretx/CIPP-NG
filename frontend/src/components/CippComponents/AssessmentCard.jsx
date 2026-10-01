@@ -49,20 +49,27 @@ export const AssessmentCard = ({ data, isLoading, title, description }) => {
   const customInformational = data?.TestResultSummary?.CustomInformational || 0;
   const customNeedsAttention = data?.TestResultSummary?.CustomNeedsAttention || 0;
   const customTotal = data?.TestResultSummary?.CustomTotal || 0;
+  const azurePassed = data?.TestResultSummary?.AzurePassed || 0;
+  const azureFailed = data?.TestResultSummary?.AzureFailed || 0;
+  const azureSkipped = data?.TestResultSummary?.AzureSkipped || 0;
+  const azureInformational = data?.TestResultSummary?.AzureInformational || 0;
+  const azureNeedsAttention = data?.TestResultSummary?.AzureNeedsAttention || 0;
+  const azureTotal = data?.TestResultSummary?.AzureTotal || 0;
 
-  const overallPassed = identityPassed + devicesPassed + customPassed;
-  const overallFailed = identityFailed + devicesFailed + customFailed;
-  const overallSkipped = identitySkipped + devicesSkipped + customSkipped;
+  const overallPassed = identityPassed + devicesPassed + customPassed + azurePassed;
+  const overallFailed = identityFailed + devicesFailed + customFailed + azureFailed;
+  const overallSkipped = identitySkipped + devicesSkipped + customSkipped + azureSkipped;
   const overallInformational =
-    identityInformational + devicesInformational + customInformational;
+    identityInformational + devicesInformational + customInformational + azureInformational;
   const overallNeedsAttention =
-    identityNeedsAttention + devicesNeedsAttention + customNeedsAttention;
-  const overallTotal = identityTotal + devicesTotal + customTotal;
+    identityNeedsAttention + devicesNeedsAttention + customNeedsAttention + azureNeedsAttention;
+  const overallTotal = identityTotal + devicesTotal + customTotal + azureTotal;
 
   // Determine if we should show section
   const hasIdentityTests = identityTotal > 0;
   const hasDeviceTests = devicesTotal > 0;
   const hasCustomTests = customTotal > 0;
+  const hasAzureTests = azureTotal > 0;
 
   const testCategories = [
     {
@@ -97,6 +104,17 @@ export const AssessmentCard = ({ data, isLoading, title, description }) => {
       needsAttention: customNeedsAttention,
       total: customTotal,
       show: hasCustomTests,
+    },
+    {
+      key: "azure",
+      label: "Azure",
+      passed: azurePassed,
+      failed: azureFailed,
+      skipped: azureSkipped,
+      informational: azureInformational,
+      needsAttention: azureNeedsAttention,
+      total: azureTotal,
+      show: hasAzureTests,
     },
   ].filter((category) => category.show);
 

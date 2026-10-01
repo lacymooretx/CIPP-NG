@@ -256,6 +256,16 @@ function Push-CIPPDBCacheData {
             Write-Host "Skipping Teams data collection for $TenantFilter - no required license"
         }
 
+        # Azure always runs — access comes from an Azure RBAC grant, not a licence, and a tenant
+        # without one costs a single ARM call that returns no subscriptions
+        $Tasks.Add(@{
+                FunctionName   = 'ExecCIPPDBCache'
+                CollectionType = 'Azure'
+                TenantFilter   = $TenantFilter
+                QueueId        = $QueueId
+                QueueName      = "DB Cache Azure - $TenantFilter"
+            })
+
         Write-Information "Built $($Tasks.Count) grouped cache tasks for tenant $TenantFilter (down from individual per-type tasks)"
 
         # Return the task list — the PostExecution function will aggregate and start a flat orchestrator

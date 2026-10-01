@@ -46,6 +46,7 @@ export const CippAddTestReportDrawer = ({
       IdentityTests: [],
       DevicesTests: [],
       CustomTests: [],
+      AzureTests: [],
     },
   })
 
@@ -54,6 +55,7 @@ export const CippAddTestReportDrawer = ({
     useWatch({ control: formControl.control, name: 'IdentityTests' }) || []
   const selectedDeviceTests = useWatch({ control: formControl.control, name: 'DevicesTests' }) || []
   const selectedCustomTests = useWatch({ control: formControl.control, name: 'CustomTests' }) || []
+  const selectedAzureTests = useWatch({ control: formControl.control, name: 'AzureTests' }) || []
 
   const createReport = ApiPostCall({
     urlFromData: true,
@@ -70,6 +72,7 @@ export const CippAddTestReportDrawer = ({
     IdentityTests: [],
     DevicesTests: [],
     CustomTests: [],
+    AzureTests: [],
   }
 
   // Reset form fields on successful creation
@@ -82,6 +85,7 @@ export const CippAddTestReportDrawer = ({
           IdentityTests: [],
           DevicesTests: [],
           CustomTests: [],
+      AzureTests: [],
         })
       }
     }
@@ -95,6 +99,7 @@ export const CippAddTestReportDrawer = ({
         IdentityTests: reportToEdit.IdentityTests || [],
         DevicesTests: reportToEdit.DevicesTests || [],
         CustomTests: reportToEdit.CustomTests || [],
+        AzureTests: reportToEdit.AzureTests || [],
       })
     }
   }, [visible, isEditMode, reportToEdit, formControl])
@@ -136,6 +141,7 @@ export const CippAddTestReportDrawer = ({
       IdentityTests: [],
       DevicesTests: [],
       CustomTests: [],
+      AzureTests: [],
     })
   }
 
@@ -144,6 +150,7 @@ export const CippAddTestReportDrawer = ({
       Identity: 'IdentityTests',
       Devices: 'DevicesTests',
       Custom: 'CustomTests',
+      Azure: 'AzureTests',
     }
     const fieldName = fieldMap[testType] || 'IdentityTests'
     const currentTests = formControl.getValues(fieldName) || []
@@ -166,6 +173,9 @@ export const CippAddTestReportDrawer = ({
     if (testType === 'Devices') {
       return selectedDeviceTests.includes(testId)
     }
+    if (testType === 'Azure') {
+      return selectedAzureTests.includes(testId)
+    }
     return selectedCustomTests.includes(testId)
   }
 
@@ -183,9 +193,11 @@ export const CippAddTestReportDrawer = ({
       ? filterTests(availableTests.IdentityTests || [])
       : activeTab === 1
         ? filterTests(availableTests.DevicesTests || [])
-        : filterTests(availableTests.CustomTests || [])
+        : activeTab === 2
+          ? filterTests(availableTests.CustomTests || [])
+          : filterTests(availableTests.AzureTests || [])
 
-  const currentTestType = activeTab === 0 ? 'Identity' : activeTab === 1 ? 'Devices' : 'Custom'
+  const currentTestType = ['Identity', 'Devices', 'Custom', 'Azure'][activeTab] ?? 'Identity'
 
   return (
     <>
@@ -320,6 +332,12 @@ export const CippAddTestReportDrawer = ({
                   size="small"
                   variant="outlined"
                 />
+                <Chip
+                  label={`${selectedAzureTests.length} Azure`}
+                  color="success"
+                  size="small"
+                  variant="outlined"
+                />
                 <Box sx={{ flex: 1 }} />
                 <Typography variant="caption" sx={{
                   color: "text.secondary"
@@ -327,7 +345,8 @@ export const CippAddTestReportDrawer = ({
                   Total:{' '}
                   {selectedIdentityTests.length +
                     selectedDeviceTests.length +
-                    selectedCustomTests.length}{' '}
+                    selectedCustomTests.length +
+                    selectedAzureTests.length}{' '}
                   tests
                 </Typography>
               </Stack>
@@ -381,6 +400,16 @@ export const CippAddTestReportDrawer = ({
                         <span>Custom Tests</span>
                         {selectedCustomTests.length > 0 && (
                           <Chip size="small" label={selectedCustomTests.length} color="info" />
+                        )}
+                      </Box>
+                    }
+                  />
+                  <Tab
+                    label={
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <span>Azure Tests</span>
+                        {selectedAzureTests.length > 0 && (
+                          <Chip size="small" label={selectedAzureTests.length} color="success" />
                         )}
                       </Box>
                     }
