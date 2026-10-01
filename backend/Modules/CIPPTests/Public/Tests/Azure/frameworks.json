@@ -1,0 +1,185 @@
+{
+  "note": "Indicative mapping maintained by Aspendora for the AZ_ Azure subscription tests. Each test is tagged with control themes; each theme maps to the framework controls it supports. It shows which controls a technical check provides evidence for. It is not an auditor's control mapping and does not establish compliance with any framework.",
+  "frameworks": {
+    "MCSB": "Microsoft cloud security benchmark v1",
+    "CISv8": "CIS Critical Security Controls v8 (safeguards)",
+    "NISTCSF": "NIST Cybersecurity Framework 2.0 (categories)",
+    "NIST80053": "NIST SP 800-53 Rev. 5",
+    "CMMC": "CMMC 2.0 / NIST SP 800-171 Rev. 2",
+    "SOC2": "SOC 2 Trust Services Criteria (2017)",
+    "ISO27001": "ISO/IEC 27001:2022 Annex A"
+  },
+  "themes": {
+    "PrivilegedAccess": {
+      "name": "Least privilege for administrative roles",
+      "MCSB": ["PA-1", "PA-7"], "CISv8": ["5.4", "6.8"], "NISTCSF": ["PR.AA"], "NIST80053": ["AC-6", "AC-6(5)"],
+      "CMMC": ["AC.L2-3.1.5"], "SOC2": ["CC6.3"], "ISO27001": ["8.2"]
+    },
+    "ExternalIdentities": {
+      "name": "Control of guest and third-party identities",
+      "MCSB": ["PA-1"], "CISv8": ["5.4", "6.8"], "NISTCSF": ["PR.AA"], "NIST80053": ["AC-2", "AC-6"],
+      "CMMC": ["AC.L2-3.1.5"], "SOC2": ["CC6.2", "CC6.3"], "ISO27001": ["5.18", "8.2"]
+    },
+    "AccessReview": {
+      "name": "Access review and removal of stale access",
+      "MCSB": ["PA-4"], "CISv8": ["5.3", "6.2"], "NISTCSF": ["PR.AA"], "NIST80053": ["AC-2"],
+      "CMMC": ["AC.L1-3.1.1"], "SOC2": ["CC6.2"], "ISO27001": ["5.18"]
+    },
+    "JustInTimeAccess": {
+      "name": "No standing privileged access",
+      "MCSB": ["PA-2"], "CISv8": ["5.4"], "NISTCSF": ["PR.AA"], "NIST80053": ["AC-6"],
+      "CMMC": ["AC.L2-3.1.5", "AC.L2-3.1.6"], "SOC2": ["CC6.3"], "ISO27001": ["8.2"]
+    },
+    "IdentityAuthentication": {
+      "name": "Centralised identity-based authentication (no shared keys or local accounts)",
+      "MCSB": ["IM-1", "IM-3"], "CISv8": ["6.7"], "NISTCSF": ["PR.AA"], "NIST80053": ["IA-2", "IA-5"],
+      "CMMC": ["IA.L1-3.5.2"], "SOC2": ["CC6.1"], "ISO27001": ["8.5"]
+    },
+    "ThreatDetection": {
+      "name": "Threat detection and endpoint protection",
+      "MCSB": ["LT-1", "ES-1"], "CISv8": ["10.1", "13.1"], "NISTCSF": ["DE.CM"], "NIST80053": ["SI-3", "SI-4"],
+      "CMMC": ["SI.L1-3.14.2", "SI.L2-3.14.6"], "SOC2": ["CC6.8", "CC7.2"], "ISO27001": ["8.7", "8.16"]
+    },
+    "IncidentNotification": {
+      "name": "Security incident notification",
+      "MCSB": ["IR-2"], "CISv8": ["17.2"], "NISTCSF": ["RS.MA"], "NIST80053": ["IR-6"],
+      "CMMC": ["IR.L2-3.6.1"], "SOC2": ["CC7.3"], "ISO27001": ["5.24"]
+    },
+    "PostureManagement": {
+      "name": "Secure configuration baseline and posture assessment",
+      "MCSB": ["PV-1", "PV-2"], "CISv8": ["4.1"], "NISTCSF": ["PR.PS", "ID.RA"], "NIST80053": ["CM-6", "RA-5"],
+      "CMMC": ["CM.L2-3.4.2", "RA.L2-3.11.2"], "SOC2": ["CC7.1"], "ISO27001": ["8.8", "8.9"]
+    },
+    "EncryptionInTransit": {
+      "name": "Encryption of data in transit",
+      "MCSB": ["DP-3"], "CISv8": ["3.10"], "NISTCSF": ["PR.DS"], "NIST80053": ["SC-8"],
+      "CMMC": ["SC.L2-3.13.8"], "SOC2": ["CC6.7"], "ISO27001": ["8.24"]
+    },
+    "DataExposure": {
+      "name": "Restricting public and network access to data stores",
+      "MCSB": ["NS-2"], "CISv8": ["3.3"], "NISTCSF": ["PR.DS", "PR.AA"], "NIST80053": ["AC-3", "SC-7"],
+      "CMMC": ["AC.L1-3.1.1", "SC.L1-3.13.1"], "SOC2": ["CC6.1", "CC6.6"], "ISO27001": ["8.3", "8.20"]
+    },
+    "KeyProtection": {
+      "name": "Protection of keys and secrets",
+      "MCSB": ["DP-8"], "CISv8": [], "NISTCSF": ["PR.DS"], "NIST80053": ["SC-12"],
+      "CMMC": ["SC.L2-3.13.10"], "SOC2": ["CC6.1"], "ISO27001": ["8.24"]
+    },
+    "DataRecovery": {
+      "name": "Recovery of deleted or overwritten data",
+      "MCSB": ["BR-1"], "CISv8": ["11.1"], "NISTCSF": ["PR.DS", "RC.RP"], "NIST80053": ["CP-9"],
+      "CMMC": ["MP.L2-3.8.9"], "SOC2": ["A1.2"], "ISO27001": ["8.13"]
+    },
+    "NetworkBoundary": {
+      "name": "Network boundary protection and exposure of services",
+      "MCSB": ["NS-1", "NS-2"], "CISv8": ["4.4", "12.2"], "NISTCSF": ["PR.IR"], "NIST80053": ["SC-7", "CM-7"],
+      "CMMC": ["SC.L1-3.13.1", "CM.L2-3.4.7"], "SOC2": ["CC6.6"], "ISO27001": ["8.20", "8.22"]
+    },
+    "NetworkMonitoring": {
+      "name": "Network traffic logging",
+      "MCSB": ["LT-4"], "CISv8": ["13.6"], "NISTCSF": ["DE.CM"], "NIST80053": ["AU-12", "SI-4"],
+      "CMMC": ["AU.L2-3.3.1"], "SOC2": ["CC7.2"], "ISO27001": ["8.16"]
+    },
+    "SecureConfiguration": {
+      "name": "Secure configuration of compute and platform services",
+      "MCSB": ["PV-1", "PV-3"], "CISv8": ["4.1"], "NISTCSF": ["PR.PS"], "NIST80053": ["CM-6", "CM-7"],
+      "CMMC": ["CM.L2-3.4.2", "CM.L2-3.4.7"], "SOC2": ["CC7.1"], "ISO27001": ["8.9"]
+    },
+    "AuditLogging": {
+      "name": "Audit logging",
+      "MCSB": ["LT-3"], "CISv8": ["8.2"], "NISTCSF": ["PR.PS", "DE.CM"], "NIST80053": ["AU-2", "AU-12"],
+      "CMMC": ["AU.L2-3.3.1"], "SOC2": ["CC7.2"], "ISO27001": ["8.15"]
+    },
+    "LogRetention": {
+      "name": "Log retention",
+      "MCSB": ["LT-6"], "CISv8": ["8.10"], "NISTCSF": ["PR.PS"], "NIST80053": ["AU-11"],
+      "CMMC": ["AU.L2-3.3.1"], "SOC2": ["CC7.2"], "ISO27001": ["8.15"]
+    },
+    "ChangeAlerting": {
+      "name": "Alerting on security-relevant changes",
+      "MCSB": ["LT-1"], "CISv8": ["8.11"], "NISTCSF": ["DE.CM", "DE.AE"], "NIST80053": ["AU-6", "SI-4"],
+      "CMMC": ["SI.L2-3.14.6"], "SOC2": ["CC7.2"], "ISO27001": ["8.16"]
+    },
+    "Backup": {
+      "name": "Backup coverage and monitoring",
+      "MCSB": ["BR-1", "BR-3"], "CISv8": ["11.2"], "NISTCSF": ["PR.DS", "RC.RP"], "NIST80053": ["CP-9"],
+      "CMMC": ["MP.L2-3.8.9"], "SOC2": ["A1.2"], "ISO27001": ["8.13"]
+    },
+    "BackupProtection": {
+      "name": "Protection of backup data",
+      "MCSB": ["BR-2"], "CISv8": ["11.3"], "NISTCSF": ["PR.DS"], "NIST80053": ["CP-9"],
+      "CMMC": ["MP.L2-3.8.9"], "SOC2": ["A1.2"], "ISO27001": ["8.13"]
+    }
+  },
+  "tests": {
+    "AZ_RBAC_01": ["PrivilegedAccess"],
+    "AZ_RBAC_02": ["ExternalIdentities", "PrivilegedAccess"],
+    "AZ_RBAC_03": ["AccessReview"],
+    "AZ_RBAC_04": ["PrivilegedAccess", "ExternalIdentities"],
+    "AZ_RBAC_05": ["PrivilegedAccess"],
+    "AZ_RBAC_06": ["JustInTimeAccess"],
+    "AZ_DFC_01": ["ThreatDetection", "PostureManagement"],
+    "AZ_DFC_02": ["ThreatDetection"],
+    "AZ_DFC_03": ["ThreatDetection"],
+    "AZ_DFC_04": ["ThreatDetection"],
+    "AZ_DFC_05": ["ThreatDetection"],
+    "AZ_DFC_06": ["ThreatDetection"],
+    "AZ_DFC_07": ["ThreatDetection"],
+    "AZ_DFC_08": ["ThreatDetection"],
+    "AZ_DFC_09": ["IncidentNotification"],
+    "AZ_DFC_10": ["IncidentNotification"],
+    "AZ_DFC_11": ["ThreatDetection"],
+    "AZ_DFC_12": ["PostureManagement"],
+    "AZ_DFC_13": ["PostureManagement"],
+    "AZ_STG_01": ["EncryptionInTransit"],
+    "AZ_STG_02": ["EncryptionInTransit"],
+    "AZ_STG_03": ["DataExposure"],
+    "AZ_STG_04": ["DataExposure", "NetworkBoundary"],
+    "AZ_STG_05": ["IdentityAuthentication"],
+    "AZ_STG_06": ["DataExposure"],
+    "AZ_STG_07": ["DataRecovery"],
+    "AZ_STG_08": ["DataRecovery"],
+    "AZ_KV_01": ["KeyProtection", "DataRecovery"],
+    "AZ_KV_02": ["KeyProtection", "PrivilegedAccess"],
+    "AZ_KV_03": ["KeyProtection", "NetworkBoundary"],
+    "AZ_KV_04": ["AuditLogging"],
+    "AZ_NET_01": ["NetworkBoundary"],
+    "AZ_NET_02": ["NetworkBoundary"],
+    "AZ_NET_03": ["NetworkBoundary"],
+    "AZ_NET_04": ["NetworkBoundary"],
+    "AZ_NET_05": ["NetworkBoundary"],
+    "AZ_NET_06": ["NetworkMonitoring"],
+    "AZ_NET_07": ["NetworkMonitoring"],
+    "AZ_NET_08": ["NetworkBoundary"],
+    "AZ_VM_01": ["SecureConfiguration"],
+    "AZ_VM_02": ["SecureConfiguration"],
+    "AZ_VM_03": ["Backup"],
+    "AZ_VM_04": ["DataExposure"],
+    "AZ_VM_05": ["SecureConfiguration"],
+    "AZ_SQL_01": ["AuditLogging"],
+    "AZ_SQL_02": ["NetworkBoundary", "DataExposure"],
+    "AZ_SQL_03": ["IdentityAuthentication"],
+    "AZ_SQL_04": ["IdentityAuthentication"],
+    "AZ_SQL_05": ["EncryptionInTransit"],
+    "AZ_SQL_06": ["NetworkBoundary", "DataExposure"],
+    "AZ_DB_01": ["NetworkBoundary", "DataExposure"],
+    "AZ_APP_01": ["EncryptionInTransit"],
+    "AZ_APP_02": ["EncryptionInTransit"],
+    "AZ_APP_03": ["EncryptionInTransit", "SecureConfiguration"],
+    "AZ_APP_04": ["SecureConfiguration"],
+    "AZ_APP_05": ["IdentityAuthentication"],
+    "AZ_LOG_01": ["AuditLogging", "LogRetention"],
+    "AZ_LOG_02": ["ChangeAlerting"],
+    "AZ_LOG_03": ["LogRetention"],
+    "AZ_GOV_01": ["PostureManagement"],
+    "AZ_GOV_02": ["PostureManagement"],
+    "AZ_BKP_01": ["BackupProtection"],
+    "AZ_BKP_02": ["BackupProtection"],
+    "AZ_BKP_03": ["Backup"],
+    "AZ_ACR_01": ["IdentityAuthentication"],
+    "AZ_ACR_02": ["DataExposure"],
+    "AZ_AKS_01": ["IdentityAuthentication"],
+    "AZ_AKS_02": ["NetworkBoundary"],
+    "AZ_AI_01": ["IdentityAuthentication"]
+  }
+}

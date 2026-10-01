@@ -22,6 +22,8 @@ function Invoke-CippTestAZ_RBAC_01 {
         $TooMany = @($Rows | Where-Object { $_.Owners -gt 3 })
         $TooFew = @($Rows | Where-Object { $_.Owners -lt 2 })
         $Status = if ($TooMany.Count) { 'Failed' } elseif ($TooFew.Count) { 'Investigate' } else { 'Passed' }
-        @{ Status = $Status; Markdown = "Owners per subscription (active, subscription or management-group scope). More than 3 widens the blast radius of one compromised account; fewer than 2 risks losing control of the subscription.`n`n$(Format-CippAzureFindingTable -Rows $Rows)" }
+        $OutOfRange = @($TooMany) + @($TooFew)
+        if ($OutOfRange.Count -eq 0) { return @{ Status = 'Passed'; Markdown = "All $(@($Rows).Count) subscription(s) have 2 or 3 owners (active, subscription or management-group scope)." } }
+        @{ Status = $Status; Markdown = "$($TooMany.Count) subscription(s) have more than 3 owners and $($TooFew.Count) fewer than 2 (active, subscription or management-group scope). More than 3 widens the blast radius of one compromised account; fewer than 2 risks losing control of the subscription.`n`n$(Format-CippAzureFindingTable -Rows $OutOfRange)" }
     }
 }
