@@ -878,5 +878,48 @@
     "name": "NewRole",
     "label": "Alert on changes to directory role membership",
     "recommendedRunInterval": "1d"
+  },
+  {
+    "name": "CompromiseSweep",
+    "label": "Alert on tenant-wide compromise patterns (device-code sign-ins, password spray, distributed brute force, MFA registered on dormant accounts)",
+    "recommendedRunInterval": "4h",
+    "requiresInput": true,
+    "inputs": [
+      {
+        "inputType": "textField",
+        "inputLabel": "Hours of sign-in history to sweep each run (default: 24). Detections are de-duplicated, so a short window loses nothing; the device-code query times out on long windows.",
+        "inputName": "CompromiseSweepLookbackHours"
+      },
+      {
+        "inputType": "textField",
+        "inputLabel": "Password spray: distinct accounts failing from one IP before alerting (default: 5).",
+        "inputName": "CompromiseSweepSprayUsersPerIp"
+      },
+      {
+        "inputType": "textField",
+        "inputLabel": "Brute force: distinct IPs failing against one account before alerting (default: 3).",
+        "inputName": "CompromiseSweepBruteForceIpsPerUser"
+      },
+      {
+        "inputType": "textField",
+        "inputLabel": "Dormant MFA: days without a successful sign-in before an MFA registration is suspicious (default: 30).",
+        "inputName": "CompromiseSweepDormantDays"
+      },
+      {
+        "inputType": "textField",
+        "inputLabel": "Device code allow-list: UPNs or application IDs that legitimately use the device code flow (Teams Rooms, az CLI), comma separated.",
+        "inputName": "CompromiseSweepDeviceCodeAllowList"
+      },
+      {
+        "inputType": "textField",
+        "inputLabel": "Minimum severity to raise: High (only detections with a successful sign-in, device-code sign-ins and dormant-account MFA) or Medium (also blocked spray/brute-force campaigns). Default: Medium.",
+        "inputName": "CompromiseSweepMinSeverity"
+      },
+      {
+        "inputType": "textField",
+        "inputLabel": "Maximum new detections to raise per run (default: 10). High severity first; the excess is recorded and logged as a warning.",
+        "inputName": "CompromiseSweepMaxPerCycle"
+      }
+    ]
   }
 ]
