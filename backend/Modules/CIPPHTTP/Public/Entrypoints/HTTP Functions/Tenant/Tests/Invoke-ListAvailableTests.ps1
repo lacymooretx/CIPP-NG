@@ -89,6 +89,35 @@ function Invoke-ListAvailableTests {
             }
         }
 
+        # Build Azure subscription tests array
+        $AzureTests = foreach ($TestFolder in $TestFolders) {
+            $AzurePath = Join-Path $TestFolder 'Azure'
+            if (-not [System.IO.Directory]::Exists($AzurePath)) {
+                continue
+            }
+            $AzureTestFiles = [System.IO.Directory]::EnumerateFiles($AzurePath, '*.ps1', [System.IO.SearchOption]::TopDirectoryOnly)
+            foreach ($TestFile in $AzureTestFiles) {
+                $BaseName = [System.IO.Path]::GetFileNameWithoutExtension($TestFile)
+                if ($BaseName -match 'Invoke-CippTest(.+)$') {
+                    $TestId = $Matches[1]
+
+                    $TestContent = [System.IO.File]::ReadAllText($TestFile)
+                    $TestName = $TestId
+
+                    if ($TestContent -match '\.SYNOPSIS\s+(.+?)(?=\s+\.|\s+#>|\s+\[)') {
+                        $TestName = $Matches[1].Trim()
+                    }
+
+                    [PSCustomObject]@{
+                        id         = $TestId
+                        name       = $TestName
+                        category   = 'Azure'
+                        testFolder = [System.IO.Path]::GetFileName($TestFolder)
+                    }
+                }
+            }
+        }
+
         # Build custom tests array from latest custom scripts
         $CustomTestsList = foreach ($CustomTest in @($LatestCustomScripts)) {
             $ScriptGuid = $CustomTest.ScriptGuid
@@ -116,6 +145,7 @@ function Invoke-ListAvailableTests {
         $Body = [PSCustomObject]@{
             IdentityTests = $IdentityTests
             DevicesTests  = $DevicesTests
+            AzureTests    = @($AzureTests)
             CustomTests   = @($CustomTestsList)
         }
         $StatusCode = [HttpStatusCode]::OK

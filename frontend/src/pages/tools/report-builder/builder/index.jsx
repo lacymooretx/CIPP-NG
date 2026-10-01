@@ -1266,6 +1266,7 @@ const Page = () => {
     IdentityTests: [],
     DevicesTests: [],
     CustomTests: [],
+    AzureTests: [],
   }
 
   const allTestOptions = [
@@ -1289,6 +1290,12 @@ const Page = () => {
       category: 'Custom',
       name: t.name,
       testFolder: t.testFolder || 'Custom',
+    })),    ...(availableTests.AzureTests || []).map((t) => ({
+      label: `[Azure] ${t.name}`,
+      value: t.id,
+      category: 'Azure',
+      name: t.name,
+      testFolder: t.testFolder,
     })),
   ]
 

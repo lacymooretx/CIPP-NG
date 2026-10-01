@@ -15,6 +15,11 @@
     "icon": "Devices"
   },
   {
+    "label": "Azure",
+    "path": "/dashboardv2/azure",
+    "icon": "Cloud"
+  },
+  {
     "label": "Custom",
     "path": "/dashboardv2/custom",
     "icon": "Apps"

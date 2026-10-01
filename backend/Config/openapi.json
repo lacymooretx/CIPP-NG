@@ -7523,6 +7523,9 @@
               "schema": {
                 "type": "object",
                 "properties": {
+                  "AzureTests": {
+                    "type": "string"
+                  },
                   "CustomTests": {
                     "type": "string"
                   },
@@ -7563,6 +7566,10 @@
                   "type": "object",
                   "description": "Derived from the fields written into the storage table it reads, and the fields the endpoint selects onto each record. Fields taken from the storage writers may be omitted by this endpoint, and the response may carry computed fields not listed here.",
                   "properties": {
+                    "AzureTests": {
+                      "type": "string",
+                      "x-cipp-field-source": "storage"
+                    },
                     "CreatedAt": {
                       "x-cipp-field-source": "storage"
                     },
@@ -8564,6 +8571,10 @@
                   "type": "object",
                   "description": "Derived from the fields written into the storage table it reads, and the fields the endpoint selects onto each record. Fields taken from the storage writers may be omitted by this endpoint, and the response may carry computed fields not listed here.",
                   "properties": {
+                    "AzureTests": {
+                      "type": "string",
+                      "x-cipp-field-source": "storage"
+                    },
                     "CreatedAt": {
                       "x-cipp-field-source": "storage"
                     },
@@ -45315,6 +45326,9 @@
                       "AlertStatuses": {
                         "x-cipp-field-source": "storage"
                       },
+                      "AzureTests": {
+                        "x-cipp-field-source": "backend"
+                      },
                       "Category": {
                         "x-cipp-field-source": "storage"
                       },
@@ -67785,6 +67799,10 @@
                     "type": "object",
                     "description": "Derived from the fields written into the storage table it reads. Fields taken from the storage writers may be omitted by this endpoint, and the response may carry computed fields not listed here.",
                     "properties": {
+                      "AzureTests": {
+                        "type": "string",
+                        "x-cipp-field-source": "storage"
+                      },
                       "CreatedAt": {
                         "x-cipp-field-source": "storage"
                       },

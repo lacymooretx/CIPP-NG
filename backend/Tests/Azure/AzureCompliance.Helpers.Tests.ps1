@@ -155,3 +155,27 @@ Describe 'Azure compliance helpers' {
         }
     }
 }
+
+Describe 'Test-CIPPAzureTestsEnabled' {
+    BeforeAll {
+        function Get-CippTable { param($tablename) @{ TableName = $tablename } }
+        function Get-CIPPAzDataTableEntity { param($TableName, $Filter, $Property) }
+        function Remove-CIPPAzDataTableEntity { param($TableName, $Entity, [switch]$Force) }
+    }
+
+    It 'runs the suite when the last collection found subscriptions, without touching results' {
+        Mock Get-CIPPAzDataTableEntity { [pscustomobject]@{ DataCount = 2 } }
+        Mock Remove-CIPPAzDataTableEntity { }
+        Test-CIPPAzureTestsEnabled -TenantFilter 'contoso.com' | Should -BeTrue
+        Should -Invoke Remove-CIPPAzDataTableEntity -Times 0 -Exactly
+    }
+
+    It 'skips the suite and deletes only AZ_ results for that tenant when no subscription is readable' {
+        Mock Get-CIPPAzDataTableEntity -ParameterFilter { $TableName -eq 'CippReportingDB' } { [pscustomobject]@{ DataCount = 0 } }
+        Mock Get-CIPPAzDataTableEntity -ParameterFilter { $TableName -eq 'CippTestResults' } { @([pscustomobject]@{ PartitionKey = 'contoso.com'; RowKey = 'AZ_STG_01' }) }
+        Mock Remove-CIPPAzDataTableEntity { }
+        Test-CIPPAzureTestsEnabled -TenantFilter 'contoso.com' | Should -BeFalse
+        Should -Invoke Get-CIPPAzDataTableEntity -ParameterFilter { $TableName -eq 'CippTestResults' -and $Filter -eq "PartitionKey eq 'contoso.com' and RowKey ge 'AZ_' and RowKey lt 'AZ``'" } -Times 1 -Exactly
+        Should -Invoke Remove-CIPPAzDataTableEntity -Times 1 -Exactly
+    }
+}

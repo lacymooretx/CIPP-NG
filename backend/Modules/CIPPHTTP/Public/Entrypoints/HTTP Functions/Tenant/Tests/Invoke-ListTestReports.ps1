@@ -45,6 +45,15 @@ function Invoke-ListTestReports {
             $IdentityTests = @()
             $DevicesTests = @()
             $CustomTests = @()
+            $AzureTests = @()
+
+            if ($Report.AzureTests) {
+                try {
+                    $AzureTests = @($Report.AzureTests | ConvertFrom-Json)
+                } catch {
+                    $AzureTests = @()
+                }
+            }
 
             if ($Report.IdentityTests) {
                 try {
@@ -80,6 +89,7 @@ function Invoke-ListTestReports {
                 IdentityTests = $IdentityTests
                 DevicesTests  = $DevicesTests
                 CustomTests   = $CustomTests
+                AzureTests    = $AzureTests
             }
         }
 
