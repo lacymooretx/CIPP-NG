@@ -164,7 +164,7 @@ function Get-CIPPAlertCompromiseSweep {
                             'IPs'        = ($Ips -join ', ')
                             'Locations'  = (@($Group.Group | ForEach-Object { "$($_.location.city), $($_.location.countryOrRegion)" } | Sort-Object -Unique) -join '; ')
                             'First Seen' = ([datetime]($Group.Group | Sort-Object createdDateTime | Select-Object -First 1).createdDateTime).ToString('u')
-                            'Next step'  = $(if ($Success.Count) { 'Account likely compromised: revoke sessions, reset the password, run the CIPP compromise check.' } else { 'The password is being guessed. Confirm the account has phishing-resistant MFA and a strong password; consider a password change.' })
+                            'Next step'  = $(if ($Success.Count) { 'Account likely compromised: revoke sessions, reset the password, run the CIPP compromise check.' } else { 'Guessing is being blocked and nothing got in. Do NOT force a password change (NIST SP 800-63B: no evidence of compromise; forced changes lead to weaker passwords). Confirm MFA is enforced for the account; if the campaign continues, block the source IPs or countries with Conditional Access.' })
                             'Tenant'     = $TenantFilter
                         })
                 }
