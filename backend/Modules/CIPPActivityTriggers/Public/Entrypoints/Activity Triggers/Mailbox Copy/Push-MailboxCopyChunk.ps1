@@ -5,6 +5,10 @@ function Push-MailboxCopyChunk {
     .DESCRIPTION
         Groups the chunk's items into exportItems calls (max 10 items, ~10 MB), posts each item to a
         destination import session, and for Move soft-deletes the source item (recoverable from Recoverable Items) once its import succeeded.
+        Archive mailboxes: follows the documented auto-expanding archive redirects - an export answered
+        with ErrorArchiveFolderMovedPermanently is reissued at the URL in the error, and an import
+        answered 409 "expected in mailbox MBX:..." gets a new import session for that mailbox.
+
         Progress (Done/Copied/Failed + last errors) is saved after every group, so a requeue or a
         retried task resumes after the last saved item instead of importing it twice.
     .FUNCTIONALITY
@@ -28,7 +32,12 @@ function Push-MailboxCopyChunk {
     $Chunk = Get-CIPPAzDataTableEntity @Table -Filter "PartitionKey eq '$OperationId' and RowKey eq '$ChunkKey'"
     if (-not $Op -or -not $Chunk -or $Chunk.State -eq 'Done' -or $Op.Status -eq 'Cancelled') { return @() }
 
-    $Graph = 'https://graph.microsoft.com/v1.0/admin/exchange/mailboxes'
+    # Chunks name their own mailboxes and API version: an online archive is a separate mailbox that only
+    # beta will serve. Chunks written before archive support fall back to the operation's pair.
+    $SrcMailboxId = [string]($Chunk.SrcMailboxId ?? $Op.SrcMailboxId)
+    $DstMailboxId = [string]($Chunk.DstMailboxId ?? $Op.DstMailboxId)
+    $SrcGraph = "https://graph.microsoft.com/$([string]($Chunk.SrcApi ?? 'v1.0'))/admin/exchange/mailboxes"
+    $DstGraph = "https://graph.microsoft.com/$([string]($Chunk.DstApi ?? 'v1.0'))/admin/exchange/mailboxes"
     $Items = @(([string]$Chunk.Ids | ConvertFrom-Json) | ForEach-Object {
             $Parts = ([string]$_).Split('|')
             [PSCustomObject]@{ Id = $Parts[0]; Size = [int64]($Parts[1] ?? 0) }
@@ -56,11 +65,12 @@ function Push-MailboxCopyChunk {
     }
 
     # Hashtable so the scriptblock can refresh the cached session (a plain variable would not survive the child scope).
-    $Ctx = @{ Session = $null }
+    # ImportMailbox moves when an auto-expanded archive answers 409 "expected in mailbox MBX:...".
+    $Ctx = @{ Session = $null; ImportMailbox = $DstMailboxId }
     $GetSession = {
         $S = $Ctx.Session
         if (-not $S -or ([DateTime]$S.expirationDateTime).ToUniversalTime() -lt [DateTime]::UtcNow.AddMinutes(5)) {
-            $S = New-GraphPOSTRequest -uri "$Graph/$($Op.DstMailboxId)/createImportSession" -tenantid $TenantFilter -body '{}' -AsApp $true
+            $S = New-GraphPOSTRequest -uri "$DstGraph/$($Ctx.ImportMailbox)/createImportSession" -tenantid $TenantFilter -body '{}' -AsApp $true
             if (-not $S.importUrl) { throw 'createImportSession returned no importUrl.' }
             $Ctx.Session = $S
         }
@@ -78,10 +88,30 @@ function Push-MailboxCopyChunk {
             }
 
             $Body = @{ itemIds = @($Group.Id) } | ConvertTo-Json -Compress
-            $Response = New-GraphPOSTRequest -uri "$Graph/$($Op.SrcMailboxId)/exportItems" -tenantid $TenantFilter -body $Body -AsApp $true
+            $Response = New-GraphPOSTRequest -uri "$SrcGraph/$SrcMailboxId/exportItems" -tenantid $TenantFilter -body $Body -AsApp $true
             $Exported = @($Response.value ?? $Response)
             $ById = @{}
-            foreach ($X in $Exported) { if ($X.itemId) { $ById[[string]$X.itemId] = $X } }
+            # Which mailbox each item really lives in - an auto-expanded archive keeps some folders' items
+            # in an auxiliary mailbox; Move has to delete them there.
+            $ItemMailbox = @{}
+            $Redirects = @{}
+            foreach ($X in $Exported) {
+                if (-not $X.itemId) { continue }
+                $ById[[string]$X.itemId] = $X
+                if ([string]$X.error.code -eq 'ErrorArchiveFolderMovedPermanently' -and [string]$X.error.message -match '^https://graph\.microsoft\.com/') {
+                    $Url = [string]$X.error.message
+                    if (-not $Redirects.ContainsKey($Url)) { $Redirects[$Url] = [System.Collections.Generic.List[string]]::new() }
+                    $Redirects[$Url].Add([string]$X.itemId)
+                }
+            }
+            # Reissue the export for redirected items at the URL the API named.
+            foreach ($Url in $Redirects.Keys) {
+                $Again = New-GraphPOSTRequest -uri $Url -tenantid $TenantFilter -body (@{ itemIds = @($Redirects[$Url]) } | ConvertTo-Json -Compress) -AsApp $true
+                $AuxMailbox = if ($Url -match '/mailboxes/([^/]+)/') { $Matches[1] } else { $SrcMailboxId }
+                foreach ($X in @($Again.value ?? $Again)) {
+                    if ($X.itemId) { $ById[[string]$X.itemId] = $X; $ItemMailbox[[string]$X.itemId] = $AuxMailbox }
+                }
+            }
 
             foreach ($G in $Group) {
                 $X = $ById[$G.Id]
@@ -100,6 +130,12 @@ function Push-MailboxCopyChunk {
                     } catch {
                         $Status = [int]($_.Exception.Response.StatusCode ?? 0)
                         if ($Status -in @(401, 403)) { $Ctx.Session = $null }
+                        # Auto-expanded archive: the folder lives in an auxiliary mailbox, named in the 409.
+                        if ($Status -eq 409 -and [string]$_.ErrorDetails.Message -match 'expected in mailbox (MBX:[^\s."]+)' -and $Matches[1] -ne $Ctx.ImportMailbox) {
+                            $Ctx.ImportMailbox = $Matches[1]
+                            $Ctx.Session = $null
+                            continue
+                        }
                         if ($Attempt -lt 4 -and $Status -in @(0, 401, 403, 429, 500, 502, 503, 504)) {
                             Start-Sleep -Seconds ([Math]::Min(60, 5 * $Attempt * $Attempt))
                             continue
@@ -113,7 +149,8 @@ function Push-MailboxCopyChunk {
                 $Copied++
                 if ($IsMove) {
                     try {
-                        $null = New-GraphPOSTRequest -uri "$Graph/$($Op.SrcMailboxId)/folders/$($Chunk.SrcFolderId)/items/$($G.Id)?disposalType=softDelete" -tenantid $TenantFilter -type DELETE -AsApp $true
+                        $FromMailbox = $ItemMailbox[$G.Id] ?? $SrcMailboxId
+                        $null = New-GraphPOSTRequest -uri "$SrcGraph/$FromMailbox/folders/$($Chunk.SrcFolderId)/items/$($G.Id)?disposalType=softDelete" -tenantid $TenantFilter -type DELETE -AsApp $true
                     } catch {
                         & $AddError "Copied but not removed from source: $(Get-NormalizedError -message $_.Exception.Message)"
                     }

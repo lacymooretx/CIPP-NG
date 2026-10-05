@@ -9,7 +9,10 @@ function Invoke-ExecMailboxCopy {
         through the Graph full-fidelity export/import API: into a new folder ("From <name> (<date>)"
         unless FolderName is given) or merged into the destination's own folders (Destination=Root).
         Operation=Move deletes each source item after it is imported. IncludeDeletedItems and
-        IncludeJunk are off by default. Action Preflight counts without changing anything; Start
+        IncludeJunk are off by default. IncludeArchive (on by default) also copies the source's online
+        archive: into the destination's archive (ArchiveDestination=Archive, the default) or into an
+        "Online Archive" folder in their main mailbox (ArchiveDestination=Primary, also the fallback
+        when the destination has no archive). Action Preflight counts without changing anything; Start
         creates the folders and queues the copy; Cancel (with OperationId) stops a running copy after
         the chunks in flight. Track progress with ListMailboxCopies.
     #>
@@ -28,6 +31,8 @@ function Invoke-ExecMailboxCopy {
     $Operation = [string]($Request.Body.Operation.value ?? $Request.Body.Operation ?? 'Copy')
     $IncludeDeletedItems = ConvertTo-CIPPBoolean -Value ($Request.Body.IncludeDeletedItems ?? $false)
     $IncludeJunk = ConvertTo-CIPPBoolean -Value ($Request.Body.IncludeJunk ?? $false)
+    $IncludeArchive = ConvertTo-CIPPBoolean -Value ($Request.Body.IncludeArchive ?? $true)
+    $ArchiveDestination = [string]($Request.Body.ArchiveDestination.value ?? $Request.Body.ArchiveDestination ?? 'Archive')
 
     try {
         if ($Action -eq 'Cancel') {
@@ -50,7 +55,8 @@ function Invoke-ExecMailboxCopy {
 
         $Result = Start-CIPPMailboxCopy -TenantFilter $TenantFilter -SourceUser $SourceUser -DestinationUser $DestinationUser `
             -Mode $Action -Destination $Destination -Operation $Operation -FolderName $FolderName `
-            -IncludeDeletedItems $IncludeDeletedItems -IncludeJunk $IncludeJunk -StartedBy $StartedBy -Headers $Headers -APIName $APIName
+            -IncludeDeletedItems $IncludeDeletedItems -IncludeJunk $IncludeJunk `
+            -IncludeArchive $IncludeArchive -ArchiveDestination $ArchiveDestination -StartedBy $StartedBy -Headers $Headers -APIName $APIName
         $StatusCode = [HttpStatusCode]::OK
         $Body = @{ Results = $Result }
     } catch {

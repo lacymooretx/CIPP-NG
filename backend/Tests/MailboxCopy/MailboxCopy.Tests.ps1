@@ -58,7 +58,20 @@ Describe 'Get-CIPPMailboxCopyFolders' {
 Describe 'Start-CIPPMailboxCopy' {
     BeforeEach {
         Mock New-GraphGetRequest {
-            if ($uri -match '/settings/exchange') { return [pscustomobject]@{ primaryMailboxId = "MBX:$($uri -replace '.*/users/([^/]+)/.*','$1')" } }
+            if ($uri -match '/settings/exchange') {
+                $uid = $uri -replace '.*/users/([^/]+)/.*', '$1'
+                $R = [pscustomobject]@{ primaryMailboxId = "MBX:$uid" }
+                if ($script:Archives -contains $uid) { $R | Add-Member -NotePropertyName inPlaceArchiveMailboxId -NotePropertyValue "MBX:arch-$uid" }
+                return $R
+            }
+            if ($uri -match 'MBX:arch-id-src/folders') {
+                if ($uri -notmatch '/beta/') { throw 'Operation on Archive mailbox not allowed' }
+                return @((New-Folder 'a-old' 'Old Mail' 'aroot' $null 30), (New-Folder 'a-del' 'Deleted Items' 'aroot' 'archivedeleteditems' 9), (New-Folder 'a-out' 'Outbox' 'aroot' $null 0))
+            }
+            if ($uri -match 'MBX:arch-id-dst/folders') {
+                if ($uri -notmatch '/beta/') { throw 'Operation on Archive mailbox not allowed' }
+                return @(New-Folder 'da-old' 'Old Mail' 'daroot' $null 1)
+            }
             if ($uri -match '/users/([^/?]+)\?') {
                 $upn = [uri]::UnescapeDataString($Matches[1])
                 if ($upn -eq 'ghost@t.com') { throw 'Request_ResourceNotFound' }
@@ -73,6 +86,50 @@ Describe 'Start-CIPPMailboxCopy' {
         Mock New-GraphPOSTRequest { [pscustomobject]@{ id = "new-$([guid]::NewGuid().ToString('N').Substring(0,6))" } }
         Mock Add-CIPPAzDataTableEntity { }
         Mock Start-CIPPOrchestrator { }
+        $script:Archives = @()
+    }
+
+    It 'includes the source archive (via beta) in preflight, skipping archive system and deleted folders' {
+        $script:Archives = @('id-src', 'id-dst')
+        $R = Start-CIPPMailboxCopy -TenantFilter 't' -SourceUser 'src@t.com' -DestinationUser 'dst@t.com'
+        $R.ArchiveItems | Should -Be 30
+        $R.ItemCount | Should -Be 50
+        $R.ArchiveDestination | Should -Match 'online archive'
+        ($R.SkippedFolders -join ' ') | Should -Match 'Archive: Deleted Items'
+        ($R.SkippedFolders -join ' ') | Should -Match 'Archive: Outbox'
+    }
+
+    It 'leaves the archive out when asked, and says so' {
+        $script:Archives = @('id-src')
+        $R = Start-CIPPMailboxCopy -TenantFilter 't' -SourceUser 'src@t.com' -DestinationUser 'dst@t.com' -IncludeArchive $false
+        $R.ArchiveItems | Should -Be 0
+        $R.ArchiveDestination | Should -Be 'Not included'
+    }
+
+    It 'copies archive into the destination archive with beta rows and a container there' {
+        $script:Archives = @('id-src', 'id-dst')
+        $null = Start-CIPPMailboxCopy -TenantFilter 't' -SourceUser 'src@t.com' -DestinationUser 'dst@t.com' -Mode Start
+        Should -Invoke New-GraphPOSTRequest -Times 1 -Exactly -ParameterFilter { $uri -match '/beta/admin/exchange/mailboxes/MBX:arch-id-dst/folders$' -and $body -match 'From Name src' }
+        Should -Invoke Add-CIPPAzDataTableEntity -Times 1 -Exactly -ParameterFilter {
+            $Entity.SrcFolderId -eq 'a-old' -and $Entity.SrcMailboxId -eq 'MBX:arch-id-src' -and $Entity.DstMailboxId -eq 'MBX:arch-id-dst' -and $Entity.SrcApi -eq 'beta' -and $Entity.DstApi -eq 'beta' -and $Entity.Path -eq 'Archive/Old Mail'
+        }
+        Should -Invoke Add-CIPPAzDataTableEntity -ParameterFilter { $Entity.SrcFolderId -eq 's-inbox' -and $Entity.SrcApi -eq 'v1.0' -and $Entity.DstMailboxId -eq 'MBX:id-dst' }
+    }
+
+    It 'falls back to an Online Archive folder in the main mailbox when the destination has no archive' {
+        $script:Archives = @('id-src')
+        $P = Start-CIPPMailboxCopy -TenantFilter 't' -SourceUser 'src@t.com' -DestinationUser 'dst@t.com'
+        ($P.Warnings -join ' ') | Should -Match 'has no online archive'
+        $null = Start-CIPPMailboxCopy -TenantFilter 't' -SourceUser 'src@t.com' -DestinationUser 'dst@t.com' -Mode Start
+        Should -Invoke New-GraphPOSTRequest -Times 1 -Exactly -ParameterFilter { $uri -match '/v1.0/admin/exchange/mailboxes/MBX:id-dst/folders/new-\w+/childFolders$' -and $body -match '"Online Archive"' }
+        Should -Invoke Add-CIPPAzDataTableEntity -ParameterFilter { $Entity.SrcFolderId -eq 'a-old' -and $Entity.SrcApi -eq 'beta' -and $Entity.DstApi -eq 'v1.0' -and $Entity.DstMailboxId -eq 'MBX:id-dst' }
+    }
+
+    It 'root mode merges the archive into same-name folders of the destination archive' {
+        $script:Archives = @('id-src', 'id-dst')
+        $null = Start-CIPPMailboxCopy -TenantFilter 't' -SourceUser 'src@t.com' -DestinationUser 'dst@t.com' -Mode Start -Destination Root
+        Should -Invoke Add-CIPPAzDataTableEntity -ParameterFilter { $Entity.SrcFolderId -eq 'a-old' -and $Entity.DstFolderId -eq 'da-old' }
+        Should -Invoke New-GraphPOSTRequest -Times 0 -ParameterFilter { $uri -match 'arch-id-dst' }
     }
 
     It 'preflight counts items and folders without creating anything' {
@@ -160,5 +217,47 @@ Describe 'Push-MailboxCopyChunk' {
         $script:Op.Status = 'Cancelled'
         Push-MailboxCopyChunk -Item ([pscustomobject]@{ OperationId = 'op1'; TenantFilter = 't'; ChunkKey = 'c00001' })
         Should -Invoke Invoke-RestMethod -Times 5 -Exactly
+    }
+
+    It 'reissues exports the archive redirected, and deletes moved items from the auxiliary mailbox' {
+        $script:Op.Operation = 'Move'
+        $script:Chunk | Add-Member -NotePropertyName SrcMailboxId -NotePropertyValue 'MBX:arch' -Force
+        $script:Chunk | Add-Member -NotePropertyName SrcApi -NotePropertyValue 'beta' -Force
+        $script:Chunk.Ids = (ConvertTo-Json -InputObject @('item1|10', 'item2|10') -Compress)
+        Mock New-GraphPOSTRequest {
+            if ($uri -match 'createImportSession') { return [pscustomobject]@{ importUrl = 'https://outlook/import'; expirationDateTime = [DateTime]::UtcNow.AddHours(1).ToString('o') } }
+            if ($uri -match 'MBX:aux/exportItems') { return [pscustomobject]@{ value = @([pscustomobject]@{ itemId = 'item2'; data = 'QUJD' }) } }
+            if ($uri -match 'exportItems') {
+                return [pscustomobject]@{ value = @(
+                        [pscustomobject]@{ itemId = 'item1'; data = 'QUJD' }
+                        [pscustomobject]@{ itemId = 'item2'; error = [pscustomobject]@{ code = 'ErrorArchiveFolderMovedPermanently'; message = 'https://graph.microsoft.com/beta/admin/exchange/mailboxes/MBX:aux/exportItems' } }
+                    ) }
+            }
+        }
+        Push-MailboxCopyChunk -Item ([pscustomobject]@{ OperationId = 'op1'; TenantFilter = 't'; ChunkKey = 'c00001' })
+        Should -Invoke New-GraphPOSTRequest -Times 1 -Exactly -ParameterFilter { $uri -match '/beta/admin/exchange/mailboxes/MBX:arch/exportItems' }
+        Should -Invoke New-GraphPOSTRequest -Times 1 -Exactly -ParameterFilter { $uri -eq 'https://graph.microsoft.com/beta/admin/exchange/mailboxes/MBX:aux/exportItems' }
+        Should -Invoke Invoke-RestMethod -Times 2 -Exactly
+        Should -Invoke New-GraphPOSTRequest -Times 1 -Exactly -ParameterFilter { $type -eq 'DELETE' -and $uri -match 'MBX:arch/folders/sf/items/item1\?' }
+        Should -Invoke New-GraphPOSTRequest -Times 1 -Exactly -ParameterFilter { $type -eq 'DELETE' -and $uri -match 'MBX:aux/folders/sf/items/item2\?' }
+    }
+
+    It 'opens a new import session in the mailbox a 409 names' {
+        $script:Chunk.Ids = (ConvertTo-Json -InputObject @('item1|10') -Compress)
+        $script:Imports = 0
+        Mock Invoke-RestMethod {
+            $script:Imports++
+            if ($script:Imports -eq 1) {
+                $Err = [System.Management.Automation.ErrorRecord]::new([System.Exception]::new('Conflict'), 'x', 'InvalidOperation', $null)
+                $Err.ErrorDetails = [System.Management.Automation.ErrorDetails]::new('{"Message":"Invalid import session. The target session is expected in mailbox MBX:auxdst."}')
+                $Resp = [System.Net.Http.HttpResponseMessage]::new([System.Net.HttpStatusCode]::Conflict)
+                $Ex = [Microsoft.PowerShell.Commands.HttpResponseException]::new('Conflict', $Resp)
+                throw [System.Management.Automation.ErrorRecord]::new($Ex, 'x', 'InvalidOperation', $null) | ForEach-Object { $_.ErrorDetails = $Err.ErrorDetails; $_ }
+            }
+            [pscustomobject]@{ itemId = 'new' }
+        }
+        Push-MailboxCopyChunk -Item ([pscustomobject]@{ OperationId = 'op1'; TenantFilter = 't'; ChunkKey = 'c00001' })
+        Should -Invoke New-GraphPOSTRequest -Times 1 -Exactly -ParameterFilter { $uri -match 'MBX:auxdst/createImportSession' }
+        ($script:Saved | Where-Object { $_.RowKey -eq 'c00001' } | Select-Object -Last 1).Copied | Should -Be 1
     }
 }

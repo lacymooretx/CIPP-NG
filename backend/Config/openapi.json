@@ -28104,7 +28104,7 @@
         "tags": [
           "Email-Exchange > Administration"
         ],
-        "description": "Copies or moves one mailbox's content (mail, calendar, contacts, tasks) into another mailbox\nthrough the Graph full-fidelity export/import API: into a new folder (\"From <name> (<date>)\"\nunless FolderName is given) or merged into the destination's own folders (Destination=Root).\nOperation=Move deletes each source item after it is imported. IncludeDeletedItems and\nIncludeJunk are off by default. Action Preflight counts without changing anything; Start\ncreates the folders and queues the copy; Cancel (with OperationId) stops a running copy after\nthe chunks in flight. Track progress with ListMailboxCopies.",
+        "description": "Copies or moves one mailbox's content (mail, calendar, contacts, tasks) into another mailbox\nthrough the Graph full-fidelity export/import API: into a new folder (\"From <name> (<date>)\"\nunless FolderName is given) or merged into the destination's own folders (Destination=Root).\nOperation=Move deletes each source item after it is imported. IncludeDeletedItems and\nIncludeJunk are off by default. IncludeArchive (on by default) also copies the source's online\narchive: into the destination's archive (ArchiveDestination=Archive, the default) or into an\n\"Online Archive\" folder in their main mailbox (ArchiveDestination=Primary, also the fallback\nwhen the destination has no archive). Action Preflight counts without changing anything; Start\ncreates the folders and queues the copy; Cancel (with OperationId) stops a running copy after\nthe chunks in flight. Track progress with ListMailboxCopies.",
         "requestBody": {
           "required": true,
           "content": {
@@ -28114,6 +28114,9 @@
                 "properties": {
                   "Action": {
                     "type": "string"
+                  },
+                  "ArchiveDestination": {
+                    "$ref": "#/components/schemas/LabelValue"
                   },
                   "Destination": {
                     "allOf": [
@@ -28127,6 +28130,9 @@
                     "$ref": "#/components/schemas/LabelValue"
                   },
                   "FolderName": {
+                    "type": "string"
+                  },
+                  "IncludeArchive": {
                     "type": "string"
                   },
                   "IncludeDeletedItems": {
@@ -57469,6 +57475,12 @@
                     "type": "object",
                     "description": "Derived from the fields written into the storage table it reads, and the fields the endpoint selects onto each record, and the columns the CIPP UI renders. Fields taken from the storage writers may be omitted by this endpoint, and the response may carry computed fields not listed here.",
                     "properties": {
+                      "ArchiveDestination": {
+                        "x-cipp-field-source": "backend,frontend"
+                      },
+                      "ArchiveItems": {
+                        "x-cipp-field-source": "backend,frontend"
+                      },
                       "ChunksDone": {
                         "x-cipp-field-source": "backend"
                       },

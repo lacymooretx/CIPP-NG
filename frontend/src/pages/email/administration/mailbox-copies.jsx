@@ -34,6 +34,8 @@ const Page = () => {
         'ItemsTotal',
         'ItemsCopied',
         'ItemsFailed',
+        'ArchiveItems',
+        'ArchiveDestination',
         'RecentErrors',
         'Message',
         'StartedBy',
