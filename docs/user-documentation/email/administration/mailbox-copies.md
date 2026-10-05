@@ -21,7 +21,7 @@ On the source user, open the action menu and choose **Copy or move mailbox conte
 These folders are never copied: search folders, Sync Issues, Recoverable Items, Outbox and hidden system folders.
 
 {% hint style="warning" %}
-Nothing is de-duplicated. Running the same copy twice imports every item twice. When you merge into the destination's own folders, the extra copies land beside the user's existing mail.
+A new copy is not de-duplicated: starting the same copy twice imports every item twice. To finish or retry a copy, use **Resume** on its row. Resume skips items that are already in the destination. When you merge into the destination's own folders, the extra copies land beside the user's existing mail.
 {% endhint %}
 
 ## Table Details
@@ -41,7 +41,10 @@ Nothing is de-duplicated. Running the same copy twice imports every item twice. 
 
 ## Actions
 
-* **Cancel copy**: stops new chunks from starting. Items already copied stay where they are.
+* **Cancel copy**: stops between item groups. Items already copied stay where they are.
+* **Resume (copy only what is missing)**: available on a cancelled, failed or partly failed copy.
+  * CIPP compares each destination folder with its source folder and copies only the items that are not there yet. The match uses each item's search key, which survives the copy, so nothing is duplicated.
+  * Use it to retry failures, or to finish a copy you cancelled.
 
 ## Requirements
 
