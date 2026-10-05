@@ -125,18 +125,18 @@ Describe 'Push-MailboxCopyChunk' {
             if ($uri -match 'createImportSession') { return [pscustomobject]@{ importUrl = 'https://outlook/import?authtoken=x'; expirationDateTime = [DateTime]::UtcNow.AddHours(1).ToString('o') } }
             if ($uri -match 'exportItems') {
                 $ids = ($body | ConvertFrom-Json).itemIds
-                return @($ids | ForEach-Object {
+                return [pscustomobject]@{ value = @($ids | ForEach-Object {
                         if ($_ -eq 'item3') { [pscustomobject]@{ itemId = $_; error = [pscustomobject]@{ code = 'ErrorCorruptData'; message = 'bad item' } } }
                         else { [pscustomobject]@{ itemId = $_; data = 'QUJD' } }
-                    })
+                    }) }
             }
         }
         Mock Invoke-RestMethod { [pscustomobject]@{ itemId = 'new'; changeKey = 'k' } }
     }
 
-    It 'exports in groups of 20, imports each item, counts failures and closes the operation' {
+    It 'exports in groups of 10, imports each item, counts failures and closes the operation' {
         Push-MailboxCopyChunk -Item ([pscustomobject]@{ OperationId = 'op1'; TenantFilter = 't'; ChunkKey = 'c00001' })
-        Should -Invoke New-GraphPOSTRequest -Times 2 -Exactly -ParameterFilter { $uri -match 'exportItems' }
+        Should -Invoke New-GraphPOSTRequest -Times 3 -Exactly -ParameterFilter { $uri -match 'exportItems' }
         Should -Invoke New-GraphPOSTRequest -Times 1 -Exactly -ParameterFilter { $uri -match 'createImportSession' }
         Should -Invoke Invoke-RestMethod -Times 24 -Exactly -ParameterFilter { $Body -match '"FolderId":"df"' -and $Body -match '"Mode":"create"' }
         $Final = $script:Saved | Where-Object { $_.RowKey -eq 'c00001' } | Select-Object -Last 1
@@ -150,7 +150,7 @@ Describe 'Push-MailboxCopyChunk' {
     It 'deletes each source item after import in Move mode' {
         $script:Op.Operation = 'Move'
         Push-MailboxCopyChunk -Item ([pscustomobject]@{ OperationId = 'op1'; TenantFilter = 't'; ChunkKey = 'c00001' })
-        Should -Invoke New-GraphPOSTRequest -Times 24 -Exactly -ParameterFilter { $type -eq 'DELETE' -and $uri -match '/folders/sf/items/item' }
+        Should -Invoke New-GraphPOSTRequest -Times 24 -Exactly -ParameterFilter { $type -eq 'DELETE' -and $uri -match '/folders/sf/items/item\d+\?disposalType=softDelete$' }
     }
 
     It 'resumes after the saved position and does nothing for a finished or cancelled copy' {

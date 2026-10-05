@@ -3,8 +3,8 @@ function Push-MailboxCopyChunk {
     .SYNOPSIS
         Exports one chunk of mailbox items and imports them into the destination folder (resumable)
     .DESCRIPTION
-        Groups the chunk's items into exportItems calls (max 20 items, ~20 MB), posts each item to a
-        destination import session, and for Move deletes the source item once its import succeeded.
+        Groups the chunk's items into exportItems calls (max 10 items, ~10 MB), posts each item to a
+        destination import session, and for Move soft-deletes the source item (recoverable from Recoverable Items) once its import succeeded.
         Progress (Done/Copied/Failed + last errors) is saved after every group, so a requeue or a
         retried task resumes after the last saved item instead of importing it twice.
     .FUNCTIONALITY
@@ -17,7 +17,10 @@ function Push-MailboxCopyChunk {
     $TenantFilter = [string]$Item.TenantFilter
     $ChunkKey = [string]$Item.ChunkKey
     $TimeboxSeconds = 900
-    $MaxGroupBytes = 20MB
+    # The export stream runs far larger than an item's reported size (a 95 KB message exported as
+    # 3.8 MB of base64 in testing), so groups stay well under the API's 20-item limit.
+    $MaxGroupItems = 10
+    $MaxGroupBytes = 10MB
     $Stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
 
     $Table = Get-CippTable -tablename 'MailboxCopy'
@@ -66,16 +69,17 @@ function Push-MailboxCopyChunk {
 
     try {
         while ($Done -lt $Items.Count) {
-            # Group: up to 20 items and ~20 MB (a single larger item goes on its own).
+            # Group: up to 10 items and ~10 MB (a single larger item goes on its own).
             $Group = [System.Collections.Generic.List[object]]::new()
             $Bytes = 0
-            for ($i = $Done; $i -lt $Items.Count -and $Group.Count -lt 20; $i++) {
+            for ($i = $Done; $i -lt $Items.Count -and $Group.Count -lt $MaxGroupItems; $i++) {
                 if ($Group.Count -gt 0 -and ($Bytes + $Items[$i].Size) -gt $MaxGroupBytes) { break }
                 $Group.Add($Items[$i]); $Bytes += $Items[$i].Size
             }
 
             $Body = @{ itemIds = @($Group.Id) } | ConvertTo-Json -Compress
-            $Exported = @(New-GraphPOSTRequest -uri "$Graph/$($Op.SrcMailboxId)/exportItems" -tenantid $TenantFilter -body $Body -AsApp $true)
+            $Response = New-GraphPOSTRequest -uri "$Graph/$($Op.SrcMailboxId)/exportItems" -tenantid $TenantFilter -body $Body -AsApp $true
+            $Exported = @($Response.value ?? $Response)
             $ById = @{}
             foreach ($X in $Exported) { if ($X.itemId) { $ById[[string]$X.itemId] = $X } }
 
@@ -109,7 +113,7 @@ function Push-MailboxCopyChunk {
                 $Copied++
                 if ($IsMove) {
                     try {
-                        $null = New-GraphPOSTRequest -uri "$Graph/$($Op.SrcMailboxId)/folders/$($Chunk.SrcFolderId)/items/$($G.Id)" -tenantid $TenantFilter -type DELETE -AsApp $true
+                        $null = New-GraphPOSTRequest -uri "$Graph/$($Op.SrcMailboxId)/folders/$($Chunk.SrcFolderId)/items/$($G.Id)?disposalType=softDelete" -tenantid $TenantFilter -type DELETE -AsApp $true
                     } catch {
                         & $AddError "Copied but not removed from source: $(Get-NormalizedError -message $_.Exception.Message)"
                     }
