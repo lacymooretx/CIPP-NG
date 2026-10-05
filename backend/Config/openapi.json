@@ -31592,6 +31592,104 @@
         "x-cipp-role": "CIPP.Extension.ReadWrite"
       }
     },
+    "/api/ExecOneDriveCopy": {
+      "post": {
+        "summary": "ExecOneDriveCopy",
+        "operationId": "ExecOneDriveCopy",
+        "tags": [
+          "Teams-Sharepoint"
+        ],
+        "description": "Copies or moves a user's OneDrive into another user's OneDrive using SharePoint server-side\ncopy jobs: into a new folder (\"From <name> (<date>)\" unless FolderName is given) or the root\n(Destination=Root); Operation=Move removes source items after copying; ConflictBehavior\nRename|Fail|Replace. Action Preflight checks\nand counts without changing anything; Action Start creates the folder and queues the copy.\nTrack progress with ListOneDriveCopies.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "Action": {
+                    "type": "string"
+                  },
+                  "ConflictBehavior": {
+                    "$ref": "#/components/schemas/LabelValue"
+                  },
+                  "Destination": {
+                    "allOf": [
+                      {
+                        "$ref": "#/components/schemas/LabelValue"
+                      }
+                    ],
+                    "description": "Form autocompletes post {label, value}; plain strings work too."
+                  },
+                  "DestinationUser": {
+                    "$ref": "#/components/schemas/LabelValue"
+                  },
+                  "FolderName": {
+                    "type": "string"
+                  },
+                  "Operation": {
+                    "$ref": "#/components/schemas/LabelValue"
+                  },
+                  "SourceUser": {
+                    "$ref": "#/components/schemas/LabelValue"
+                  },
+                  "tenantFilter": {
+                    "$ref": "#/components/schemas/LabelValue"
+                  },
+                  "userPrincipalName": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "tenantFilter"
+                ]
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "Action",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/tenantFilter"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Not described statically: this endpoint returns the upstream response as-is, so its fields are determined by the upstream API rather than by CIPP. Call the endpoint to see the actual shape, or add a response schema in backend/Config/openapi-overrides."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - missing required field or invalid input"
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cipp-role": "Sharepoint.Site.ReadWrite"
+      }
+    },
     "/api/ExecOneDriveProvision": {
       "post": {
         "summary": "ExecOneDriveProvision",
@@ -59329,6 +59427,104 @@
           }
         ],
         "x-cipp-role": "Tenant.Administration.ReadWrite"
+      }
+    },
+    "/api/ListOneDriveCopies": {
+      "get": {
+        "summary": "ListOneDriveCopies",
+        "operationId": "ListOneDriveCopies",
+        "tags": [
+          "Teams-Sharepoint"
+        ],
+        "description": "Lists OneDrive copies for a tenant (newest first) and refreshes the progress of any still\nrunning by polling their SharePoint copy jobs.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/tenantFilter"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "description": "Derived from the fields written into the storage table it reads, and the columns the CIPP UI renders. Fields taken from the storage writers may be omitted by this endpoint, and the response may carry computed fields not listed here.",
+                    "properties": {
+                      "CopyJobInfos": {
+                        "x-cipp-field-source": "storage"
+                      },
+                      "DestinationFolder": {
+                        "x-cipp-field-source": "frontend"
+                      },
+                      "DestinationUrl": {
+                        "x-cipp-field-source": "frontend"
+                      },
+                      "DestinationUser": {
+                        "x-cipp-field-source": "frontend"
+                      },
+                      "Errors": {
+                        "x-cipp-field-source": "frontend"
+                      },
+                      "ETag": {
+                        "type": "string",
+                        "x-cipp-field-source": "storage"
+                      },
+                      "FilesCreated": {
+                        "x-cipp-field-source": "frontend"
+                      },
+                      "Message": {
+                        "x-cipp-field-source": "frontend"
+                      },
+                      "Operation": {
+                        "x-cipp-field-source": "frontend"
+                      },
+                      "ProgressPercent": {
+                        "x-cipp-field-source": "frontend"
+                      },
+                      "RowKey": {
+                        "x-cipp-field-source": "storage"
+                      },
+                      "SourceUser": {
+                        "x-cipp-field-source": "frontend"
+                      },
+                      "Started": {
+                        "x-cipp-field-source": "frontend"
+                      },
+                      "StartedBy": {
+                        "x-cipp-field-source": "frontend"
+                      },
+                      "Status": {
+                        "x-cipp-field-source": "storage,frontend"
+                      },
+                      "Timestamp": {
+                        "type": "string",
+                        "x-cipp-field-source": "storage"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - missing required field or invalid input"
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cipp-role": "Sharepoint.Site.Read"
       }
     },
     "/api/ListOoO": {

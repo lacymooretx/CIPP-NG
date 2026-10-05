@@ -18,7 +18,9 @@ function Invoke-CIPPSharePointCreateCopyJobs {
         [string]$DestinationUri,
 
         [int]$NameConflictBehavior = 1,
-        [bool]$SameWebCopyMoveOptimization = $false
+        [bool]$SameWebCopyMoveOptimization = $false,
+        # Move: SharePoint removes each source item once it has been copied. Default stays copy.
+        [bool]$IsMoveMode = $false
     )
 
     $SharePointInfo = Get-SharePointAdminLink -Public $false -tenantFilter $TenantFilter
@@ -28,8 +30,8 @@ function Invoke-CIPPSharePointCreateCopyJobs {
         exportObjectUris = @($ExportObjectUris)
         destinationUri   = $DestinationUri
         options          = @{
-            IsMoveMode                            = $false
-            MoveButKeepSource                     = $true
+            IsMoveMode                            = $IsMoveMode
+            MoveButKeepSource                     = -not $IsMoveMode
             IgnoreVersionHistory                  = $false
             AllowSchemaMismatch                   = $true
             AllowSmallerVersionLimitOnDestination = $true
