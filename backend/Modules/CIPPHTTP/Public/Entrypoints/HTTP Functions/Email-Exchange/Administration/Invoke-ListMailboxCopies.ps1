@@ -38,6 +38,8 @@ function Invoke-ListMailboxCopies {
             ItemsTotal        = $Planned
             ItemsCopied       = $Copied
             ItemsFailed       = $Failed
+            ArchiveItems      = [int]($Op.ArchiveItems ?? 0)
+            ArchiveDestination = [string]($Op.ArchiveDestination ?? '')
             Folders           = [int]($Op.FolderCount ?? 0)
             ChunksDone        = @($Chunks | Where-Object { $_.State -eq 'Done' }).Count
             ChunksTotal       = $Chunks.Count

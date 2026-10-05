@@ -9,6 +9,9 @@ function Push-MailboxCopyPlan {
         paging of anything still being listed.
 
         Timeboxed: checkpoints folder index + skip on the operation row and requeues itself.
+        Folder rows carry their own source/destination mailbox ids and API version (the online
+        archive is a separate mailbox, reachable only through beta); chunk rows copy them.
+
         When done it starts three Sequential orchestrations (lanes) of Push-MailboxCopyChunk.
     .FUNCTIONALITY
         Entrypoint
@@ -32,12 +35,15 @@ function Push-MailboxCopyPlan {
     $Skip = [int]($Op.PlanSkip ?? 0)
     $ChunkCount = [int]($Op.ChunkCount ?? 0)
     $Listed = [int]($Op.ListedItems ?? 0)
-    $Base = "https://graph.microsoft.com/v1.0/admin/exchange/mailboxes/$($Op.SrcMailboxId)/folders"
 
 
     try {
         while ($FolderIndex -lt $Folders.Count) {
             $Folder = $Folders[$FolderIndex]
+            # Each folder row names its own mailbox and API: archive folders live in a different mailbox
+            # and are only reachable through beta. Rows from before archive support fall back to the op.
+            $SrcMailboxId = [string]($Folder.SrcMailboxId ?? $Op.SrcMailboxId)
+            $Base = "https://graph.microsoft.com/$([string]($Folder.SrcApi ?? 'v1.0'))/admin/exchange/mailboxes/$SrcMailboxId/folders"
             if ([int]$Folder.ItemCount -gt 0) {
                 $Uri = "$Base/$($Folder.SrcFolderId)/items?`$select=id,size&`$orderby=createdDateTime&`$top=$ChunkSize&`$skip=$Skip"
                 while ($true) {
@@ -48,6 +54,10 @@ function Push-MailboxCopyPlan {
                         Add-CIPPAzDataTableEntity @Table -Entity @{
                             PartitionKey = $OperationId
                             RowKey       = 'c{0:D5}' -f $ChunkCount
+                            SrcMailboxId = $SrcMailboxId
+                            DstMailboxId = [string]($Folder.DstMailboxId ?? $Op.DstMailboxId)
+                            SrcApi       = [string]($Folder.SrcApi ?? 'v1.0')
+                            DstApi       = [string]($Folder.DstApi ?? 'v1.0')
                             SrcFolderId  = [string]$Folder.SrcFolderId
                             DstFolderId  = [string]$Folder.DstFolderId
                             Path         = [string]$Folder.Path

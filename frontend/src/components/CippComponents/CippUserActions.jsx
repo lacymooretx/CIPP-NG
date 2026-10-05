@@ -1062,6 +1062,8 @@ export const useCippUserActions = () => {
         Operation: { label: 'Copy (keep the items in the source)', value: 'Copy' },
         IncludeDeletedItems: false,
         IncludeJunk: false,
+        IncludeArchive: true,
+        ArchiveDestination: { label: "Their online archive", value: 'Archive' },
       },
       fields: [
         {
@@ -1117,9 +1119,21 @@ export const useCippUserActions = () => {
         },
         { type: 'switch', name: 'IncludeDeletedItems', label: 'Include Deleted Items' },
         { type: 'switch', name: 'IncludeJunk', label: 'Include Junk Email' },
+        { type: 'switch', name: 'IncludeArchive', label: 'Include the online archive (if they have one)' },
+        {
+          type: 'autoComplete',
+          name: 'ArchiveDestination',
+          label: 'Put the archive in',
+          multiple: false,
+          creatable: false,
+          options: [
+            { label: "Their online archive", value: 'Archive' },
+            { label: "An 'Online Archive' folder in their main mailbox", value: 'Primary' },
+          ],
+        },
       ],
       confirmText:
-        "Copy or move [userPrincipalName]'s mail, calendar, contacts and tasks into the selected mailbox? Items keep their dates, senders and attachments. With Move, each item is deleted from [userPrincipalName]'s mailbox after it is copied. Track it under Email & Exchange > Mailbox Copies.",
+        "Copy or move [userPrincipalName]'s mail, calendar, contacts and tasks (and online archive, if included) into the selected mailbox? If the destination has no online archive, the archive goes into an 'Online Archive' folder in their main mailbox. Items keep their dates, senders and attachments. With Move, each item is deleted from [userPrincipalName]'s mailbox after it is copied. Track it under Email & Exchange > Mailbox Copies.",
       multiPost: false,
       condition: () => canWriteMailbox,
     },

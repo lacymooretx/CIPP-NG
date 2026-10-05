@@ -13,6 +13,10 @@ On the source user, open the action menu and choose **Copy or move mailbox conte
 * **Folder name**: optional. Replaces the default "From <name> (date)" name.
 * **Copy or move**: Move deletes each item from the source once it has been imported. Folders are left in place, empty.
 * **Include Deleted Items / Include Junk Email**: both are off by default.
+* **Include the online archive**: on by default. Copies the source's online archive as well, if it has one.
+* **Put the archive in**:
+  * **Their online archive** (default): uses the same layout as above, inside the destination's archive.
+  * **An 'Online Archive' folder in their main mailbox**: also used automatically when the destination has no archive. Enable their archive first if you want it to land in the archive.
 
 These folders are never copied: search folders, Sync Issues, Recoverable Items, Outbox and hidden system folders.
 
@@ -31,6 +35,8 @@ Nothing is de-duplicated. Running the same copy twice imports every item twice. 
 | Status             | Planning (listing items), Copying, Completed, CompletedWithErrors, Failed or Cancelled. |
 | Progress Percent   | Items processed out of items listed.                                              |
 | Items Copied / Failed | Running totals.                                                                |
+| Archive Items      | How many of the items came from the online archive.                              |
+| Archive Destination | Where the archive content went.                                                 |
 | Recent Errors      | The last few item-level errors.                                                   |
 
 ## Actions
