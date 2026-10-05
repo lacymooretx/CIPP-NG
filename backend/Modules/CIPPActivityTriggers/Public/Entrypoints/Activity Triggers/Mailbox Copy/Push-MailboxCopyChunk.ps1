@@ -44,7 +44,8 @@ function Push-MailboxCopyChunk {
     # A resume re-plans into new chunks numbered after PlanFirstChunk; lanes from the earlier run that are
     # still queued must not copy their (superseded) chunks again.
     $FirstChunk = [int]($Op.PlanFirstChunk ?? 0)
-    if ([int]($ChunkKey.TrimStart('c')) -le $FirstChunk) { return @() }
+    $ChunkNumber = [int]($ChunkKey.TrimStart('c'))
+    if ($ChunkNumber -le $FirstChunk) { return @() }
 
     # Chunks name their own mailboxes and API version: an online archive is a separate mailbox that only
     # beta will serve. Chunks written before archive support fall back to the operation's pair.
@@ -84,9 +85,20 @@ function Push-MailboxCopyChunk {
         param([int]$Attempt, [double]$RetryAfter, [int]$Status, [string]$Stage)
         $Seconds = if ($RetryAfter -gt 0) { [Math]::Min(300, [Math]::Ceiling($RetryAfter)) } else { [Math]::Min(60, 15 * $Attempt) }
         Write-Information "MailboxCopy $OperationId ${ChunkKey}: $Stage HTTP $Status, attempt $Attempt; waiting ${Seconds}s$(if ($RetryAfter -gt 0) { ' (Retry-After)' })"
+        # Heartbeat first: Resume treats a chunk updated in the last 6 minutes as still working, which
+        # covers the longest sleep (300s), so it can never re-plan underneath a sleeping chunk.
+        & $Save 'Running'
         Start-Sleep -Seconds $Seconds
+        if (-not (& $StillMine)) { throw $StopSignal }
     }
     $Retryable = { param([int]$Status) $Status -eq 0 -or $Status -eq 429 -or $Status -ge 500 }
+    # False once the copy is cancelled or a Resume has re-planned past this chunk. A chunk can sleep for
+    # minutes in throttle back-off, so this is checked after every sleep as well as every few items.
+    $StillMine = {
+        $Current = Get-CIPPAzDataTableEntity @Table -Filter "PartitionKey eq 'Operation' and RowKey eq '$OperationId'" -Property Status, PlanFirstChunk
+        $Current.Status -ne 'Cancelled' -and [int]($Current.PlanFirstChunk ?? 0) -lt $ChunkNumber
+    }
+    $StopSignal = 'CIPP-MAILBOXCOPY-STOP'
     $IsOutOfMemory = { param($Err) $Err.Exception -is [System.OutOfMemoryException] -or $Err.Exception.InnerException -is [System.OutOfMemoryException] }
 
     # Hashtable so the scriptblocks can refresh cached state (a plain variable would not survive the child scope).
@@ -179,10 +191,7 @@ function Push-MailboxCopyChunk {
         $SinceSave = 0
         while ($Done -lt $Items.Count) {
             # A cancel takes effect within a few items, not only between chunks.
-            if ($Done % 5 -eq 0) {
-                $Current = Get-CIPPAzDataTableEntity @Table -Filter "PartitionKey eq 'Operation' and RowKey eq '$OperationId'" -Property Status
-                if ($Current.Status -eq 'Cancelled') { & $Save 'Cancelled'; return @() }
-            }
+            if ($Done % 5 -eq 0 -and -not (& $StillMine)) { & $Save 'Stopped'; return @() }
 
             $G = $Items[$Done]
             $Big = $false
@@ -229,6 +238,11 @@ function Push-MailboxCopyChunk {
             }
         }
     } catch {
+        if ([string]$_.Exception.Message -eq $StopSignal -or [string]$_ -eq $StopSignal) {
+            # Cancelled or superseded while waiting out a throttle: the item in hand was not imported.
+            & $Save 'Stopped'
+            return @()
+        }
         # Unexpected failure outside the per-item handling: count the rest of the chunk as failed so
         # the operation still finishes, and keep the reason. A Resume re-plans whatever did not copy.
         $Message = Get-NormalizedError -message $_.Exception.Message

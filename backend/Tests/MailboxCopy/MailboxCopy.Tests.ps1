@@ -320,12 +320,25 @@ Describe 'Push-MailboxCopyChunk' {
         }
         & $script:Run
         Should -Invoke Invoke-CIPPMailboxItemImport -Times 6 -Exactly   # 2 before + item1..item5 minus corrupt item3 = 4 more
-        (& $script:Final).State | Should -Be 'Cancelled'
+        (& $script:Final).State | Should -Be 'Stopped'
 
         $script:Op.Status = 'Copying'
         $script:Op | Add-Member -NotePropertyName PlanFirstChunk -NotePropertyValue 250 -Force
         & $script:Run
         Should -Invoke Invoke-CIPPMailboxItemImport -Times 6 -Exactly
+    }
+
+    It 'stops after a throttle sleep when a Resume has re-planned past it, without importing the item' {
+        $script:Chunk.Ids = (ConvertTo-Json -InputObject @('item1|10', 'item2|10') -Compress)
+        Mock Invoke-CIPPMailboxItemImport { [pscustomobject]@{ Success = $false; StatusCode = 429; Body = 'throttled'; RetryAfterSeconds = 290 } }
+        Mock Start-Sleep { $script:Op | Add-Member -NotePropertyName PlanFirstChunk -NotePropertyValue 5 -Force }
+        & $script:Run
+        Should -Invoke Invoke-CIPPMailboxItemImport -Times 1 -Exactly
+        $States = @($script:Saved | Where-Object { $_.RowKey -eq 'c00001' } | ForEach-Object State)
+        $States[0] | Should -Be 'Running'   # heartbeat written before the sleep
+        $States[-1] | Should -Be 'Stopped'
+        (& $script:Final).Copied | Should -Be 0
+        (& $script:Final).Failed | Should -Be 0
     }
 }
 
@@ -361,7 +374,7 @@ Describe 'Push-MailboxCopyPlan' {
         $Final.AlreadyPresent | Should -Be 2
         $Final.Status | Should -Be 'Copying'
         Should -Invoke New-GraphGetRequest -ParameterFilter { $uri -match '/beta/admin/exchange/mailboxes/MBX:d/folders/df/items' -and $uri -match '0x300B' }
-        Should -Invoke Start-CIPPOrchestrator -Times 1 -Exactly -ParameterFilter { $InputObject.Sequential -and $InputObject.Batch[0].ChunkKey -eq 'c00251' }
+        Should -Invoke Start-CIPPOrchestrator -Times 1 -Exactly -ParameterFilter { $InputObject.Sequential -and $InputObject.Batch[0].ChunkKey -eq 'c00251' -and $InputObject.OrchestratorName -like '*_p250_lane0' }
     }
 
     It 'completes without starting lanes when everything is already there' {

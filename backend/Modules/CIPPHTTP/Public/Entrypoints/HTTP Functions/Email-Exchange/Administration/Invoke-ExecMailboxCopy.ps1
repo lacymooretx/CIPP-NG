@@ -68,7 +68,8 @@ function Invoke-ExecMailboxCopy {
                     throw "This copy is still $($Op.Status.ToLower()) (last progress $([int]([DateTime]::UtcNow - $LastActivity).TotalMinutes) min ago). Cancel it first, or let it finish."
                 }
             }
-            $Busy = @($Chunks | Where-Object { $_.State -eq 'Running' -and $_.Timestamp -and ([DateTimeOffset]$_.Timestamp).UtcDateTime -gt [DateTime]::UtcNow.AddMinutes(-3) })
+            # 6 minutes: a chunk writes a heartbeat before each throttle sleep, and sleeps at most 300s.
+            $Busy = @($Chunks | Where-Object { $_.State -eq 'Running' -and $_.Timestamp -and ([DateTimeOffset]$_.Timestamp).UtcDateTime -gt [DateTime]::UtcNow.AddMinutes(-6) })
             if ($Busy.Count -gt 0) { throw "$($Busy.Count) chunk(s) of the earlier run are still finishing their current items. Try again in a few minutes." }
 
             foreach ($P in @{

@@ -165,7 +165,9 @@ function Push-MailboxCopyPlan {
                 [PSCustomObject]@{ FunctionName = 'MailboxCopyChunk'; OperationId = $OperationId; TenantFilter = $TenantFilter; ChunkKey = $Keys[$c] }
             }
             $null = Start-CIPPOrchestrator -InputObject ([PSCustomObject]@{
-                    OrchestratorName = "MailboxCopy_$($OperationId.Substring(0, 8))_lane$LaneNumber"
+                    # Unique per planning pass: Craft skips a run whose name is still active, and lanes of
+                    # an earlier pass can still be finishing a chunk when a Resume plans the next.
+                    OrchestratorName = "MailboxCopy_$($OperationId.Substring(0, 8))_p$($FirstChunk)_lane$LaneNumber"
                     Batch            = @($Batch)
                     Sequential       = $true
                     SkipLog          = $true
