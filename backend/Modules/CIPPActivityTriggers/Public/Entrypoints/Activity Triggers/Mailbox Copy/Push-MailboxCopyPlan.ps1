@@ -20,8 +20,9 @@ function Push-MailboxCopyPlan {
         listing per destination folder rather than a lookup per item. Items without a search key are
         always copied.
 
-        When done it starts three Sequential orchestrations (lanes) of Push-MailboxCopyChunk over the
-        chunks written by this planning pass (a resume numbers on from the earlier chunks).
+        When done it starts Sequential orchestrations (lanes) of Push-MailboxCopyChunk over the chunks
+        written by this planning pass (a resume numbers on from the earlier chunks): two lanes per
+        destination mailbox, because Exchange's import throttle (IncomingBytes) is per mailbox.
     .FUNCTIONALITY
         Entrypoint
     #>
@@ -31,7 +32,11 @@ function Push-MailboxCopyPlan {
     $OperationId = [string]$Item.OperationId
     $TenantFilter = [string]$Item.TenantFilter
     $ChunkSize = 100
-    $Lanes = 3
+    # Lanes per destination mailbox. Exchange caps imports at ~150 MB per 5 minutes per mailbox per app
+    # ("Application is over its IncomingBytes limit") and allows 4 concurrent requests per mailbox. Two
+    # lanes keep one mailbox's budget full; a main mailbox and its online archive are separate mailboxes
+    # with separate budgets, so each gets its own lanes and both fill at once.
+    $LanesPerMailbox = 2
     $TimeboxSeconds = 600
     $Stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
 
@@ -150,16 +155,23 @@ function Push-MailboxCopyPlan {
         return @()
     }
 
-    for ($Lane = 0; $Lane -lt [Math]::Min($Lanes, $NewChunks); $Lane++) {
-        $Batch = for ($c = $FirstChunk + $Lane + 1; $c -le $ChunkCount; $c += $Lanes) {
-            [PSCustomObject]@{ FunctionName = 'MailboxCopyChunk'; OperationId = $OperationId; TenantFilter = $TenantFilter; ChunkKey = ('c{0:D5}' -f $c) }
+    $NewRows = @(Get-CIPPAzDataTableEntity @Table -Filter "PartitionKey eq '$OperationId' and RowKey gt '$('c{0:D5}' -f $FirstChunk)' and RowKey lt 'd'" -Property RowKey, DstMailboxId | Sort-Object RowKey)
+    $LaneNumber = 0
+    foreach ($Group in @($NewRows | Group-Object { [string]($_.DstMailboxId ?? $Op.DstMailboxId) })) {
+        $Keys = @($Group.Group.RowKey)
+        $Count = [Math]::Min($LanesPerMailbox, $Keys.Count)
+        for ($Lane = 0; $Lane -lt $Count; $Lane++) {
+            $Batch = for ($c = $Lane; $c -lt $Keys.Count; $c += $Count) {
+                [PSCustomObject]@{ FunctionName = 'MailboxCopyChunk'; OperationId = $OperationId; TenantFilter = $TenantFilter; ChunkKey = $Keys[$c] }
+            }
+            $null = Start-CIPPOrchestrator -InputObject ([PSCustomObject]@{
+                    OrchestratorName = "MailboxCopy_$($OperationId.Substring(0, 8))_lane$LaneNumber"
+                    Batch            = @($Batch)
+                    Sequential       = $true
+                    SkipLog          = $true
+                })
+            $LaneNumber++
         }
-        $null = Start-CIPPOrchestrator -InputObject ([PSCustomObject]@{
-                OrchestratorName = "MailboxCopy_$($OperationId.Substring(0, 8))_lane$Lane"
-                Batch            = @($Batch)
-                Sequential       = $true
-                SkipLog          = $true
-            })
     }
     Write-LogMessage -API 'MailboxCopy' -tenant $TenantFilter -message "Mailbox copy ${OperationId}: queued $Listed items in $NewChunks chunks$(if ($Dedupe) { " ($AlreadyPresent already in the destination, skipped)" }); copying" -sev Info
     return @()

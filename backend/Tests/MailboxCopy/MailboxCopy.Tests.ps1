@@ -227,15 +227,16 @@ Describe 'Push-MailboxCopyChunk' {
         (& $script:Final).Failed | Should -Be 0
     }
 
-    It 'gives up on an item only after 8 throttled attempts, and carries on with the next' {
+    It 'gives up on an item only after 12 throttled attempts (short waits, no Retry-After), and carries on with the next' {
         $script:Chunk.Ids = (ConvertTo-Json -InputObject @('item1|10', 'item2|10') -Compress)
         Mock Invoke-CIPPMailboxItemImport {
             if ($Export.ItemId -eq 'item1') { return [pscustomobject]@{ Success = $false; StatusCode = 429; Body = 'throttled'; RetryAfterSeconds = 0 } }
             Ok
         }
         & $script:Run
-        Should -Invoke Invoke-CIPPMailboxItemImport -Times 8 -Exactly -ParameterFilter { $Export.ItemId -eq 'item1' }
-        Should -Invoke Start-Sleep -Times 7 -Exactly
+        Should -Invoke Invoke-CIPPMailboxItemImport -Times 12 -Exactly -ParameterFilter { $Export.ItemId -eq 'item1' }
+        Should -Invoke Start-Sleep -Times 11 -Exactly
+        Should -Invoke Start-Sleep -Times 0 -Exactly -ParameterFilter { $Seconds -gt 60 }
         (& $script:Final).Copied | Should -Be 1
         (& $script:Final).Failed | Should -Be 1
     }
@@ -339,6 +340,7 @@ Describe 'Push-MailboxCopyPlan' {
         $script:Folder = [pscustomobject]@{ RowKey = 'f00001'; SrcFolderId = 'sf'; DstFolderId = 'df'; Path = 'Inbox'; ItemCount = 5; SrcMailboxId = 'MBX:s'; DstMailboxId = 'MBX:d'; SrcApi = 'beta'; DstApi = 'beta' }
         Mock Get-CIPPAzDataTableEntity {
             if ($Filter -match "PartitionKey eq 'Operation'") { return $script:Op }
+            if ($Filter -match "RowKey gt 'c") { return @($script:Saved | Where-Object { $_.RowKey -like 'c*' }) }
             @($script:Folder)
         }
         Mock Add-CIPPAzDataTableEntity { $script:Saved.Add(($Entity | Select-Object *)) }
@@ -377,5 +379,23 @@ Describe 'Push-MailboxCopyPlan' {
         Push-MailboxCopyPlan -Item ([pscustomobject]@{ OperationId = '11111111-2222-3333-4444-555555555555'; TenantFilter = 't' })
         Should -Invoke New-GraphGetRequest -Times 0 -ParameterFilter { $uri -match '/folders/df/items' }
         ($script:Saved | Where-Object { $_.RowKey -eq 'c00001' }).Count | Should -Be 5
+    }
+
+    It 'gives each destination mailbox its own two lanes (main mailbox and archive throttle separately)' {
+        $script:Op.Dedupe = $false; $script:Op.ChunkCount = 0; $script:Op.PlanFirstChunk = 0
+        $Archive = [pscustomobject]@{ RowKey = 'f00002'; SrcFolderId = 'asf'; DstFolderId = 'adf'; Path = 'Archive/Inbox'; ItemCount = 5; SrcMailboxId = 'MBX:sa'; DstMailboxId = 'MBX:da'; SrcApi = 'beta'; DstApi = 'beta' }
+        Mock Get-CIPPAzDataTableEntity {
+            if ($Filter -match "PartitionKey eq 'Operation'") { return $script:Op }
+            if ($Filter -match "RowKey gt 'c") { return @($script:Saved | Where-Object { $_.RowKey -like 'c*' }) }
+            @($script:Folder, $Archive)
+        }
+        Mock New-GraphGetRequest { @(1..250 | ForEach-Object { [pscustomobject]@{ id = "s$_"; size = 10 } }) | Select-Object -Skip ([int]($uri -replace '.*skip=(\d+).*', '$1')) -First 100 }
+        Push-MailboxCopyPlan -Item ([pscustomobject]@{ OperationId = '11111111-2222-3333-4444-555555555555'; TenantFilter = 't' })
+        # 3 chunks per folder -> 2 lanes for MBX:d and 2 lanes for MBX:da
+        Should -Invoke Start-CIPPOrchestrator -Times 4 -Exactly
+        $Main = { $InputObject.Batch[0].ChunkKey -in @('c00001', 'c00002') }
+        $Arch = { $InputObject.Batch[0].ChunkKey -in @('c00004', 'c00005') }
+        Should -Invoke Start-CIPPOrchestrator -Times 2 -Exactly -ParameterFilter $Main
+        Should -Invoke Start-CIPPOrchestrator -Times 2 -Exactly -ParameterFilter $Arch
     }
 }

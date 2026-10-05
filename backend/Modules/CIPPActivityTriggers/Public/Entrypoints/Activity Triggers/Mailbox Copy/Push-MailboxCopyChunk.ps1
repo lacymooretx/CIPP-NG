@@ -11,9 +11,10 @@ function Push-MailboxCopyChunk {
         archive copy even with small groups. One item per export also ends the "NotReturned" items that
         multi-item exports silently dropped.
 
-        Throttling: Exchange answers 429 "Application is over its IncomingBytes limit" when the
-        app imports too fast. 429/5xx/network errors back off (Retry-After when given, else 15s doubling,
-        capped at 5 min) for up to 8 attempts before an item counts as failed.
+        Throttling: Exchange caps imports at ~150 MB per 5 minutes per destination mailbox and answers
+        429 "Application is over its IncomingBytes limit" beyond it - that cap, not CIPP, sets the pace
+        of a big copy (~1.75 GB/hour per mailbox). 429/5xx/network errors wait (Retry-After when given,
+        else 15-60s) for up to 12 attempts before an item counts as failed; each wait is logged.
 
         For Move the source item is soft-deleted (recoverable from Recoverable Items) after its import.
         Archive mailboxes: an export answered with ErrorArchiveFolderMovedPermanently is reissued at the
@@ -33,7 +34,7 @@ function Push-MailboxCopyChunk {
     $TenantFilter = [string]$Item.TenantFilter
     $ChunkKey = [string]$Item.ChunkKey
     $TimeboxSeconds = 900
-    $MaxAttempts = 8
+    $MaxAttempts = 12
     $Stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
 
     $Table = Get-CippTable -tablename 'MailboxCopy'
@@ -76,10 +77,13 @@ function Push-MailboxCopyChunk {
         $Chunk | Add-Member -NotePropertyName State -NotePropertyValue $State -Force
         $null = Add-CIPPAzDataTableEntity @Table -Entity $Chunk -Force
     }
-    # Wait before retry attempt N: the server's Retry-After when it gave one, else 15s doubling, max 5 min.
+    # Wait before retry attempt N: the server's Retry-After when it gave one, else 15s, 30s, 45s, then
+    # 60s. Exchange's import budget is a rolling 5-minute window, so short regular waits use it as it
+    # frees up; doubling to minutes left it idle (measured on the 3E copy).
     $Backoff = {
-        param([int]$Attempt, [double]$RetryAfter)
-        $Seconds = if ($RetryAfter -gt 0) { [Math]::Min(300, [Math]::Ceiling($RetryAfter)) } else { [Math]::Min(300, 15 * [Math]::Pow(2, $Attempt - 1)) }
+        param([int]$Attempt, [double]$RetryAfter, [int]$Status, [string]$Stage)
+        $Seconds = if ($RetryAfter -gt 0) { [Math]::Min(300, [Math]::Ceiling($RetryAfter)) } else { [Math]::Min(60, 15 * $Attempt) }
+        Write-Information "MailboxCopy $OperationId ${ChunkKey}: $Stage HTTP $Status, attempt $Attempt; waiting ${Seconds}s$(if ($RetryAfter -gt 0) { ' (Retry-After)' })"
         Start-Sleep -Seconds $Seconds
     }
     $Retryable = { param([int]$Status) $Status -eq 0 -or $Status -eq 429 -or $Status -ge 500 }
@@ -116,13 +120,13 @@ function Push-MailboxCopyChunk {
                     return @{ Error = "Export ran out of memory (reported size $([Math]::Round($G.Size / 1MB, 1)) MB)" }
                 }
                 $LastStatus = 0
-                if ($Attempt -lt $MaxAttempts) { & $Backoff $Attempt 0; continue }
+                if ($Attempt -lt $MaxAttempts) { & $Backoff $Attempt 0 0 'export'; continue }
                 return @{ Error = "Export: $($_.Exception.InnerException.Message ?? $_.Exception.Message)" }
             }
             if ($X.HasData) { return @{ Export = $X; Mailbox = $Mailbox } }
             $LastStatus = [int]$X.StatusCode
             if ($LastStatus -eq 401 -and $Attempt -lt $MaxAttempts) { continue }
-            if ((& $Retryable $LastStatus) -and $Attempt -lt $MaxAttempts) { & $Backoff $Attempt $X.RetryAfterSeconds; continue }
+            if ((& $Retryable $LastStatus) -and $Attempt -lt $MaxAttempts) { & $Backoff $Attempt $X.RetryAfterSeconds $LastStatus 'export'; continue }
             # No data: an error entry for the item, a redirect, an HTTP error, or nothing at all.
             $Entry = $null
             try { $Entry = @(($X.Body | ConvertFrom-Json -ErrorAction Stop).value)[0] } catch { }
@@ -153,7 +157,7 @@ function Push-MailboxCopyChunk {
                     [System.GC]::Collect()
                     return "Import ran out of memory ($([Math]::Round($X.DataLength / 1MB, 1)) MB exported)"
                 }
-                if ($Attempt -lt $MaxAttempts) { & $Backoff $Attempt 0; continue }
+                if ($Attempt -lt $MaxAttempts) { & $Backoff $Attempt 0 0 'import'; continue }
                 return "Import: $($_.Exception.InnerException.Message ?? $_.Exception.Message)"
             }
             if ($R.Success) { return $null }
@@ -165,7 +169,7 @@ function Push-MailboxCopyChunk {
                 continue
             }
             if ($Status -in @(401, 403) -and $Attempt -lt $MaxAttempts) { $Ctx.Session = $null; continue }
-            if ((& $Retryable $Status) -and $Attempt -lt $MaxAttempts) { & $Backoff $Attempt $R.RetryAfterSeconds; continue }
+            if ((& $Retryable $Status) -and $Attempt -lt $MaxAttempts) { & $Backoff $Attempt $R.RetryAfterSeconds $Status 'import'; continue }
             return "Import ($Status): $($R.Body)"
         }
         'Import: gave up after retries.'
