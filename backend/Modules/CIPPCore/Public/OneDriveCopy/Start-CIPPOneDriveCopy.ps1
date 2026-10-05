@@ -4,7 +4,10 @@ function Start-CIPPOneDriveCopy {
         Copies a user's OneDrive into a new folder in another user's OneDrive (preflight or start)
     .DESCRIPTION
         The typical use is an offboarding hand-off: the departed user's files land in
-        "From <name> (<date>)" in the manager's OneDrive. The source is never modified.
+        "From <name> (<date>)" in the manager's OneDrive. Options:
+          -Destination NewFolder (default) | Root   - into a new folder, or straight into their OneDrive root
+          -Operation   Copy (default) | Move        - Move removes each source item after it is copied
+          -ConflictBehavior Rename (default) | Fail | Replace - when a same-named item already exists
 
         Uses SharePoint's server-side copy (CreateCopyJobs, MoveButKeepSource) through the same
         helpers and the same SharePointLibraryCopy operation table as upstream's library copy. That
@@ -27,6 +30,9 @@ function Start-CIPPOneDriveCopy {
         [Parameter(Mandatory = $true)][string]$SourceUser,
         [Parameter(Mandatory = $true)][string]$DestinationUser,
         [ValidateSet('Preflight', 'Start')][string]$Mode = 'Preflight',
+        [ValidateSet('NewFolder', 'Root')][string]$Destination = 'NewFolder',
+        [ValidateSet('Copy', 'Move')][string]$Operation = 'Copy',
+        [ValidateSet('Rename', 'Fail', 'Replace')][string]$ConflictBehavior = 'Rename',
         [string]$FolderName,
         [string]$StartedBy = 'CIPP-API',
         $Headers,
@@ -70,17 +76,25 @@ function Start-CIPPOneDriveCopy {
     $Enumerate = Get-CIPPSharePointLibraryRootChildUris -TenantFilter $TenantFilter -SiteUrl $SrcSiteUrl -ListId $SrcListId
     $Count = [int]$Enumerate.EligibleRootCount
 
-    $Folder = if ($FolderName) { $FolderName.Trim() } else { "From $($Src.displayName) ($((Get-Date).ToString('yyyy-MM-dd')))" }
-    # OneDrive rejects these characters in item names.
-    $Folder = ($Folder -replace '["*:<>?/\\|]', '-').Trim().TrimEnd('.')
-    if (-not $Folder) { throw 'Folder name is empty after removing characters OneDrive does not allow.' }
+    $Folder = $null
+    if ($Destination -eq 'NewFolder') {
+        $Folder = if ($FolderName) { $FolderName.Trim() } else { "From $($Src.displayName) ($((Get-Date).ToString('yyyy-MM-dd')))" }
+        # OneDrive rejects these characters in item names.
+        $Folder = ($Folder -replace '["*:<>?/\\|]', '-').Trim().TrimEnd('.')
+        if (-not $Folder) { throw 'Folder name is empty after removing characters OneDrive does not allow.' }
+    }
+    # SharePoint copy job NameConflictBehavior: 0 = fail (skip the item), 1 = replace, 2 = keep both (rename).
+    $ConflictCode = switch ($ConflictBehavior) { 'Fail' { 0 } 'Replace' { 1 } default { 2 } }
 
     $SizeBytes = [int64]($SrcRoot.size ?? 0)
     $FreeBytes = [int64]($DstDrive.quota.remaining ?? 0)
     $Preflight = [ordered]@{
         SourceUser        = $Src.userPrincipalName
         DestinationUser   = $Dst.userPrincipalName
+        Destination       = $(if ($Folder) { "New folder '$Folder'" } else { 'OneDrive root' })
         DestinationFolder = $Folder
+        Operation         = $Operation
+        ConflictBehavior  = $ConflictBehavior
         RootItemCount     = $Count
         SourceSizeGB      = [math]::Round($SizeBytes / 1GB, 2)
         DestinationFreeGB = [math]::Round($FreeBytes / 1GB, 2)
@@ -92,33 +106,44 @@ function Start-CIPPOneDriveCopy {
         throw "Not enough space: the source is $($Preflight.SourceSizeGB) GB and $($Dst.userPrincipalName) has $($Preflight.DestinationFreeGB) GB free."
     }
     if ($Count -gt 200) { $Preflight.Warnings.Add("$Count root items means $Count SharePoint copy jobs; large copies can take hours.") }
+    if ($Operation -eq 'Move') { $Preflight.Warnings.Add("MOVE: each item is removed from $($Src.userPrincipalName)'s OneDrive after it is copied.") }
+    if ($Destination -eq 'Root' -and $ConflictBehavior -eq 'Replace') { $Preflight.Warnings.Add("Replace into the OneDrive root overwrites $($Dst.userPrincipalName)'s files that have the same name.") }
 
     if ($Mode -eq 'Preflight') {
-        $Preflight.Message = "Ready to copy $Count item(s) ($($Preflight.SourceSizeGB) GB) into '$Folder' in $($Dst.userPrincipalName)'s OneDrive."
+        $Verb = $Operation.ToLower()
+        $Where = if ($Folder) { "'$Folder' in" } else { 'the root of' }
+        $Preflight.Message = "Ready to $Verb $Count item(s) ($($Preflight.SourceSizeGB) GB) into $Where $($Dst.userPrincipalName)'s OneDrive."
         return [PSCustomObject]$Preflight
     }
 
-    # A fresh folder per run; 'rename' means a second run never merges into the first.
-    $FolderBody = @{ name = $Folder; folder = @{}; '@microsoft.graph.conflictBehavior' = 'rename' } | ConvertTo-Json -Compress
-    $NewFolder = New-GraphPOSTRequest -uri "$Graph/drives/$($DstDrive.id)/root/children" -tenantid $TenantFilter -body $FolderBody -AsApp $true
-    if (-not $NewFolder.webUrl) { throw "Could not create '$Folder' in $($Dst.userPrincipalName)'s OneDrive." }
+    if ($Destination -eq 'NewFolder') {
+        # A fresh folder per run; 'rename' means a second run never merges into the first.
+        $FolderBody = @{ name = $Folder; folder = @{}; '@microsoft.graph.conflictBehavior' = 'rename' } | ConvertTo-Json -Compress
+        $Target = New-GraphPOSTRequest -uri "$Graph/drives/$($DstDrive.id)/root/children" -tenantid $TenantFilter -body $FolderBody -AsApp $true
+        if (-not $Target.webUrl) { throw "Could not create '$Folder' in $($Dst.userPrincipalName)'s OneDrive." }
+    } else {
+        $Target = [pscustomobject]@{ name = 'OneDrive root'; webUrl = [string]$DstDrive.webUrl }
+    }
 
     $CopyJobs = Invoke-CIPPSharePointCreateCopyJobs -TenantFilter $TenantFilter -SourceSiteUrl $SrcSiteUrl `
-        -ExportObjectUris $Enumerate.ChildUris -DestinationUri ([string]$NewFolder.webUrl) -NameConflictBehavior 1
+        -ExportObjectUris $Enumerate.ChildUris -DestinationUri ([string]$Target.webUrl) -NameConflictBehavior $ConflictCode `
+        -IsMoveMode ($Operation -eq 'Move')
 
     $OperationId = (New-Guid).Guid
     $HandleStates = @($CopyJobs | ForEach-Object { [PSCustomObject]@{ Status = 'Queued'; IsComplete = $false } })
     Set-CIPPSharePointLibraryCopyOperation -TenantFilter $TenantFilter -OperationId $OperationId -Entity @{
         Kind              = 'OneDriveCopy'
+        Operation         = $Operation
+        ConflictBehavior  = $ConflictBehavior
         SourceUser        = [string]$Src.userPrincipalName
         DestinationUser   = [string]$Dst.userPrincipalName
-        DestinationFolder = [string]$NewFolder.name
-        DestinationUrl    = [string]$NewFolder.webUrl
+        DestinationFolder = [string]$Target.name
+        DestinationUrl    = [string]$Target.webUrl
         SourceSiteUrl     = $SrcSiteUrl
         SourceSiteName    = "OneDrive - $($Src.displayName)"
         SourceLibraryName = 'Documents'
         DestSiteName      = "OneDrive - $($Dst.displayName)"
-        DestLibraryName   = [string]$NewFolder.name
+        DestLibraryName   = [string]$Target.name
         StartedBy         = $StartedBy
         Status            = 'Processing'
         JobHandleCount    = $CopyJobs.Count
@@ -137,15 +162,16 @@ function Start-CIPPOneDriveCopy {
     }
 
     Write-LogMessage -headers $Headers -API $APIName -tenant $TenantFilter -sev Info `
-        -message "Started OneDrive copy ${OperationId}: $($Src.userPrincipalName) -> $($Dst.userPrincipalName) '$($NewFolder.name)' ($Count items, $($CopyJobs.Count) jobs)"
+        -message "Started OneDrive $($Operation.ToLower()) ${OperationId}: $($Src.userPrincipalName) -> $($Dst.userPrincipalName) '$($Target.name)' ($Count items, $($CopyJobs.Count) jobs)"
 
     [PSCustomObject]@{
         OperationId       = $OperationId
         SourceUser        = $Src.userPrincipalName
         DestinationUser   = $Dst.userPrincipalName
-        DestinationFolder = $NewFolder.name
-        DestinationUrl    = $NewFolder.webUrl
+        DestinationFolder = $Target.name
+        DestinationUrl    = $Target.webUrl
         JobCount          = $CopyJobs.Count
-        Message           = "Copying $Count item(s) into '$($NewFolder.name)' in $($Dst.userPrincipalName)'s OneDrive. Progress: OneDrive copies list."
+        Operation         = $Operation
+        Message           = "$(if ($Operation -eq 'Move') { 'Moving' } else { 'Copying' }) $Count item(s) into $(if ($Folder) { "'$($Target.name)' in" } else { 'the root of' }) $($Dst.userPrincipalName)'s OneDrive. Progress: Teams & SharePoint > OneDrive Copies."
     }
 }

@@ -33,6 +33,7 @@ function Invoke-ListOneDriveCopies {
             if (-not $Snapshot -and $Row.SanitizedSnapshot) { $Snapshot = $Row.SanitizedSnapshot | ConvertFrom-Json -ErrorAction SilentlyContinue }
             [PSCustomObject]@{
                 OperationId       = $Row.RowKey
+                Operation         = $Row.Operation ?? 'Copy'
                 SourceUser        = $Row.SourceUser
                 DestinationUser   = $Row.DestinationUser
                 DestinationFolder = $Row.DestinationFolder

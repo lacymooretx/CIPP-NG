@@ -9,6 +9,7 @@ const Page = () => {
       title="OneDrive Copies"
       apiUrl="/api/ListOneDriveCopies"
       simpleColumns={[
+        'Operation',
         'SourceUser',
         'DestinationUser',
         'DestinationFolder',

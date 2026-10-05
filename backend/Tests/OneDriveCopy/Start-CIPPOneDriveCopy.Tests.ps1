@@ -4,7 +4,7 @@ BeforeAll {
 
     function Write-LogMessage { param($headers, $API, $tenant, $message, $sev) }
     function Get-CIPPSharePointLibraryRootChildUris { param($TenantFilter, $SiteUrl, $ListId) }
-    function Invoke-CIPPSharePointCreateCopyJobs { param($TenantFilter, $SourceSiteUrl, $ExportObjectUris, $DestinationUri, $NameConflictBehavior) }
+    function Invoke-CIPPSharePointCreateCopyJobs { param($TenantFilter, $SourceSiteUrl, $ExportObjectUris, $DestinationUri, $NameConflictBehavior, $IsMoveMode) }
     function Set-CIPPSharePointLibraryCopyOperation { param($TenantFilter, $OperationId, $Entity) }
     function New-GraphPOSTRequest { param($uri, $tenantid, $body, $AsApp) }
     function New-GraphGetRequest {
@@ -58,6 +58,30 @@ Describe 'Start-CIPPOneDriveCopy' {
         }
         $R.JobCount | Should -Be 2
         $R.OperationId | Should -Not -BeNullOrEmpty
+    }
+
+    It 'copies straight into the destination root without creating a folder' {
+        $R = Start-CIPPOneDriveCopy -TenantFilter 't.com' -SourceUser 'src@t.com' -DestinationUser 'dst@t.com' -Destination Root -Mode Start
+        Should -Invoke New-GraphPOSTRequest -Times 0 -Exactly
+        Should -Invoke Invoke-CIPPSharePointCreateCopyJobs -Times 1 -Exactly -ParameterFilter {
+            $DestinationUri -eq 'https://t-my.sharepoint.com/personal/id-dst/Documents' -and $IsMoveMode -eq $false -and $NameConflictBehavior -eq 2
+        }
+        $R.Message | Should -Match 'the root of dst@t.com'
+    }
+
+    It 'passes move mode through and warns about it in preflight' {
+        $P = Start-CIPPOneDriveCopy -TenantFilter 't.com' -SourceUser 'src@t.com' -DestinationUser 'dst@t.com' -Operation Move -Mode Preflight
+        ($P.Warnings -join ' ') | Should -Match 'MOVE'
+        $null = Start-CIPPOneDriveCopy -TenantFilter 't.com' -SourceUser 'src@t.com' -DestinationUser 'dst@t.com' -Operation Move -Mode Start
+        Should -Invoke Invoke-CIPPSharePointCreateCopyJobs -Times 1 -Exactly -ParameterFilter { $IsMoveMode -eq $true }
+        Should -Invoke Set-CIPPSharePointLibraryCopyOperation -Times 1 -Exactly -ParameterFilter { $Entity.Operation -eq 'Move' }
+    }
+
+    It 'maps conflict behaviour to SharePoint codes (Fail 0, Replace 1, Rename 2) and warns on Replace into the root' {
+        $null = Start-CIPPOneDriveCopy -TenantFilter 't.com' -SourceUser 'src@t.com' -DestinationUser 'dst@t.com' -ConflictBehavior Fail -Mode Start
+        Should -Invoke Invoke-CIPPSharePointCreateCopyJobs -Times 1 -Exactly -ParameterFilter { $NameConflictBehavior -eq 0 }
+        $P = Start-CIPPOneDriveCopy -TenantFilter 't.com' -SourceUser 'src@t.com' -DestinationUser 'dst@t.com' -Destination Root -ConflictBehavior Replace -Mode Preflight
+        ($P.Warnings -join ' ') | Should -Match 'overwrites'
     }
 
     It 'strips characters OneDrive does not allow from a custom folder name' {

@@ -974,13 +974,18 @@ export const useCippUserActions = () => {
       condition: () => canWriteUser,
     },
     {
-      label: 'Copy OneDrive files to another user',
+      label: 'Copy or move OneDrive files to another user',
       type: 'POST',
       icon: <CippIcons.FileCopy />,
       url: '/api/ExecOneDriveCopy',
       data: {
         SourceUser: 'userPrincipalName',
         Action: '!Start',
+      },
+      defaultvalues: {
+        Destination: { label: 'A new folder "From <name> (date)"', value: 'NewFolder' },
+        Operation: { label: 'Copy (keep the files in the source)', value: 'Copy' },
+        ConflictBehavior: { label: 'Keep both (rename the new one)', value: 'Rename' },
       },
       fields: [
         {
@@ -1004,13 +1009,50 @@ export const useCippUserActions = () => {
           },
         },
         {
+          type: 'autoComplete',
+          name: 'Destination',
+          label: 'Put the files in',
+          multiple: false,
+          creatable: false,
+          validators: { required: 'Choose where the files go' },
+          options: [
+            { label: 'A new folder "From <name> (date)"', value: 'NewFolder' },
+            { label: 'The root of their OneDrive (no extra folder)', value: 'Root' },
+          ],
+        },
+        {
           type: 'textField',
           name: 'FolderName',
-          label: 'Folder name (optional, default "From <name> (<date>)")',
+          label: 'Folder name (new folder only, optional)',
+        },
+        {
+          type: 'autoComplete',
+          name: 'Operation',
+          label: 'Copy or move',
+          multiple: false,
+          creatable: false,
+          validators: { required: 'Choose copy or move' },
+          options: [
+            { label: 'Copy (keep the files in the source)', value: 'Copy' },
+            { label: 'Move (remove the files from the source)', value: 'Move' },
+          ],
+        },
+        {
+          type: 'autoComplete',
+          name: 'ConflictBehavior',
+          label: 'If a file or folder with the same name already exists',
+          multiple: false,
+          creatable: false,
+          validators: { required: 'Choose what happens on a name clash' },
+          options: [
+            { label: 'Keep both (rename the new one)', value: 'Rename' },
+            { label: 'Skip it (leave the existing one)', value: 'Fail' },
+            { label: 'Replace it (overwrite the existing one)', value: 'Replace' },
+          ],
         },
       ],
       confirmText:
-        "Copy all of [userPrincipalName]'s OneDrive files into a new folder in the selected user's OneDrive? The source is not changed. The copy runs in SharePoint; track it under Teams & SharePoint > OneDrive Copies.",
+        "Copy or move all of [userPrincipalName]'s OneDrive files into the selected user's OneDrive? With Move, the files are removed from [userPrincipalName]'s OneDrive after copying. The work runs in SharePoint; track it under Teams & SharePoint > OneDrive Copies.",
       multiPost: false,
       condition: () => canWriteSite,
     },

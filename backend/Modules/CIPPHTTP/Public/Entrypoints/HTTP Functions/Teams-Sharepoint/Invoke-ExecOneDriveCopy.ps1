@@ -5,8 +5,10 @@ function Invoke-ExecOneDriveCopy {
     .ROLE
         Sharepoint.Site.ReadWrite
     .DESCRIPTION
-        Copies a user's OneDrive into a new folder ("From <name> (<date>)" unless FolderName is given)
-        in another user's OneDrive using SharePoint server-side copy jobs. Action Preflight checks
+        Copies or moves a user's OneDrive into another user's OneDrive using SharePoint server-side
+        copy jobs: into a new folder ("From <name> (<date>)" unless FolderName is given) or the root
+        (Destination=Root); Operation=Move removes source items after copying; ConflictBehavior
+        Rename|Fail|Replace. Action Preflight checks
         and counts without changing anything; Action Start creates the folder and queues the copy.
         Track progress with ListOneDriveCopies.
     #>
@@ -20,6 +22,10 @@ function Invoke-ExecOneDriveCopy {
     $SourceUser = $Request.Body.SourceUser.value ?? $Request.Body.SourceUser ?? $Request.Body.userPrincipalName
     $DestinationUser = $Request.Body.DestinationUser.value ?? $Request.Body.DestinationUser
     $FolderName = [string]$Request.Body.FolderName
+    # Form autocompletes post {label, value}; plain strings work too.
+    $Destination = [string]($Request.Body.Destination.value ?? $Request.Body.Destination ?? 'NewFolder')
+    $Operation = [string]($Request.Body.Operation.value ?? $Request.Body.Operation ?? 'Copy')
+    $ConflictBehavior = [string]($Request.Body.ConflictBehavior.value ?? $Request.Body.ConflictBehavior ?? 'Rename')
 
     try {
         if (-not $TenantFilter) { throw 'tenantFilter is required.' }
@@ -30,7 +36,8 @@ function Invoke-ExecOneDriveCopy {
         $StartedBy = $User.userDetails ?? $Headers.'x-ms-client-principal-name' ?? 'CIPP-API'
 
         $Result = Start-CIPPOneDriveCopy -TenantFilter $TenantFilter -SourceUser $SourceUser -DestinationUser $DestinationUser `
-            -Mode $Action -FolderName $FolderName -StartedBy $StartedBy -Headers $Headers -APIName $APIName
+            -Mode $Action -Destination $Destination -Operation $Operation -ConflictBehavior $ConflictBehavior `
+            -FolderName $FolderName -StartedBy $StartedBy -Headers $Headers -APIName $APIName
         $StatusCode = [HttpStatusCode]::OK
         $Body = @{ Results = $Result }
     } catch {

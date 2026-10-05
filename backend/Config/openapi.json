@@ -31599,7 +31599,7 @@
         "tags": [
           "Teams-Sharepoint"
         ],
-        "description": "Copies a user's OneDrive into a new folder (\"From <name> (<date>)\" unless FolderName is given)\nin another user's OneDrive using SharePoint server-side copy jobs. Action Preflight checks\nand counts without changing anything; Action Start creates the folder and queues the copy.\nTrack progress with ListOneDriveCopies.",
+        "description": "Copies or moves a user's OneDrive into another user's OneDrive using SharePoint server-side\ncopy jobs: into a new folder (\"From <name> (<date>)\" unless FolderName is given) or the root\n(Destination=Root); Operation=Move removes source items after copying; ConflictBehavior\nRename|Fail|Replace. Action Preflight checks\nand counts without changing anything; Action Start creates the folder and queues the copy.\nTrack progress with ListOneDriveCopies.",
         "requestBody": {
           "required": true,
           "content": {
@@ -31610,11 +31610,25 @@
                   "Action": {
                     "type": "string"
                   },
+                  "ConflictBehavior": {
+                    "$ref": "#/components/schemas/LabelValue"
+                  },
+                  "Destination": {
+                    "allOf": [
+                      {
+                        "$ref": "#/components/schemas/LabelValue"
+                      }
+                    ],
+                    "description": "Form autocompletes post {label, value}; plain strings work too."
+                  },
                   "DestinationUser": {
                     "$ref": "#/components/schemas/LabelValue"
                   },
                   "FolderName": {
                     "type": "string"
+                  },
+                  "Operation": {
+                    "$ref": "#/components/schemas/LabelValue"
                   },
                   "SourceUser": {
                     "$ref": "#/components/schemas/LabelValue"
@@ -59462,6 +59476,9 @@
                         "x-cipp-field-source": "frontend"
                       },
                       "Message": {
+                        "x-cipp-field-source": "frontend"
+                      },
+                      "Operation": {
                         "x-cipp-field-source": "frontend"
                       },
                       "ProgressPercent": {
