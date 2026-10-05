@@ -50,6 +50,7 @@ function New-CIPPUserTask {
                         Webhook = [bool]$Request.Body.PostExecution.webhook
                         Email   = [bool]$Request.Body.PostExecution.email
                         PSA     = [bool]$Request.Body.PostExecution.psa
+                        Push    = [bool]$Request.Body.PostExecution.push
                     }
                 }
                 Add-CIPPScheduledTask -Task $taskObject -hidden $false -Headers $Headers
