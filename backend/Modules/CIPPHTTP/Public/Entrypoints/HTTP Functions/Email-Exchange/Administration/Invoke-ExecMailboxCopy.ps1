@@ -13,8 +13,11 @@ function Invoke-ExecMailboxCopy {
         archive: into the destination's archive (ArchiveDestination=Archive, the default) or into an
         "Online Archive" folder in their main mailbox (ArchiveDestination=Primary, also the fallback
         when the destination has no archive). Action Preflight counts without changing anything; Start
-        creates the folders and queues the copy; Cancel (with OperationId) stops a running copy after
-        the chunks in flight. Track progress with ListMailboxCopies.
+        creates the folders and queues the copy; Cancel (with OperationId) stops a running copy between
+        item groups. Resume (with OperationId) restarts a cancelled, failed or partly failed copy and
+        copies only what is missing: the planner compares PR_SEARCH_KEY against the destination folders,
+        so items copied by an earlier run are skipped rather than duplicated. Track progress with
+        ListMailboxCopies.
     #>
     [CmdletBinding()]
     param($Request, $TriggerMetadata)
@@ -46,9 +49,38 @@ function Invoke-ExecMailboxCopy {
             Write-LogMessage -headers $Headers -API $APIName -tenant $Op.TenantFilter -message "Cancelled mailbox copy $OperationId ($($Op.SourceUser) -> $($Op.DestinationUser))" -sev Info
             return ([HttpResponseContext]@{ StatusCode = [HttpStatusCode]::OK; Body = @{ Results = "Cancelled. Chunks already running finish their current items; nothing new starts." } })
         }
+        if ($Action -eq 'Resume') {
+            $OperationId = [string]($Request.Body.OperationId ?? $Request.Query.OperationId)
+            if ($OperationId -notmatch '^[0-9a-fA-F-]{36}$') { throw 'OperationId is required to resume.' }
+            $Table = Get-CippTable -tablename 'MailboxCopy'
+            $Op = Get-CIPPAzDataTableEntity @Table -Filter "PartitionKey eq 'Operation' and RowKey eq '$OperationId'"
+            if (-not $Op) { throw "Mailbox copy $OperationId was not found." }
+            if ($Op.Status -in @('Planning', 'Copying')) { throw "This copy is still $($Op.Status.ToLower()); cancel it first or let it finish." }
+            # Chunks of a cancelled run finish their current group before stopping. Resuming under them
+            # would race them into the same folders, so wait until they have gone quiet.
+            $FirstChunk = [int]($Op.PlanFirstChunk ?? 0)
+            $Busy = @(Get-CIPPAzDataTableEntity @Table -Filter "PartitionKey eq '$OperationId' and RowKey gt '$('c{0:D5}' -f $FirstChunk)' and RowKey lt 'd' and State eq 'Running'" |
+                    Where-Object { $_.Timestamp -and ([DateTimeOffset]$_.Timestamp).UtcDateTime -gt [DateTime]::UtcNow.AddMinutes(-3) })
+            if ($Busy.Count -gt 0) { throw "$($Busy.Count) chunk(s) of the earlier run are still finishing their current items. Try again in a few minutes." }
+
+            foreach ($P in @{
+                    Status = 'Planning'; Dedupe = $true; PlanFirstChunk = [int]($Op.ChunkCount ?? 0); PlanFolderIndex = 0; PlanSkip = 0
+                    ListedItems = 0; AlreadyPresent = 0; ResumeCount = [int]($Op.ResumeCount ?? 0) + 1; Message = ''; Finished = ''
+                }.GetEnumerator()) {
+                $Op | Add-Member -NotePropertyName $P.Key -NotePropertyValue $P.Value -Force
+            }
+            Add-CIPPAzDataTableEntity @Table -Entity $Op -Force
+            $null = Start-CIPPOrchestrator -InputObject ([PSCustomObject]@{
+                    OrchestratorName = "MailboxCopyPlan_$($OperationId.Substring(0, 8))_resume$($Op.ResumeCount)"
+                    Batch            = @([PSCustomObject]@{ FunctionName = 'MailboxCopyPlan'; OperationId = $OperationId; TenantFilter = $Op.TenantFilter })
+                    SkipLog          = $true
+                })
+            Write-LogMessage -headers $Headers -API $APIName -tenant $Op.TenantFilter -message "Resumed mailbox copy $OperationId ($($Op.SourceUser) -> $($Op.DestinationUser)); copying only items not already in the destination" -sev Info
+            return ([HttpResponseContext]@{ StatusCode = [HttpStatusCode]::OK; Body = @{ Results = 'Resumed. CIPP is comparing the destination with the source and will copy only the items that are missing. Progress: Mailbox Copies.' } })
+        }
         if (-not $TenantFilter) { throw 'tenantFilter is required.' }
         if (-not $SourceUser -or -not $DestinationUser) { throw 'SourceUser and DestinationUser are required.' }
-        if ($Action -notin @('Preflight', 'Start')) { throw "Unknown Action '$Action'. Use Preflight, Start or Cancel." }
+        if ($Action -notin @('Preflight', 'Start')) { throw "Unknown Action '$Action'. Use Preflight, Start, Cancel or Resume." }
 
         $User = try { [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($Headers.'x-ms-client-principal')) | ConvertFrom-Json } catch { $null }
         $StartedBy = $User.userDetails ?? $Headers.'x-ms-client-principal-name' ?? 'CIPP-API'

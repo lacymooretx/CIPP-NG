@@ -12,7 +12,16 @@ function Push-MailboxCopyPlan {
         Folder rows carry their own source/destination mailbox ids and API version (the online
         archive is a separate mailbox, reachable only through beta); chunk rows copy them.
 
-        When done it starts three Sequential orchestrations (lanes) of Push-MailboxCopyChunk.
+        Dedupe mode (the operation's Dedupe flag, set by ExecMailboxCopy Action=Resume): before listing a
+        folder it reads the destination folder's PR_SEARCH_KEY values (Binary 0x300B) and leaves out
+        every source item already there. FTS import keeps PR_SEARCH_KEY (verified: 100/100 copied
+        calendar items matched their source), while createdDateTime and size both change - so this is
+        the only reliable "already copied" test. Binary properties cannot be $filter'ed, hence one
+        listing per destination folder rather than a lookup per item. Items without a search key are
+        always copied.
+
+        When done it starts three Sequential orchestrations (lanes) of Push-MailboxCopyChunk over the
+        chunks written by this planning pass (a resume numbers on from the earlier chunks).
     .FUNCTIONALITY
         Entrypoint
     #>
@@ -34,8 +43,46 @@ function Push-MailboxCopyPlan {
     $FolderIndex = [int]($Op.PlanFolderIndex ?? 0)
     $Skip = [int]($Op.PlanSkip ?? 0)
     $ChunkCount = [int]($Op.ChunkCount ?? 0)
+    $FirstChunk = [int]($Op.PlanFirstChunk ?? 0)
     $Listed = [int]($Op.ListedItems ?? 0)
-
+    $Dedupe = [bool]($Op.Dedupe ?? $false)
+    $AlreadyPresent = [int]($Op.AlreadyPresent ?? 0)
+    $KeyExpand = "`$expand=singleValueExtendedProperties(`$filter=id eq 'Binary 0x300B')"
+    $SearchKey = {
+        param($Entry)
+        ($Entry.singleValueExtendedProperties | Where-Object { $_.id -match '0x300B' } | Select-Object -First 1).value
+    }
+    $Buffer = [System.Collections.Generic.List[string]]::new()
+    $FlushChunk = {
+        param($Folder, $SrcMailboxId)
+        if ($Buffer.Count -eq 0) { return 0 }
+        $Ids = @($Buffer)
+        $Buffer.Clear()
+        $null = Add-CIPPAzDataTableEntity @Table -Entity @{
+            PartitionKey = $OperationId
+            RowKey       = 'c{0:D5}' -f ($ChunkCount + 1)
+            SrcMailboxId = $SrcMailboxId
+            DstMailboxId = [string]($Folder.DstMailboxId ?? $Op.DstMailboxId)
+            SrcApi       = [string]($Folder.SrcApi ?? 'v1.0')
+            DstApi       = [string]($Folder.DstApi ?? 'v1.0')
+            SrcFolderId  = [string]$Folder.SrcFolderId
+            DstFolderId  = [string]$Folder.DstFolderId
+            Path         = [string]$Folder.Path
+            Ids          = [string](ConvertTo-Json -InputObject $Ids -Compress)
+            Count        = $Ids.Count
+            Done         = 0
+            Copied       = 0
+            Failed       = 0
+            State        = 'Pending'
+        } -Force
+        1
+    }
+    $SaveCheckpoint = {
+        foreach ($P in @{ PlanFolderIndex = $FolderIndex; PlanSkip = $Skip; ChunkCount = $ChunkCount; ListedItems = $Listed; AlreadyPresent = $AlreadyPresent }.GetEnumerator()) {
+            $Op | Add-Member -NotePropertyName $P.Key -NotePropertyValue $P.Value -Force
+        }
+        $null = Add-CIPPAzDataTableEntity @Table -Entity $Op -Force
+    }
 
     try {
         while ($FolderIndex -lt $Folders.Count) {
@@ -45,40 +92,33 @@ function Push-MailboxCopyPlan {
             $SrcMailboxId = [string]($Folder.SrcMailboxId ?? $Op.SrcMailboxId)
             $Base = "https://graph.microsoft.com/$([string]($Folder.SrcApi ?? 'v1.0'))/admin/exchange/mailboxes/$SrcMailboxId/folders"
             if ([int]$Folder.ItemCount -gt 0) {
-                $Uri = "$Base/$($Folder.SrcFolderId)/items?`$select=id,size&`$orderby=createdDateTime&`$top=$ChunkSize&`$skip=$Skip"
-                while ($true) {
-                    $Page = @(New-GraphGetRequest -uri $Uri -tenantid $TenantFilter -AsApp $true -noPagination $true)
-                    $Ids = @($Page | Where-Object { $_.id } | ForEach-Object { "$($_.id)|$([int64]($_.size ?? 0))" })
-                    if ($Ids.Count -gt 0) {
-                        $ChunkCount++
-                        Add-CIPPAzDataTableEntity @Table -Entity @{
-                            PartitionKey = $OperationId
-                            RowKey       = 'c{0:D5}' -f $ChunkCount
-                            SrcMailboxId = $SrcMailboxId
-                            DstMailboxId = [string]($Folder.DstMailboxId ?? $Op.DstMailboxId)
-                            SrcApi       = [string]($Folder.SrcApi ?? 'v1.0')
-                            DstApi       = [string]($Folder.DstApi ?? 'v1.0')
-                            SrcFolderId  = [string]$Folder.SrcFolderId
-                            DstFolderId  = [string]$Folder.DstFolderId
-                            Path         = [string]$Folder.Path
-                            Ids          = [string](ConvertTo-Json -InputObject @($Ids) -Compress)
-                            Count        = $Ids.Count
-                            Done         = 0
-                            Copied       = 0
-                            Failed       = 0
-                            State        = 'Pending'
-                        } -Force
-                        $Listed += $Ids.Count
+                $Present = $null
+                if ($Dedupe) {
+                    $DstBase = "https://graph.microsoft.com/$([string]($Folder.DstApi ?? 'v1.0'))/admin/exchange/mailboxes/$([string]($Folder.DstMailboxId ?? $Op.DstMailboxId))/folders"
+                    $Present = [System.Collections.Generic.HashSet[string]]::new()
+                    foreach ($D in @(New-GraphGetRequest -uri "$DstBase/$($Folder.DstFolderId)/items?`$select=id&`$top=250&$KeyExpand" -tenantid $TenantFilter -AsApp $true)) {
+                        $K = & $SearchKey $D
+                        if ($K) { $null = $Present.Add([string]$K) }
                     }
-                    if ($Ids.Count -lt $ChunkSize) { break }
-                    $Skip += $Ids.Count
-                    $Uri = "$Base/$($Folder.SrcFolderId)/items?`$select=id,size&`$orderby=createdDateTime&`$top=$ChunkSize&`$skip=$Skip"
+                }
+                $Select = if ($Dedupe) { "`$select=id,size&$KeyExpand" } else { '$select=id,size' }
+                while ($true) {
+                    $Uri = "$Base/$($Folder.SrcFolderId)/items?$Select&`$orderby=createdDateTime&`$top=$ChunkSize&`$skip=$Skip"
+                    $Page = @(New-GraphGetRequest -uri $Uri -tenantid $TenantFilter -AsApp $true -noPagination $true | Where-Object { $_.id })
+                    foreach ($P in $Page) {
+                        if ($Present) {
+                            $K = & $SearchKey $P
+                            if ($K -and $Present.Contains([string]$K)) { $AlreadyPresent++; continue }
+                        }
+                        $Buffer.Add("$($P.id)|$([int64]($P.size ?? 0))")
+                        $Listed++
+                        if ($Buffer.Count -ge $ChunkSize) { $ChunkCount += & $FlushChunk $Folder $SrcMailboxId }
+                    }
+                    if ($Page.Count -lt $ChunkSize) { break }
+                    $Skip += $Page.Count
                     if ($Stopwatch.Elapsed.TotalSeconds -gt $TimeboxSeconds) {
-                        $Op | Add-Member -NotePropertyName PlanFolderIndex -NotePropertyValue $FolderIndex -Force
-                        $Op | Add-Member -NotePropertyName PlanSkip -NotePropertyValue $Skip -Force
-                        $Op | Add-Member -NotePropertyName ChunkCount -NotePropertyValue $ChunkCount -Force
-                        $Op | Add-Member -NotePropertyName ListedItems -NotePropertyValue $Listed -Force
-                        Add-CIPPAzDataTableEntity @Table -Entity $Op -Force
+                        $ChunkCount += & $FlushChunk $Folder $SrcMailboxId
+                        & $SaveCheckpoint
                         $null = Start-CIPPOrchestrator -InputObject ([PSCustomObject]@{
                                 OrchestratorName = "MailboxCopyPlanResume_$($OperationId.Substring(0, 8))_$([guid]::NewGuid().ToString('N').Substring(0, 6))"
                                 Batch            = @([PSCustomObject]@{ FunctionName = 'MailboxCopyPlan'; OperationId = $OperationId; TenantFilter = $TenantFilter })
@@ -87,6 +127,7 @@ function Push-MailboxCopyPlan {
                         return @()
                     }
                 }
+                $ChunkCount += & $FlushChunk $Folder $SrcMailboxId
             }
             $FolderIndex++
             $Skip = 0
@@ -100,15 +141,17 @@ function Push-MailboxCopyPlan {
         return @()
     }
 
-    $Op | Add-Member -NotePropertyName PlanFolderIndex -NotePropertyValue $FolderIndex -Force
-    $Op | Add-Member -NotePropertyName ChunkCount -NotePropertyValue $ChunkCount -Force
-    $Op | Add-Member -NotePropertyName ListedItems -NotePropertyValue $Listed -Force
-    $Op | Add-Member -NotePropertyName Status -NotePropertyValue $(if ($ChunkCount -gt 0) { 'Copying' } else { 'Completed' }) -Force
-    Add-CIPPAzDataTableEntity @Table -Entity $Op -Force
-    if ($ChunkCount -eq 0) { return @() }
+    $NewChunks = $ChunkCount - $FirstChunk
+    $Op | Add-Member -NotePropertyName Status -NotePropertyValue $(if ($NewChunks -gt 0) { 'Copying' } else { 'Completed' }) -Force
+    if ($NewChunks -le 0) { $Op | Add-Member -NotePropertyName Finished -NotePropertyValue ([DateTime]::UtcNow.ToString('o')) -Force }
+    & $SaveCheckpoint
+    if ($NewChunks -le 0) {
+        Write-LogMessage -API 'MailboxCopy' -tenant $TenantFilter -message "Mailbox copy ${OperationId}: nothing left to copy ($AlreadyPresent items already in the destination)" -sev Info
+        return @()
+    }
 
-    for ($Lane = 0; $Lane -lt [Math]::Min($Lanes, $ChunkCount); $Lane++) {
-        $Batch = for ($c = $Lane + 1; $c -le $ChunkCount; $c += $Lanes) {
+    for ($Lane = 0; $Lane -lt [Math]::Min($Lanes, $NewChunks); $Lane++) {
+        $Batch = for ($c = $FirstChunk + $Lane + 1; $c -le $ChunkCount; $c += $Lanes) {
             [PSCustomObject]@{ FunctionName = 'MailboxCopyChunk'; OperationId = $OperationId; TenantFilter = $TenantFilter; ChunkKey = ('c{0:D5}' -f $c) }
         }
         $null = Start-CIPPOrchestrator -InputObject ([PSCustomObject]@{
@@ -118,6 +161,6 @@ function Push-MailboxCopyPlan {
                 SkipLog          = $true
             })
     }
-    Write-LogMessage -API 'MailboxCopy' -tenant $TenantFilter -message "Mailbox copy ${OperationId}: listed $Listed items into $ChunkCount chunks; copying" -sev Info
+    Write-LogMessage -API 'MailboxCopy' -tenant $TenantFilter -message "Mailbox copy ${OperationId}: queued $Listed items in $NewChunks chunks$(if ($Dedupe) { " ($AlreadyPresent already in the destination, skipped)" }); copying" -sev Info
     return @()
 }

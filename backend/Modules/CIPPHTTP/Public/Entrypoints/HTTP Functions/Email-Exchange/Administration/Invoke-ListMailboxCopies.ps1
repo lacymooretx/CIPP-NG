@@ -19,12 +19,16 @@ function Invoke-ListMailboxCopies {
     }
 
     $Results = foreach ($Op in @(Get-CIPPAzDataTableEntity @Table -Filter $Filter)) {
-        $Chunks = @(Get-CIPPAzDataTableEntity @Table -Filter "PartitionKey eq '$($Op.RowKey)' and RowKey ge 'c' and RowKey lt 'd'" -Property RowKey, Count, Done, Copied, Failed, State, Errors)
-        $Copied = [int](($Chunks | Measure-Object -Property Copied -Sum).Sum)
+        # After a Resume only the latest planning pass counts: its chunks are numbered after
+        # PlanFirstChunk, and everything earlier runs copied is in AlreadyPresent.
+        $FirstChunk = [int]($Op.PlanFirstChunk ?? 0)
+        $Chunks = @(Get-CIPPAzDataTableEntity @Table -Filter "PartitionKey eq '$($Op.RowKey)' and RowKey gt '$('c{0:D5}' -f $FirstChunk)' and RowKey lt 'd'" -Property RowKey, Count, Done, Copied, Failed, State, Errors)
+        $AlreadyPresent = [int]($Op.AlreadyPresent ?? 0)
+        $Copied = $AlreadyPresent + [int](($Chunks | Measure-Object -Property Copied -Sum).Sum)
         $Failed = [int](($Chunks | Measure-Object -Property Failed -Sum).Sum)
-        $Planned = [int]($Op.ListedItems ?? $Op.PlannedItems ?? 0)
+        $Planned = $AlreadyPresent + [int]($Op.ListedItems ?? 0)
         if ($Op.Status -eq 'Planning') { $Planned = [int]($Op.PlannedItems ?? 0) }
-        $Processed = [int](($Chunks | Measure-Object -Property Done -Sum).Sum)
+        $Processed = $AlreadyPresent + [int](($Chunks | Measure-Object -Property Done -Sum).Sum)
         $Errors = @($Chunks | ForEach-Object { try { [string]$_.Errors | ConvertFrom-Json } catch { } } | Where-Object { $_ } | Select-Object -Last 5)
         [PSCustomObject]@{
             OperationId       = $Op.RowKey
@@ -40,6 +44,8 @@ function Invoke-ListMailboxCopies {
             ItemsFailed       = $Failed
             ArchiveItems      = [int]($Op.ArchiveItems ?? 0)
             ArchiveDestination = [string]($Op.ArchiveDestination ?? '')
+            AlreadyPresent    = $AlreadyPresent
+            Resumes           = [int]($Op.ResumeCount ?? 0)
             Folders           = [int]($Op.FolderCount ?? 0)
             ChunksDone        = @($Chunks | Where-Object { $_.State -eq 'Done' }).Count
             ChunksTotal       = $Chunks.Count
