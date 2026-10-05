@@ -542,6 +542,7 @@ export const useCippUserActions = () => {
   const canWriteUser = checkPermissions(['Identity.User.ReadWrite'])
   const canWriteMailbox = checkPermissions(['Exchange.Mailbox.ReadWrite'])
   const canWriteGroup = checkPermissions(['Identity.Group.ReadWrite'])
+  const canWriteSite = checkPermissions(['Sharepoint.Site.ReadWrite'])
 
   return [
     {
@@ -971,6 +972,47 @@ export const useCippUserActions = () => {
         'Migrate root OneDrive shortcuts for [userPrincipalName] into the Shortcuts folder?',
       multiPost: false,
       condition: () => canWriteUser,
+    },
+    {
+      label: 'Copy OneDrive files to another user',
+      type: 'POST',
+      icon: <CippIcons.FileCopy />,
+      url: '/api/ExecOneDriveCopy',
+      data: {
+        SourceUser: 'userPrincipalName',
+        Action: '!Start',
+      },
+      fields: [
+        {
+          type: 'autoComplete',
+          name: 'DestinationUser',
+          label: 'Copy into the OneDrive of',
+          multiple: false,
+          creatable: false,
+          validators: { required: 'Select the user who receives the files' },
+          api: {
+            url: '/api/ListGraphRequest',
+            data: {
+              Endpoint: 'users',
+              $select: 'id,displayName,userPrincipalName,accountEnabled',
+              $filter: 'accountEnabled eq true',
+              $top: 999,
+            },
+            labelField: (option) => `${option.displayName} (${option.userPrincipalName})`,
+            valueField: 'userPrincipalName',
+            queryKey: `enabledUsers-${tenant}`,
+          },
+        },
+        {
+          type: 'textField',
+          name: 'FolderName',
+          label: 'Folder name (optional, default "From <name> (<date>)")',
+        },
+      ],
+      confirmText:
+        "Copy all of [userPrincipalName]'s OneDrive files into a new folder in the selected user's OneDrive? The source is not changed. The copy runs in SharePoint; track it under Teams & SharePoint > OneDrive Copies.",
+      multiPost: false,
+      condition: () => canWriteSite,
     },
     {
       label: 'Set Sign In State',

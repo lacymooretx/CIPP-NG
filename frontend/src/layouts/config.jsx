@@ -804,6 +804,11 @@ export const nativeMenuItems = [
         permissions: ['Sharepoint.Site.*'],
       },
       {
+        title: 'OneDrive Copies',
+        path: '/teams-share/onedrive-copies',
+        permissions: ['Sharepoint.Site.*'],
+      },
+      {
         title: 'SharePoint',
         path: '/teams-share/sharepoint',
         permissions: ['Sharepoint.Admin.*'],
