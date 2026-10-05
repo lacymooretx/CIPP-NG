@@ -166,10 +166,23 @@ Describe 'Start-CIPPMailboxCopy' {
 }
 
 Describe 'Push-MailboxCopyChunk' {
+    BeforeAll {
+        function Get-GraphToken { param($tenantid, $AsApp, $SkipCache) @{ Authorization = 'Bearer t' } }
+        function Invoke-CIPPMailboxItemExport { param($ExportUri, $Authorization, $ItemId, $FolderId) }
+        function Invoke-CIPPMailboxItemImport { param($Export, $ImportUrl) }
+        function New-FakeExport([string]$Id, [bool]$HasData = $true, [int]$Status = 200, [string]$Body = '', [double]$RetryAfter = 0, [long]$Length = 100) {
+            $X = [pscustomobject]@{ ItemId = $Id; HasData = $HasData; StatusCode = $Status; Body = $Body; RetryAfterSeconds = $RetryAfter; DataLength = $Length; Released = $false }
+            $X | Add-Member -MemberType ScriptMethod -Name Release -Value { $this.Released = $true }
+            $X
+        }
+        function Ok { [pscustomobject]@{ Success = $true; StatusCode = 200; Body = ''; RetryAfterSeconds = 0 } }
+        $script:Run = { Push-MailboxCopyChunk -Item ([pscustomobject]@{ OperationId = 'op1'; TenantFilter = 't'; ChunkKey = 'c00001' }) }
+        $script:Final = { $script:Saved | Where-Object { $_.RowKey -eq 'c00001' } | Select-Object -Last 1 }
+    }
     BeforeEach {
         $script:Saved = [System.Collections.Generic.List[object]]::new()
         $script:Op = [pscustomobject]@{ PartitionKey = 'Operation'; RowKey = 'op1'; Operation = 'Copy'; Status = 'Copying'; SrcMailboxId = 'MBX:s'; DstMailboxId = 'MBX:d'; SourceUser = 's'; DestinationUser = 'd' }
-        $Ids = 1..25 | ForEach-Object { "item$_|1000" }
+        $Ids = 1..12 | ForEach-Object { "item$_|1000" }
         $script:Chunk = [pscustomobject]@{ PartitionKey = 'op1'; RowKey = 'c00001'; SrcFolderId = 'sf'; DstFolderId = 'df'; Ids = (ConvertTo-Json -InputObject @($Ids) -Compress); Done = 0; Copied = 0; Failed = 0; State = 'Pending'; Errors = '[]' }
         Mock Get-CIPPAzDataTableEntity {
             if ($Filter -match "PartitionKey eq 'Operation'") { return $script:Op }
@@ -178,147 +191,140 @@ Describe 'Push-MailboxCopyChunk' {
             return @($script:Chunk)
         }
         Mock Add-CIPPAzDataTableEntity { $script:Saved.Add(($Entity | Select-Object *)) }
+        Mock Start-Sleep { }
         Mock New-GraphPOSTRequest {
-            if ($uri -match 'createImportSession') { return [pscustomobject]@{ importUrl = 'https://outlook/import?authtoken=x'; expirationDateTime = [DateTime]::UtcNow.AddHours(1).ToString('o') } }
-            if ($uri -match 'exportItems') {
-                $ids = ($body | ConvertFrom-Json).itemIds
-                return [pscustomobject]@{ value = @($ids | ForEach-Object {
-                        if ($_ -eq 'item3') { [pscustomobject]@{ itemId = $_; error = [pscustomobject]@{ code = 'ErrorCorruptData'; message = 'bad item' } } }
-                        else { [pscustomobject]@{ itemId = $_; data = 'QUJD' } }
-                    }) }
-            }
+            if ($uri -match 'createImportSession') { return [pscustomobject]@{ importUrl = "https://outlook/import/$($uri -replace '.*mailboxes/([^/]+)/.*','$1')"; expirationDateTime = [DateTime]::UtcNow.AddHours(1).ToString('o') } }
         }
-        Mock Invoke-RestMethod { [pscustomobject]@{ itemId = 'new'; changeKey = 'k' } }
+        Mock Invoke-CIPPMailboxItemExport {
+            if ($ItemId -eq 'item3') { return New-FakeExport $ItemId $false 200 '{"value":[{"itemId":"item3","error":{"code":"ErrorCorruptData","message":"bad item"}}]}' }
+            New-FakeExport $ItemId
+        }
+        Mock Invoke-CIPPMailboxItemImport { Ok }
     }
 
-    It 'exports in groups of 10, imports each item, counts failures and closes the operation' {
-        Push-MailboxCopyChunk -Item ([pscustomobject]@{ OperationId = 'op1'; TenantFilter = 't'; ChunkKey = 'c00001' })
-        # 3 groups + one solo retry of the item the group export flagged as corrupt
-        Should -Invoke New-GraphPOSTRequest -Times 4 -Exactly -ParameterFilter { $uri -match 'exportItems' }
+    It 'copies one item per export, counts a bad item as failed and closes the operation' {
+        & $script:Run
+        Should -Invoke Invoke-CIPPMailboxItemExport -Times 12 -Exactly -ParameterFilter { $ExportUri -eq 'https://graph.microsoft.com/v1.0/admin/exchange/mailboxes/MBX:s/exportItems' -and $FolderId -eq 'df' -and $Authorization -eq 'Bearer t' }
+        Should -Invoke Invoke-CIPPMailboxItemImport -Times 11 -Exactly -ParameterFilter { $ImportUrl -eq 'https://outlook/import/MBX:d' -and $Export.Released }   # released after import
         Should -Invoke New-GraphPOSTRequest -Times 1 -Exactly -ParameterFilter { $uri -match 'createImportSession' }
-        Should -Invoke Invoke-RestMethod -Times 24 -Exactly -ParameterFilter { $Body -match '"FolderId":"df"' -and $Body -match '"Mode":"create"' }
-        $Final = $script:Saved | Where-Object { $_.RowKey -eq 'c00001' } | Select-Object -Last 1
-        $Final.State | Should -Be 'Done'
-        $Final.Copied | Should -Be 24
-        $Final.Failed | Should -Be 1
-        $Final.Errors | Should -Match 'ErrorCorruptData'
+        $F = & $script:Final
+        $F.State | Should -Be 'Done'; $F.Copied | Should -Be 11; $F.Failed | Should -Be 1
+        $F.Errors | Should -Match 'ErrorCorruptData'
         ($script:Saved | Where-Object { $_.RowKey -eq 'op1' } | Select-Object -Last 1).Status | Should -Be 'CompletedWithErrors'
     }
 
-    It 'deletes each source item after import in Move mode' {
-        $script:Op.Operation = 'Move'
-        Push-MailboxCopyChunk -Item ([pscustomobject]@{ OperationId = 'op1'; TenantFilter = 't'; ChunkKey = 'c00001' })
-        Should -Invoke New-GraphPOSTRequest -Times 24 -Exactly -ParameterFilter { $type -eq 'DELETE' -and $uri -match '/folders/sf/items/item\d+\?disposalType=softDelete$' }
+    It 'backs off on 429 IncomingBytes (honouring Retry-After) instead of failing the item' {
+        $script:Chunk.Ids = (ConvertTo-Json -InputObject @('item1|10') -Compress)
+        $script:Tries = 0
+        Mock Invoke-CIPPMailboxItemImport {
+            $script:Tries++
+            if ($script:Tries -le 2) { return [pscustomobject]@{ Success = $false; StatusCode = 429; Body = '{"error":{"code":"ApplicationThrottled","message":"Application is over its IncomingBytes limit."}}'; RetryAfterSeconds = 42 } }
+            Ok
+        }
+        & $script:Run
+        Should -Invoke Start-Sleep -Times 2 -Exactly -ParameterFilter { $Seconds -eq 42 }
+        (& $script:Final).Copied | Should -Be 1
+        (& $script:Final).Failed | Should -Be 0
     }
 
-    It 'resumes after the saved position and does nothing for a finished or cancelled copy' {
-        $script:Chunk.Done = 20; $script:Chunk.Copied = 20
-        Push-MailboxCopyChunk -Item ([pscustomobject]@{ OperationId = 'op1'; TenantFilter = 't'; ChunkKey = 'c00001' })
-        Should -Invoke Invoke-RestMethod -Times 5 -Exactly
-        $script:Op.Status = 'Cancelled'
-        Push-MailboxCopyChunk -Item ([pscustomobject]@{ OperationId = 'op1'; TenantFilter = 't'; ChunkKey = 'c00001' })
-        Should -Invoke Invoke-RestMethod -Times 5 -Exactly
+    It 'gives up on an item only after 8 throttled attempts, and carries on with the next' {
+        $script:Chunk.Ids = (ConvertTo-Json -InputObject @('item1|10', 'item2|10') -Compress)
+        Mock Invoke-CIPPMailboxItemImport {
+            if ($Export.ItemId -eq 'item1') { return [pscustomobject]@{ Success = $false; StatusCode = 429; Body = 'throttled'; RetryAfterSeconds = 0 } }
+            Ok
+        }
+        & $script:Run
+        Should -Invoke Invoke-CIPPMailboxItemImport -Times 8 -Exactly -ParameterFilter { $Export.ItemId -eq 'item1' }
+        Should -Invoke Start-Sleep -Times 7 -Exactly
+        (& $script:Final).Copied | Should -Be 1
+        (& $script:Final).Failed | Should -Be 1
     }
 
-    It 'reissues exports the archive redirected, and deletes moved items from the auxiliary mailbox' {
+    It 'fails only the item that runs out of memory, not the rest of the chunk (3E failure)' {
+        Mock Invoke-CIPPMailboxItemExport {
+            if ($ItemId -eq 'item5') { throw [System.OutOfMemoryException]::new() }
+            New-FakeExport $ItemId
+        }
+        $script:Chunk.Ids = (ConvertTo-Json -InputObject @(1..8 | ForEach-Object { "item$_|1000" }) -Compress)
+        & $script:Run
+        $F = & $script:Final
+        $F.Copied | Should -Be 7; $F.Failed | Should -Be 1; $F.State | Should -Be 'Done'
+        $F.Errors | Should -Match 'ran out of memory'
+    }
+
+    It 'reports an empty export (NotReturned) with the reported size, and retries server errors' {
+        $script:Chunk.Ids = (ConvertTo-Json -InputObject @('item1|5242880', 'item2|10') -Compress)
+        $script:Calls = @{}
+        Mock Invoke-CIPPMailboxItemExport {
+            $script:Calls[$ItemId] = 1 + ($script:Calls[$ItemId] ?? 0)
+            if ($ItemId -eq 'item1') { return New-FakeExport $ItemId $false 200 '{"value":[]}' }
+            if ($script:Calls[$ItemId] -eq 1) { return New-FakeExport $ItemId $false 503 'busy' }
+            New-FakeExport $ItemId
+        }
+        & $script:Run
+        $F = & $script:Final
+        $F.Copied | Should -Be 1; $F.Failed | Should -Be 1
+        $F.Errors | Should -Match 'NotReturned.*5 MB'
+        $script:Calls['item2'] | Should -Be 2
+    }
+
+    It 'treats an item deleted since planning as done, not failed' {
+        $script:Chunk.Ids = (ConvertTo-Json -InputObject @('item1|10') -Compress)
+        Mock Invoke-CIPPMailboxItemExport { New-FakeExport $ItemId $false 200 '{"value":[{"itemId":"item1","error":{"code":"ErrorItemNotFound","message":"gone"}}]}' }
+        & $script:Run
+        (& $script:Final).Failed | Should -Be 0
+        (& $script:Final).Done | Should -Be 1
+    }
+
+    It 'follows the archive redirect and deletes moved items from the auxiliary mailbox' {
         $script:Op.Operation = 'Move'
         $script:Chunk | Add-Member -NotePropertyName SrcMailboxId -NotePropertyValue 'MBX:arch' -Force
         $script:Chunk | Add-Member -NotePropertyName SrcApi -NotePropertyValue 'beta' -Force
         $script:Chunk.Ids = (ConvertTo-Json -InputObject @('item1|10', 'item2|10') -Compress)
-        Mock New-GraphPOSTRequest {
-            if ($uri -match 'createImportSession') { return [pscustomobject]@{ importUrl = 'https://outlook/import'; expirationDateTime = [DateTime]::UtcNow.AddHours(1).ToString('o') } }
-            if ($uri -match 'MBX:aux/exportItems') { return [pscustomobject]@{ value = @([pscustomobject]@{ itemId = 'item2'; data = 'QUJD' }) } }
-            if ($uri -match 'exportItems') {
-                return [pscustomobject]@{ value = @(
-                        [pscustomobject]@{ itemId = 'item1'; data = 'QUJD' }
-                        [pscustomobject]@{ itemId = 'item2'; error = [pscustomobject]@{ code = 'ErrorArchiveFolderMovedPermanently'; message = 'https://graph.microsoft.com/beta/admin/exchange/mailboxes/MBX:aux/exportItems' } }
-                    ) }
+        Mock Invoke-CIPPMailboxItemExport {
+            if ($ItemId -eq 'item2' -and $ExportUri -notmatch 'MBX:aux') {
+                return New-FakeExport $ItemId $false 200 '{"value":[{"itemId":"item2","error":{"code":"ErrorArchiveFolderMovedPermanently","message":"https://graph.microsoft.com/beta/admin/exchange/mailboxes/MBX:aux/exportItems"}}]}'
             }
+            New-FakeExport $ItemId
         }
-        Push-MailboxCopyChunk -Item ([pscustomobject]@{ OperationId = 'op1'; TenantFilter = 't'; ChunkKey = 'c00001' })
-        Should -Invoke New-GraphPOSTRequest -Times 1 -Exactly -ParameterFilter { $uri -match '/beta/admin/exchange/mailboxes/MBX:arch/exportItems' }
-        Should -Invoke New-GraphPOSTRequest -Times 1 -Exactly -ParameterFilter { $uri -eq 'https://graph.microsoft.com/beta/admin/exchange/mailboxes/MBX:aux/exportItems' }
-        Should -Invoke Invoke-RestMethod -Times 2 -Exactly
-        Should -Invoke New-GraphPOSTRequest -Times 1 -Exactly -ParameterFilter { $type -eq 'DELETE' -and $uri -match 'MBX:arch/folders/sf/items/item1\?' }
-        Should -Invoke New-GraphPOSTRequest -Times 1 -Exactly -ParameterFilter { $type -eq 'DELETE' -and $uri -match 'MBX:aux/folders/sf/items/item2\?' }
+        & $script:Run
+        Should -Invoke Invoke-CIPPMailboxItemExport -Times 1 -Exactly -ParameterFilter { $ExportUri -eq 'https://graph.microsoft.com/beta/admin/exchange/mailboxes/MBX:aux/exportItems' }
+        Should -Invoke New-GraphPOSTRequest -Times 1 -Exactly -ParameterFilter { $type -eq 'DELETE' -and $uri -eq 'https://graph.microsoft.com/beta/admin/exchange/mailboxes/MBX:arch/folders/sf/items/item1?disposalType=softDelete' }
+        Should -Invoke New-GraphPOSTRequest -Times 1 -Exactly -ParameterFilter { $type -eq 'DELETE' -and $uri -match 'MBX:aux/folders/sf/items/item2\?disposalType=softDelete$' }
+        (& $script:Final).Copied | Should -Be 2
     }
 
     It 'opens a new import session in the mailbox a 409 names' {
         $script:Chunk.Ids = (ConvertTo-Json -InputObject @('item1|10') -Compress)
-        $script:Imports = 0
-        Mock Invoke-RestMethod {
-            $script:Imports++
-            if ($script:Imports -eq 1) {
-                $Err = [System.Management.Automation.ErrorRecord]::new([System.Exception]::new('Conflict'), 'x', 'InvalidOperation', $null)
-                $Err.ErrorDetails = [System.Management.Automation.ErrorDetails]::new('{"Message":"Invalid import session. The target session is expected in mailbox MBX:auxdst."}')
-                $Resp = [System.Net.Http.HttpResponseMessage]::new([System.Net.HttpStatusCode]::Conflict)
-                $Ex = [Microsoft.PowerShell.Commands.HttpResponseException]::new('Conflict', $Resp)
-                throw [System.Management.Automation.ErrorRecord]::new($Ex, 'x', 'InvalidOperation', $null) | ForEach-Object { $_.ErrorDetails = $Err.ErrorDetails; $_ }
-            }
-            [pscustomobject]@{ itemId = 'new' }
+        Mock Invoke-CIPPMailboxItemImport {
+            if ($ImportUrl -notmatch 'auxdst') { return [pscustomobject]@{ Success = $false; StatusCode = 409; Body = '{"Message":"Invalid import session. The target session is expected in mailbox MBX:auxdst."}'; RetryAfterSeconds = 0 } }
+            Ok
         }
-        Push-MailboxCopyChunk -Item ([pscustomobject]@{ OperationId = 'op1'; TenantFilter = 't'; ChunkKey = 'c00001' })
+        & $script:Run
         Should -Invoke New-GraphPOSTRequest -Times 1 -Exactly -ParameterFilter { $uri -match 'MBX:auxdst/createImportSession' }
-        ($script:Saved | Where-Object { $_.RowKey -eq 'c00001' } | Select-Object -Last 1).Copied | Should -Be 1
+        (& $script:Final).Copied | Should -Be 1
     }
 
-    It 'survives an OutOfMemory group export by retrying each item alone (3E failure)' {
-        $script:Chunk.Ids = (ConvertTo-Json -InputObject @(1..5 | ForEach-Object { "item$_|1000" }) -Compress)
-        Mock New-GraphPOSTRequest {
-            if ($uri -match 'createImportSession') { return [pscustomobject]@{ importUrl = 'https://outlook/import'; expirationDateTime = [DateTime]::UtcNow.AddHours(1).ToString('o') } }
-            $ids = @(($body | ConvertFrom-Json).itemIds)
-            if ($ids.Count -gt 1) { throw [System.OutOfMemoryException]::new() }
-            if ($ids[0] -eq 'item4') { throw [System.OutOfMemoryException]::new() }
-            [pscustomobject]@{ value = @([pscustomobject]@{ itemId = $ids[0]; data = 'QUJD' }) }
-        }
-        Push-MailboxCopyChunk -Item ([pscustomobject]@{ OperationId = 'op1'; TenantFilter = 't'; ChunkKey = 'c00001' })
-        $Final = $script:Saved | Where-Object { $_.RowKey -eq 'c00001' } | Select-Object -Last 1
-        $Final.State | Should -Be 'Done'
-        $Final.Copied | Should -Be 4
-        $Final.Failed | Should -Be 1
-        $Final.Errors | Should -Match 'ExportFailed'
-    }
+    It 'resumes after the saved position, stops on cancel within a few items, and ignores superseded chunks' {
+        $script:Chunk.Done = 10; $script:Chunk.Copied = 10
+        & $script:Run
+        Should -Invoke Invoke-CIPPMailboxItemImport -Times 2 -Exactly
 
-    It 'retries items a group export silently dropped (NotReturned)' {
-        $script:Chunk.Ids = (ConvertTo-Json -InputObject @('item1|10', 'item2|10', 'item3|10') -Compress)
-        Mock New-GraphPOSTRequest {
-            if ($uri -match 'createImportSession') { return [pscustomobject]@{ importUrl = 'https://outlook/import'; expirationDateTime = [DateTime]::UtcNow.AddHours(1).ToString('o') } }
-            $ids = @(($body | ConvertFrom-Json).itemIds)
-            # The group answer leaves item2 out; asked alone, it comes back.
-            [pscustomobject]@{ value = @($ids | Where-Object { $ids.Count -eq 1 -or $_ -ne 'item2' } | ForEach-Object { [pscustomobject]@{ itemId = $_; data = 'QUJD' } }) }
-        }
-        Push-MailboxCopyChunk -Item ([pscustomobject]@{ OperationId = 'op1'; TenantFilter = 't'; ChunkKey = 'c00001' })
-        ($script:Saved | Where-Object { $_.RowKey -eq 'c00001' } | Select-Object -Last 1).Copied | Should -Be 3
-        Should -Invoke New-GraphPOSTRequest -Times 1 -Exactly -ParameterFilter { $body -eq '{"itemIds":["item2"]}' }
-    }
-
-    It 'sends items reported over 1 MB in their own export and builds the import body without re-serialising' {
-        $script:Chunk.Ids = (ConvertTo-Json -InputObject @('item1|10', 'item2|5000000', 'item4|10') -Compress)   # item3 is the mock's corrupt item
-        Push-MailboxCopyChunk -Item ([pscustomobject]@{ OperationId = 'op1'; TenantFilter = 't'; ChunkKey = 'c00001' })
-        Should -Invoke New-GraphPOSTRequest -Times 1 -Exactly -ParameterFilter { $body -eq '{"itemIds":["item2"]}' }
-        Should -Invoke Invoke-RestMethod -Times 3 -Exactly -ParameterFilter { $Body -eq '{"FolderId":"df","Mode":"create","Data":"QUJD"}' }
-    }
-
-    It 'stops between groups when the copy is cancelled mid-chunk' {
-        $script:Calls = 0
+        $script:Chunk.Done = 0; $script:Chunk.Copied = 0; $script:Chunk.State = 'Pending'
+        $script:Reads = 0
         Mock Get-CIPPAzDataTableEntity {
-            if ($Filter -match "PartitionKey eq 'Operation'") {
-                $script:Calls++
-                if ($script:Calls -ge 3) { $script:Op.Status = 'Cancelled' }
-                return $script:Op
-            }
+            if ($Filter -match "PartitionKey eq 'Operation'") { $script:Reads++; if ($script:Reads -ge 3) { $script:Op.Status = 'Cancelled' }; return $script:Op }
             if ($Filter -match "RowKey eq 'c00001'") { return $script:Chunk }
-            return @()
+            @()
         }
-        Push-MailboxCopyChunk -Item ([pscustomobject]@{ OperationId = 'op1'; TenantFilter = 't'; ChunkKey = 'c00001' })
-        Should -Invoke Invoke-RestMethod -Times 9 -Exactly   # first group of 10, minus the mock's corrupt item3
-        ($script:Saved | Where-Object { $_.RowKey -eq 'c00001' } | Select-Object -Last 1).State | Should -Be 'Cancelled'
-    }
+        & $script:Run
+        Should -Invoke Invoke-CIPPMailboxItemImport -Times 6 -Exactly   # 2 before + item1..item5 minus corrupt item3 = 4 more
+        (& $script:Final).State | Should -Be 'Cancelled'
 
-    It 'ignores chunks superseded by a resume' {
+        $script:Op.Status = 'Copying'
         $script:Op | Add-Member -NotePropertyName PlanFirstChunk -NotePropertyValue 250 -Force
-        Push-MailboxCopyChunk -Item ([pscustomobject]@{ OperationId = 'op1'; TenantFilter = 't'; ChunkKey = 'c00001' })
-        Should -Invoke Invoke-RestMethod -Times 0 -Exactly
+        & $script:Run
+        Should -Invoke Invoke-CIPPMailboxItemImport -Times 6 -Exactly
     }
 }
 

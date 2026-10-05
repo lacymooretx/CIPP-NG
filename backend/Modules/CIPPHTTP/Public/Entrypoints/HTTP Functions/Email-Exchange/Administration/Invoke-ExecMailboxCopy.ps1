@@ -55,12 +55,20 @@ function Invoke-ExecMailboxCopy {
             $Table = Get-CippTable -tablename 'MailboxCopy'
             $Op = Get-CIPPAzDataTableEntity @Table -Filter "PartitionKey eq 'Operation' and RowKey eq '$OperationId'"
             if (-not $Op) { throw "Mailbox copy $OperationId was not found." }
-            if ($Op.Status -in @('Planning', 'Copying')) { throw "This copy is still $($Op.Status.ToLower()); cancel it first or let it finish." }
-            # Chunks of a cancelled run finish their current group before stopping. Resuming under them
-            # would race them into the same folders, so wait until they have gone quiet.
+            # Chunks of an earlier run finish their current item before stopping. Resuming under them would
+            # race them into the same folders, so wait until every chunk of the current pass has gone quiet.
+            # A copy still marked Planning/Copying can be resumed only when nothing has moved for 10 minutes
+            # (its workers were lost, e.g. to an app restart); otherwise it has to be cancelled first.
             $FirstChunk = [int]($Op.PlanFirstChunk ?? 0)
-            $Busy = @(Get-CIPPAzDataTableEntity @Table -Filter "PartitionKey eq '$OperationId' and RowKey gt '$('c{0:D5}' -f $FirstChunk)' and RowKey lt 'd' and State eq 'Running'" |
-                    Where-Object { $_.Timestamp -and ([DateTimeOffset]$_.Timestamp).UtcDateTime -gt [DateTime]::UtcNow.AddMinutes(-3) })
+            $Chunks = @(Get-CIPPAzDataTableEntity @Table -Filter "PartitionKey eq '$OperationId' and RowKey gt '$('c{0:D5}' -f $FirstChunk)' and RowKey lt 'd'" -Property RowKey, State, Timestamp)
+            $Stamps = @(@($Op) + $Chunks | Where-Object { $_.Timestamp } | ForEach-Object { ([DateTimeOffset]$_.Timestamp).UtcDateTime })
+            $LastActivity = ($Stamps | Measure-Object -Maximum).Maximum
+            if ($Op.Status -in @('Planning', 'Copying')) {
+                if ($LastActivity -and $LastActivity -gt [DateTime]::UtcNow.AddMinutes(-10)) {
+                    throw "This copy is still $($Op.Status.ToLower()) (last progress $([int]([DateTime]::UtcNow - $LastActivity).TotalMinutes) min ago). Cancel it first, or let it finish."
+                }
+            }
+            $Busy = @($Chunks | Where-Object { $_.State -eq 'Running' -and $_.Timestamp -and ([DateTimeOffset]$_.Timestamp).UtcDateTime -gt [DateTime]::UtcNow.AddMinutes(-3) })
             if ($Busy.Count -gt 0) { throw "$($Busy.Count) chunk(s) of the earlier run are still finishing their current items. Try again in a few minutes." }
 
             foreach ($P in @{

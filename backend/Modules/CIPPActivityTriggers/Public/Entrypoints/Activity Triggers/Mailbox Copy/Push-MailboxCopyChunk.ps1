@@ -3,25 +3,26 @@ function Push-MailboxCopyChunk {
     .SYNOPSIS
         Exports one chunk of mailbox items and imports them into the destination folder (resumable)
     .DESCRIPTION
-        Groups the chunk's items into exportItems calls, posts each item to a destination import session,
-        and for Move soft-deletes the source item (recoverable from Recoverable Items) once its import
-        succeeded.
+        One item at a time: exportItems -> import session, through [CIPP.CippMailboxTransfer]
+        (backend/Shared/CIPPSharp/CippMailboxTransfer.cs). That class keeps the exported item as bytes
+        and posts the import straight from the same buffer, so an item costs about one copy of its
+        base64 in memory. The earlier PowerShell path (Invoke-RestMethod + ConvertFrom-Json + a JSON
+        import body) held ~7x that as UTF-16 strings, and ran the B2 plan out of memory on the 3E
+        archive copy even with small groups. One item per export also ends the "NotReturned" items that
+        multi-item exports silently dropped.
 
-        Memory: the export returns each item as base64 text, and that runs far beyond the item's reported
-        size (95 KB reported -> 3.8 MB exported in testing; archives with attachments are worse). The
-        first 3E run died with OutOfMemoryException on 10-item groups and lost the rest of each chunk,
-        and big groups came back with items silently missing ("NotReturned"). So: groups are capped by
-        reported size as well as count, anything reported over 1 MB goes alone, a group that throws or
-        drops items is retried one item at a time, and a single item that still fails is counted and
-        skipped - never the rest of the chunk. The import body is concatenated rather than
-        ConvertTo-Json'd (which would copy the base64 again), and each item's data is released as soon
-        as it is imported.
-        Archive mailboxes: follows the documented auto-expanding archive redirects - an export answered
-        with ErrorArchiveFolderMovedPermanently is reissued at the URL in the error, and an import
-        answered 409 "expected in mailbox MBX:..." gets a new import session for that mailbox.
+        Throttling: Exchange answers 429 "Application is over its IncomingBytes limit" when the
+        app imports too fast. 429/5xx/network errors back off (Retry-After when given, else 15s doubling,
+        capped at 5 min) for up to 8 attempts before an item counts as failed.
 
-        Progress (Done/Copied/Failed + last errors) is saved after every group, so a requeue or a
-        retried task resumes after the last saved item instead of importing it twice.
+        For Move the source item is soft-deleted (recoverable from Recoverable Items) after its import.
+        Archive mailboxes: an export answered with ErrorArchiveFolderMovedPermanently is reissued at the
+        URL in the error, and an import answered 409 "expected in mailbox MBX:..." gets a new import
+        session for that mailbox.
+
+        Progress (Done/Copied/Failed + last errors) is saved every few items and after every large one,
+        so a requeue resumes after the last saved item. Failed items are simply absent from the
+        destination; ExecMailboxCopy Action=Resume re-plans and copies only what is missing.
     .FUNCTIONALITY
         Entrypoint
     #>
@@ -32,11 +33,7 @@ function Push-MailboxCopyChunk {
     $TenantFilter = [string]$Item.TenantFilter
     $ChunkKey = [string]$Item.ChunkKey
     $TimeboxSeconds = 900
-    # The export stream runs far larger than an item's reported size (a 95 KB message exported as
-    # 3.8 MB of base64 in testing), so groups stay well under the API's 20-item limit.
-    $MaxGroupItems = 10
-    $MaxGroupBytes = 2MB
-    $SoloBytes = 1MB
+    $MaxAttempts = 8
     $Stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
 
     $Table = Get-CippTable -tablename 'MailboxCopy'
@@ -79,8 +76,16 @@ function Push-MailboxCopyChunk {
         $Chunk | Add-Member -NotePropertyName State -NotePropertyValue $State -Force
         $null = Add-CIPPAzDataTableEntity @Table -Entity $Chunk -Force
     }
+    # Wait before retry attempt N: the server's Retry-After when it gave one, else 15s doubling, max 5 min.
+    $Backoff = {
+        param([int]$Attempt, [double]$RetryAfter)
+        $Seconds = if ($RetryAfter -gt 0) { [Math]::Min(300, [Math]::Ceiling($RetryAfter)) } else { [Math]::Min(300, 15 * [Math]::Pow(2, $Attempt - 1)) }
+        Start-Sleep -Seconds $Seconds
+    }
+    $Retryable = { param([int]$Status) $Status -eq 0 -or $Status -eq 429 -or $Status -ge 500 }
+    $IsOutOfMemory = { param($Err) $Err.Exception -is [System.OutOfMemoryException] -or $Err.Exception.InnerException -is [System.OutOfMemoryException] }
 
-    # Hashtable so the scriptblock can refresh the cached session (a plain variable would not survive the child scope).
+    # Hashtable so the scriptblocks can refresh cached state (a plain variable would not survive the child scope).
     # ImportMailbox moves when an auto-expanded archive answers 409 "expected in mailbox MBX:...".
     $Ctx = @{ Session = $null; ImportMailbox = $DstMailboxId }
     $GetSession = {
@@ -93,123 +98,126 @@ function Push-MailboxCopyChunk {
         $S
     }
 
-    # Export a set of ids; returns id -> export entry (data or error), following archive redirects.
-    $ItemMailbox = @{}
-    $Export = {
-        param([string[]]$Ids)
-        $Response = New-GraphPOSTRequest -uri "$SrcGraph/$SrcMailboxId/exportItems" -tenantid $TenantFilter -body (@{ itemIds = @($Ids) } | ConvertTo-Json -Compress) -AsApp $true
-        $ById = @{}
-        $Redirects = @{}
-        foreach ($X in @($Response.value ?? $Response)) {
-            if (-not $X.itemId) { continue }
-            $ById[[string]$X.itemId] = $X
-            # Auto-expanded archive: the item lives in an auxiliary mailbox; reissue at the URL given.
-            if ([string]$X.error.code -eq 'ErrorArchiveFolderMovedPermanently' -and [string]$X.error.message -match '^https://graph\.microsoft\.com/') {
-                $Url = [string]$X.error.message
-                if (-not $Redirects.ContainsKey($Url)) { $Redirects[$Url] = [System.Collections.Generic.List[string]]::new() }
-                $Redirects[$Url].Add([string]$X.itemId)
+    # Export one item, with retries and the archive redirect. Returns @{ Export; Mailbox }, @{ Skip } or @{ Error }.
+    $ExportOne = {
+        param($G)
+        $Uri = "$SrcGraph/$SrcMailboxId/exportItems"
+        $Mailbox = $SrcMailboxId
+        $Redirected = $false
+        $LastStatus = 0
+        for ($Attempt = 1; $Attempt -le $MaxAttempts; $Attempt++) {
+            $X = $null
+            try {
+                $Auth = (Get-GraphToken -tenantid $TenantFilter -AsApp $true -SkipCache ($LastStatus -eq 401)).Authorization
+                $X = Invoke-CIPPMailboxItemExport -ExportUri $Uri -Authorization ([string]$Auth) -ItemId ([string]$G.Id) -FolderId ([string]$Chunk.DstFolderId)
+            } catch {
+                if (& $IsOutOfMemory $_) {
+                    [System.GC]::Collect()
+                    return @{ Error = "Export ran out of memory (reported size $([Math]::Round($G.Size / 1MB, 1)) MB)" }
+                }
+                $LastStatus = 0
+                if ($Attempt -lt $MaxAttempts) { & $Backoff $Attempt 0; continue }
+                return @{ Error = "Export: $($_.Exception.InnerException.Message ?? $_.Exception.Message)" }
             }
-        }
-        $Response = $null
-        foreach ($Url in $Redirects.Keys) {
-            $Again = New-GraphPOSTRequest -uri $Url -tenantid $TenantFilter -body (@{ itemIds = @($Redirects[$Url]) } | ConvertTo-Json -Compress) -AsApp $true
-            $AuxMailbox = if ($Url -match '/mailboxes/([^/]+)/') { $Matches[1] } else { $SrcMailboxId }
-            foreach ($X in @($Again.value ?? $Again)) {
-                if ($X.itemId) { $ById[[string]$X.itemId] = $X; $ItemMailbox[[string]$X.itemId] = $AuxMailbox }
+            if ($X.HasData) { return @{ Export = $X; Mailbox = $Mailbox } }
+            $LastStatus = [int]$X.StatusCode
+            if ($LastStatus -eq 401 -and $Attempt -lt $MaxAttempts) { continue }
+            if ((& $Retryable $LastStatus) -and $Attempt -lt $MaxAttempts) { & $Backoff $Attempt $X.RetryAfterSeconds; continue }
+            # No data: an error entry for the item, a redirect, an HTTP error, or nothing at all.
+            $Entry = $null
+            try { $Entry = @(($X.Body | ConvertFrom-Json -ErrorAction Stop).value)[0] } catch { }
+            $Code = [string]($Entry.error.code ?? $(if ($LastStatus -ne 200) { "HTTP $LastStatus" } else { 'NotReturned' }))
+            if ($Code -eq 'ErrorArchiveFolderMovedPermanently' -and -not $Redirected -and [string]$Entry.error.message -match '^https://graph\.microsoft\.com/') {
+                $Uri = [string]$Entry.error.message
+                $Mailbox = if ($Uri -match '/mailboxes/([^/]+)/') { $Matches[1] } else { $SrcMailboxId }
+                $Redirected = $true
+                $Attempt = 0
+                continue
             }
+            if ($Code -match 'NotFound') { return @{ Skip = $true } }
+            $Detail = [string]($Entry.error.message ?? $(if ($LastStatus -ne 200) { $X.Body } else { '' }))
+            return @{ Error = "Export $($Code): $Detail (reported size $([Math]::Round($G.Size / 1MB, 1)) MB)" }
         }
-        $ById
+        @{ Error = 'Export: gave up after retries.' }
     }
 
+    # Import one staged item, with retries. Returns $null on success, else the error text.
     $ImportOne = {
-        param($G, $X)
-        # Concatenate: base64 needs no JSON escaping, and ConvertTo-Json would build a second copy.
-        $ImportBody = '{"FolderId":"' + [string]$Chunk.DstFolderId + '","Mode":"create","Data":"' + [string]$X.data + '"}'
-        $Imported = $null
-        for ($Attempt = 1; $Attempt -le 4 -and -not $Imported; $Attempt++) {
+        param($X)
+        for ($Attempt = 1; $Attempt -le $MaxAttempts; $Attempt++) {
             try {
                 $S = & $GetSession
-                $Imported = Invoke-RestMethod -Method POST -Uri $S.importUrl -Body $ImportBody -ContentType 'application/json' -ErrorAction Stop
+                $R = Invoke-CIPPMailboxItemImport -Export $X -ImportUrl ([string]$S.importUrl)
             } catch {
-                $Status = [int]($_.Exception.Response.StatusCode ?? 0)
-                if ($_.Exception -is [System.OutOfMemoryException]) { [System.GC]::Collect() }
-                if ($Status -in @(401, 403)) { $Ctx.Session = $null }
-                # Auto-expanded archive: the folder lives in an auxiliary mailbox, named in the 409.
-                if ($Status -eq 409 -and [string]$_.ErrorDetails.Message -match 'expected in mailbox (MBX:[^\s."]+)' -and $Matches[1] -ne $Ctx.ImportMailbox) {
-                    $Ctx.ImportMailbox = $Matches[1]
-                    $Ctx.Session = $null
-                    continue
+                if (& $IsOutOfMemory $_) {
+                    [System.GC]::Collect()
+                    return "Import ran out of memory ($([Math]::Round($X.DataLength / 1MB, 1)) MB exported)"
                 }
-                if ($Attempt -lt 4 -and $Status -in @(0, 401, 403, 429, 500, 502, 503, 504)) {
-                    Start-Sleep -Seconds ([Math]::Min(60, 5 * $Attempt * $Attempt))
-                    continue
-                }
-                & $AddError "Import ($Status): $($_.ErrorDetails.Message ?? $_.Exception.Message)"
-                break
+                if ($Attempt -lt $MaxAttempts) { & $Backoff $Attempt 0; continue }
+                return "Import: $($_.Exception.InnerException.Message ?? $_.Exception.Message)"
             }
+            if ($R.Success) { return $null }
+            $Status = [int]$R.StatusCode
+            # Auto-expanded archive: the folder lives in an auxiliary mailbox, named in the 409.
+            if ($Status -eq 409 -and [string]$R.Body -match 'expected in mailbox (MBX:[^\s."]+)' -and $Matches[1] -ne $Ctx.ImportMailbox) {
+                $Ctx.ImportMailbox = $Matches[1]
+                $Ctx.Session = $null
+                continue
+            }
+            if ($Status -in @(401, 403) -and $Attempt -lt $MaxAttempts) { $Ctx.Session = $null; continue }
+            if ((& $Retryable $Status) -and $Attempt -lt $MaxAttempts) { & $Backoff $Attempt $R.RetryAfterSeconds; continue }
+            return "Import ($Status): $($R.Body)"
         }
-        $ImportBody = $null
-        [bool]$Imported
+        'Import: gave up after retries.'
     }
 
     try {
+        $SinceSave = 0
         while ($Done -lt $Items.Count) {
-            # A cancel takes effect between groups, not only between chunks.
-            $Current = Get-CIPPAzDataTableEntity @Table -Filter "PartitionKey eq 'Operation' and RowKey eq '$OperationId'" -Property Status
-            if ($Current.Status -eq 'Cancelled') { & $Save 'Cancelled'; return @() }
-
-            # Group: up to 10 items and 2 MB reported; anything reported over 1 MB goes alone.
-            $Group = [System.Collections.Generic.List[object]]::new()
-            $Bytes = 0
-            for ($i = $Done; $i -lt $Items.Count -and $Group.Count -lt $MaxGroupItems; $i++) {
-                if ($Group.Count -gt 0 -and ($Items[$i].Size -ge $SoloBytes -or ($Bytes + $Items[$i].Size) -gt $MaxGroupBytes)) { break }
-                $Group.Add($Items[$i]); $Bytes += $Items[$i].Size
-                if ($Items[$i].Size -ge $SoloBytes) { break }
+            # A cancel takes effect within a few items, not only between chunks.
+            if ($Done % 5 -eq 0) {
+                $Current = Get-CIPPAzDataTableEntity @Table -Filter "PartitionKey eq 'Operation' and RowKey eq '$OperationId'" -Property Status
+                if ($Current.Status -eq 'Cancelled') { & $Save 'Cancelled'; return @() }
             }
 
-            $ById = $null
-            try { $ById = & $Export @($Group.Id) } catch {
-                [System.GC]::Collect()
-                if ($Group.Count -eq 1) { & $AddError "Export: $(Get-NormalizedError -message $_.Exception.Message)" }
-            }
-
-            foreach ($G in $Group) {
-                $X = if ($ById) { $ById[$G.Id] } else { $null }
-                # The group failed or came back without this item: try it on its own.
-                if ($Group.Count -gt 1 -and (-not $X -or (-not $X.data -and [string]$X.error.code -notmatch 'NotFound'))) {
-                    try { $X = (& $Export @($G.Id))[$G.Id] } catch {
-                        [System.GC]::Collect()
-                        $X = [PSCustomObject]@{ error = [PSCustomObject]@{ code = 'ExportFailed'; message = (Get-NormalizedError -message $_.Exception.Message) } }
-                    }
-                }
-                if (-not $X -or -not $X.data) {
-                    # Gone since planning (deleted/moved by the user) is not a failure worth alarming on.
-                    $Code = [string]($X.error.code ?? 'NotReturned')
-                    if ($Code -notmatch 'NotFound') { $Failed++; & $AddError "Export $($Code): $($X.error.message)" }
-                    continue
-                }
-                $Ok = & $ImportOne $G $X
-                if ($ById) { $ById.Remove($G.Id) }
+            $G = $Items[$Done]
+            $Big = $false
+            $Got = & $ExportOne $G
+            if ($Got.Export) {
+                $X = $Got.Export
+                $FromMailbox = $Got.Mailbox
+                $Big = $X.DataLength -ge 5MB
+                $ImportError = & $ImportOne $X
+                $X.Release()
                 $X = $null
-                if (-not $Ok) { $Failed++; continue }
-                $Copied++
-                if ($IsMove) {
-                    try {
-                        $FromMailbox = $ItemMailbox[$G.Id] ?? $SrcMailboxId
-                        $null = New-GraphPOSTRequest -uri "$SrcGraph/$FromMailbox/folders/$($Chunk.SrcFolderId)/items/$($G.Id)?disposalType=softDelete" -tenantid $TenantFilter -type DELETE -AsApp $true
-                    } catch {
-                        & $AddError "Copied but not removed from source: $(Get-NormalizedError -message $_.Exception.Message)"
+                $Got = $null
+                if ($ImportError) {
+                    $Failed++
+                    & $AddError $ImportError
+                } else {
+                    $Copied++
+                    if ($IsMove) {
+                        try {
+                            $null = New-GraphPOSTRequest -uri "$SrcGraph/$FromMailbox/folders/$($Chunk.SrcFolderId)/items/$($G.Id)?disposalType=softDelete" -tenantid $TenantFilter -type DELETE -AsApp $true
+                        } catch {
+                            & $AddError "Copied but not removed from source: $(Get-NormalizedError -message $_.Exception.Message)"
+                        }
                     }
                 }
+                if ($Big) { [System.GC]::Collect() }
+            } elseif ($Got.Error) {
+                $Failed++
+                & $AddError $Got.Error
             }
-            $ById = $null
-            if ($Bytes -ge $SoloBytes) { [System.GC]::Collect() }
-            $Done += $Group.Count
-            & $Save 'Running'
+            # Skip (gone since planning) counts as done, neither copied nor failed.
+            $Done++
+            $SinceSave++
+            if ($Big -or $SinceSave -ge 5 -or $Done -ge $Items.Count) { & $Save 'Running'; $SinceSave = 0 }
 
             if ($Done -lt $Items.Count -and $Stopwatch.Elapsed.TotalSeconds -gt $TimeboxSeconds) {
+                & $Save 'Running'
                 $null = Start-CIPPOrchestrator -InputObject ([PSCustomObject]@{
-                        OrchestratorName = "MailboxCopyResume_$($OperationId.Substring(0, 8))_$ChunkKey"
+                        OrchestratorName = "MailboxCopyResume_$($OperationId.Substring(0, 8))_${ChunkKey}_$([guid]::NewGuid().ToString('N').Substring(0, 6))"
                         Batch            = @([PSCustomObject]@{ FunctionName = 'MailboxCopyChunk'; OperationId = $OperationId; TenantFilter = $TenantFilter; ChunkKey = $ChunkKey })
                         SkipLog          = $true
                     })
@@ -226,8 +234,8 @@ function Push-MailboxCopyChunk {
     }
     & $Save 'Done'
 
-    # Last chunk to finish closes the operation.
-    # Only this planning pass's chunks count (a resume starts numbering after PlanFirstChunk).
+    # Last chunk to finish closes the operation. Only this planning pass's chunks count (a resume
+    # starts numbering after PlanFirstChunk).
     $Range = "PartitionKey eq '$OperationId' and RowKey gt '$('c{0:D5}' -f $FirstChunk)' and RowKey lt 'd'"
     $Remaining = @(Get-CIPPAzDataTableEntity @Table -Filter "$Range and State ne 'Done'" -Property RowKey)
     if ($Remaining.Count -eq 0) {
@@ -238,7 +246,7 @@ function Push-MailboxCopyChunk {
         if ($Op.Status -eq 'Cancelled') { return @() }
         $Op | Add-Member -NotePropertyName Status -NotePropertyValue $(if ($TotalFailed -gt 0) { 'CompletedWithErrors' } else { 'Completed' }) -Force
         $Op | Add-Member -NotePropertyName Finished -NotePropertyValue ([DateTime]::UtcNow.ToString('o')) -Force
-        Add-CIPPAzDataTableEntity @Table -Entity $Op -Force
+        $null = Add-CIPPAzDataTableEntity @Table -Entity $Op -Force
         Write-LogMessage -API 'MailboxCopy' -tenant $TenantFilter -sev $(if ($TotalFailed -gt 0) { 'Warning' } else { 'Info' }) `
             -message "Mailbox $($Op.Operation.ToLower()) $OperationId finished: $($Op.SourceUser) -> $($Op.DestinationUser), $TotalCopied copied, $TotalFailed failed$(if ([int]($Op.AlreadyPresent ?? 0)) { ", $($Op.AlreadyPresent) already present from earlier runs" })"
     }
