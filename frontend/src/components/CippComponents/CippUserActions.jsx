@@ -1049,6 +1049,81 @@ export const useCippUserActions = () => {
       condition: () => canWriteSite,
     },
     {
+      label: 'Copy or move mailbox content to another mailbox',
+      type: 'POST',
+      icon: <CippIcons.Email />,
+      url: '/api/ExecMailboxCopy',
+      data: {
+        SourceUser: 'userPrincipalName',
+        Action: '!Start',
+      },
+      defaultvalues: {
+        Destination: { label: 'A new folder "From <name> (date)"', value: 'NewFolder' },
+        Operation: { label: 'Copy (keep the items in the source)', value: 'Copy' },
+        IncludeDeletedItems: false,
+        IncludeJunk: false,
+      },
+      fields: [
+        {
+          type: 'autoComplete',
+          name: 'DestinationUser',
+          label: 'Copy into the mailbox of',
+          multiple: false,
+          creatable: false,
+          validators: { required: 'Select the mailbox that receives the items' },
+          api: {
+            url: '/api/ListGraphRequest',
+            data: {
+              Endpoint: 'users',
+              $select: 'id,displayName,userPrincipalName,mail',
+              $top: 999,
+            },
+            labelField: (option) => `${option.displayName} (${option.userPrincipalName})`,
+            valueField: 'userPrincipalName',
+            queryKey: `mailUsers-${tenant}`,
+          },
+        },
+        {
+          type: 'autoComplete',
+          name: 'Destination',
+          label: 'Put the items in',
+          multiple: false,
+          creatable: false,
+          validators: { required: 'Choose where the items go' },
+          options: [
+            { label: 'A new folder "From <name> (date)"', value: 'NewFolder' },
+            {
+              label: 'Their own folders (Inbox into Inbox, Calendar into Calendar; no extra folder)',
+              value: 'Root',
+            },
+          ],
+        },
+        {
+          type: 'textField',
+          name: 'FolderName',
+          label: 'Folder name (new folder only, optional)',
+        },
+        {
+          type: 'autoComplete',
+          name: 'Operation',
+          label: 'Copy or move',
+          multiple: false,
+          creatable: false,
+          validators: { required: 'Choose copy or move' },
+          options: [
+            { label: 'Copy (keep the items in the source)', value: 'Copy' },
+            { label: 'Move (delete each item from the source after copying)', value: 'Move' },
+          ],
+        },
+        { type: 'switch', name: 'IncludeDeletedItems', label: 'Include Deleted Items' },
+        { type: 'switch', name: 'IncludeJunk', label: 'Include Junk Email' },
+      ],
+      confirmText:
+        "Copy or move [userPrincipalName]'s mail, calendar, contacts and tasks into the selected mailbox? Items keep their dates, senders and attachments. With Move, each item is deleted from [userPrincipalName]'s mailbox after it is copied. Track it under Email & Exchange > Mailbox Copies.",
+      multiPost: false,
+      condition: () => canWriteMailbox,
+    },
+    {
       label: 'Set Sign In State',
       type: 'POST',
       icon: <CippIcons.LockPerson />,
