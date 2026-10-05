@@ -28097,6 +28097,117 @@
         "x-cipp-any-tenant": true
       }
     },
+    "/api/ExecMailboxCopy": {
+      "post": {
+        "summary": "ExecMailboxCopy",
+        "operationId": "ExecMailboxCopy",
+        "tags": [
+          "Email-Exchange > Administration"
+        ],
+        "description": "Copies or moves one mailbox's content (mail, calendar, contacts, tasks) into another mailbox\nthrough the Graph full-fidelity export/import API: into a new folder (\"From <name> (<date>)\"\nunless FolderName is given) or merged into the destination's own folders (Destination=Root).\nOperation=Move deletes each source item after it is imported. IncludeDeletedItems and\nIncludeJunk are off by default. Action Preflight counts without changing anything; Start\ncreates the folders and queues the copy; Cancel (with OperationId) stops a running copy after\nthe chunks in flight. Track progress with ListMailboxCopies.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "Action": {
+                    "type": "string"
+                  },
+                  "Destination": {
+                    "allOf": [
+                      {
+                        "$ref": "#/components/schemas/LabelValue"
+                      }
+                    ],
+                    "description": "Form autocompletes post {label, value}; plain strings work too."
+                  },
+                  "DestinationUser": {
+                    "$ref": "#/components/schemas/LabelValue"
+                  },
+                  "FolderName": {
+                    "type": "string"
+                  },
+                  "IncludeDeletedItems": {
+                    "type": "string"
+                  },
+                  "IncludeJunk": {
+                    "type": "string"
+                  },
+                  "Operation": {
+                    "$ref": "#/components/schemas/LabelValue"
+                  },
+                  "OperationId": {
+                    "type": "string"
+                  },
+                  "SourceUser": {
+                    "$ref": "#/components/schemas/LabelValue"
+                  },
+                  "tenantFilter": {
+                    "$ref": "#/components/schemas/LabelValue"
+                  },
+                  "userPrincipalName": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "tenantFilter"
+                ]
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "Action",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "OperationId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/tenantFilter"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardResults"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - missing required field or invalid input"
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cipp-role": "Exchange.Mailbox.ReadWrite"
+      }
+    },
     "/api/ExecMailboxMobileDevices": {
       "post": {
         "summary": "ExecMailboxMobileDevices",
@@ -57312,6 +57423,116 @@
                       },
                       "SmtpClientAuthenticationDisabled": {
                         "x-cipp-field-source": "backend,frontend"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cipp-role": "Exchange.Mailbox.Read"
+      }
+    },
+    "/api/ListMailboxCopies": {
+      "get": {
+        "summary": "ListMailboxCopies",
+        "operationId": "ListMailboxCopies",
+        "tags": [
+          "Email-Exchange > Administration"
+        ],
+        "description": "Lists mailbox copy/move operations started with ExecMailboxCopy for a tenant (or all tenants with\ntenantFilter=AllTenants), with live progress summed from the operation's chunks.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/tenantFilter"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "description": "Derived from the fields written into the storage table it reads, and the fields the endpoint selects onto each record, and the columns the CIPP UI renders. Fields taken from the storage writers may be omitted by this endpoint, and the response may carry computed fields not listed here.",
+                    "properties": {
+                      "ChunksDone": {
+                        "x-cipp-field-source": "backend"
+                      },
+                      "ChunksTotal": {
+                        "x-cipp-field-source": "backend"
+                      },
+                      "DestinationFolder": {
+                        "x-cipp-field-source": "backend,frontend"
+                      },
+                      "DestinationUser": {
+                        "x-cipp-field-source": "backend,frontend"
+                      },
+                      "ETag": {
+                        "type": "string",
+                        "x-cipp-field-source": "storage"
+                      },
+                      "Finished": {
+                        "x-cipp-field-source": "backend,frontend"
+                      },
+                      "Folders": {
+                        "x-cipp-field-source": "backend"
+                      },
+                      "ItemsCopied": {
+                        "x-cipp-field-source": "backend,frontend"
+                      },
+                      "ItemsFailed": {
+                        "x-cipp-field-source": "backend,frontend"
+                      },
+                      "ItemsTotal": {
+                        "x-cipp-field-source": "backend,frontend"
+                      },
+                      "Message": {
+                        "x-cipp-field-source": "backend,frontend"
+                      },
+                      "Operation": {
+                        "x-cipp-field-source": "backend,frontend"
+                      },
+                      "OperationId": {
+                        "x-cipp-field-source": "backend"
+                      },
+                      "ProgressPercent": {
+                        "x-cipp-field-source": "backend,frontend"
+                      },
+                      "RecentErrors": {
+                        "x-cipp-field-source": "backend,frontend"
+                      },
+                      "SourceUser": {
+                        "x-cipp-field-source": "backend,frontend"
+                      },
+                      "Started": {
+                        "x-cipp-field-source": "backend,frontend"
+                      },
+                      "StartedBy": {
+                        "x-cipp-field-source": "backend,frontend"
+                      },
+                      "Status": {
+                        "x-cipp-field-source": "backend,frontend"
+                      },
+                      "Tenant": {
+                        "x-cipp-field-source": "backend"
+                      },
+                      "Timestamp": {
+                        "type": "string",
+                        "x-cipp-field-source": "storage"
                       }
                     }
                   }

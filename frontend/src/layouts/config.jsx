@@ -910,6 +910,11 @@ export const nativeMenuItems = [
             permissions: ['Exchange.Mailbox.*'],
           },
           {
+            title: 'Mailbox Copies',
+            path: '/email/administration/mailbox-copies',
+            permissions: ['Exchange.Mailbox.*'],
+          },
+          {
             title: 'HVE Accounts',
             path: '/email/administration/hve-accounts',
             permissions: ['Exchange.Mailbox.*'],
