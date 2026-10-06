@@ -20,9 +20,10 @@ function Push-MailboxCopyPlan {
         listing per destination folder rather than a lookup per item. Items without a search key are
         always copied.
 
-        When done it starts Sequential orchestrations (lanes) of Push-MailboxCopyChunk over the chunks
-        written by this planning pass (a resume numbers on from the earlier chunks): two lanes per
-        destination mailbox, because Exchange's import throttle (IncomingBytes) is per mailbox.
+        When done it starts lanes of Push-MailboxCopyChunk over the chunks written by this planning pass
+        (a resume numbers on from the earlier chunks): two lanes per destination mailbox, because
+        Exchange's import throttle (IncomingBytes) is per mailbox. Each lane is a chain of single tasks,
+        one alive at a time.
     .FUNCTIONALITY
         Entrypoint
     #>
@@ -161,15 +162,17 @@ function Push-MailboxCopyPlan {
         $Keys = @($Group.Group.RowKey)
         $Count = [Math]::Min($LanesPerMailbox, $Keys.Count)
         for ($Lane = 0; $Lane -lt $Count; $Lane++) {
-            $Batch = for ($c = $Lane; $c -lt $Keys.Count; $c += $Count) {
-                [PSCustomObject]@{ FunctionName = 'MailboxCopyChunk'; OperationId = $OperationId; TenantFilter = $TenantFilter; ChunkKey = $Keys[$c] }
-            }
+            # A lane is one task that works through its chunk list and hands the remainder to a single
+            # successor when its time budget runs out (see Push-MailboxCopyChunk), so exactly one worker
+            # per lane is ever alive. Name is unique per planning pass: Craft skips a run whose name is
+            # still active, and an earlier pass's lane can still be finishing when a Resume plans the next.
+            $LaneName = "MailboxCopy_$($OperationId.Substring(0, 8))_p$($FirstChunk)_lane$LaneNumber"
+            $LaneKeys = @(for ($c = $Lane; $c -lt $Keys.Count; $c += $Count) { $Keys[$c] })
+            $LaneItem = [PSCustomObject]@{ FunctionName = 'MailboxCopyChunk'; OperationId = $OperationId; TenantFilter = $TenantFilter; Lane = $LaneName; LaneChunks = $LaneKeys; LanePosition = 0 }
+            if ([int]($Op.SoftSeconds ?? 0) -gt 0) { $LaneItem | Add-Member -NotePropertyName SoftSeconds -NotePropertyValue ([int]$Op.SoftSeconds) }
             $null = Start-CIPPOrchestrator -InputObject ([PSCustomObject]@{
-                    # Unique per planning pass: Craft skips a run whose name is still active, and lanes of
-                    # an earlier pass can still be finishing a chunk when a Resume plans the next.
-                    OrchestratorName = "MailboxCopy_$($OperationId.Substring(0, 8))_p$($FirstChunk)_lane$LaneNumber"
-                    Batch            = @($Batch)
-                    Sequential       = $true
+                    OrchestratorName = $LaneName
+                    Batch            = @($LaneItem)
                     SkipLog          = $true
                 })
             $LaneNumber++

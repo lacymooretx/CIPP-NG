@@ -26,7 +26,7 @@ const Page = () => {
       data: { Action: '!Resume', OperationId: 'OperationId' },
       confirmText:
         'Resume copying [SourceUser] into [DestinationUser]? CIPP compares the destination with the source and copies only the items that are not there yet, so nothing is duplicated.',
-      condition: (row) => ['Cancelled', 'CompletedWithErrors', 'Failed'].includes(row.Status),
+      condition: (row) => ['Cancelled', 'CompletedWithErrors', 'Failed', 'Stalled'].includes(row.Status),
       multiPost: false,
     },
   ]

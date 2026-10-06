@@ -36,6 +36,8 @@ function Invoke-ExecMailboxCopy {
     $IncludeJunk = ConvertTo-CIPPBoolean -Value ($Request.Body.IncludeJunk ?? $false)
     $IncludeArchive = ConvertTo-CIPPBoolean -Value ($Request.Body.IncludeArchive ?? $true)
     $ArchiveDestination = [string]($Request.Body.ArchiveDestination.value ?? $Request.Body.ArchiveDestination ?? 'Archive')
+    # Test hook: a small worker time budget forces lane hand-offs on a small copy. Not in the UI.
+    $SoftSeconds = [int]($Request.Body.SoftSeconds ?? 0)
 
     try {
         if ($Action -eq 'Cancel') {
@@ -97,7 +99,7 @@ function Invoke-ExecMailboxCopy {
         $Result = Start-CIPPMailboxCopy -TenantFilter $TenantFilter -SourceUser $SourceUser -DestinationUser $DestinationUser `
             -Mode $Action -Destination $Destination -Operation $Operation -FolderName $FolderName `
             -IncludeDeletedItems $IncludeDeletedItems -IncludeJunk $IncludeJunk `
-            -IncludeArchive $IncludeArchive -ArchiveDestination $ArchiveDestination -StartedBy $StartedBy -Headers $Headers -APIName $APIName
+            -IncludeArchive $IncludeArchive -ArchiveDestination $ArchiveDestination -SoftSeconds $SoftSeconds -StartedBy $StartedBy -Headers $Headers -APIName $APIName
         $StatusCode = [HttpStatusCode]::OK
         $Body = @{ Results = $Result }
     } catch {

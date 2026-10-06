@@ -4,6 +4,7 @@ using System.IO;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
+using System.Threading;
 
 namespace CIPP
 {
@@ -64,7 +65,16 @@ namespace CIPP
 
         /// <summary>Exports one item and stages it for import into <paramref name="folderId"/>.</summary>
         public static MailboxExport Export(string exportUri, string authorization, string itemId, string folderId)
+            => Export(exportUri, authorization, itemId, folderId, 0);
+
+        /// <summary>
+        /// As above, abandoning the call after <paramref name="timeoutSeconds"/> (0 = client default). The copy
+        /// activity passes the time left before Craft kills the task (Worker:BgTimeoutSeconds, 1200s), so a
+        /// slow call ends in a catchable timeout instead of a killed task that never records its progress.
+        /// </summary>
+        public static MailboxExport Export(string exportUri, string authorization, string itemId, string folderId, int timeoutSeconds)
         {
+            using var cts = timeoutSeconds > 0 ? new CancellationTokenSource(TimeSpan.FromSeconds(timeoutSeconds)) : new CancellationTokenSource();
             var result = new MailboxExport();
             using var request = new HttpRequestMessage(HttpMethod.Post, exportUri);
             request.Headers.TryAddWithoutValidation("Authorization", authorization);
@@ -72,7 +82,7 @@ namespace CIPP
 
             byte[] buffer;
             int length;
-            using (var response = Client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead).GetAwaiter().GetResult())
+            using (var response = Client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cts.Token).GetAwaiter().GetResult())
             {
                 result.StatusCode = (int)response.StatusCode;
                 result.RetryAfterSeconds = RetryAfter(response);
@@ -83,7 +93,7 @@ namespace CIPP
                 }
                 long? declared = response.Content.Headers.ContentLength;
                 using var ms = declared.HasValue && declared.Value < int.MaxValue ? new MemoryStream((int)declared.Value) : new MemoryStream();
-                using (var stream = response.Content.ReadAsStreamAsync().GetAwaiter().GetResult()) { stream.CopyTo(ms); }
+                using (var stream = response.Content.ReadAsStreamAsync(cts.Token).GetAwaiter().GetResult()) { stream.CopyToAsync(ms, cts.Token).GetAwaiter().GetResult(); }
                 buffer = ms.GetBuffer();
                 length = (int)ms.Length;
             }
@@ -130,8 +140,12 @@ namespace CIPP
         }
 
         /// <summary>Posts a staged item to a (pre-authenticated) import URL. Safe to call again on retry.</summary>
-        public static MailboxImportResult Import(MailboxExport item, string importUrl)
+        public static MailboxImportResult Import(MailboxExport item, string importUrl) => Import(item, importUrl, 0);
+
+        /// <summary>As above, abandoning the call after <paramref name="timeoutSeconds"/> (0 = client default).</summary>
+        public static MailboxImportResult Import(MailboxExport item, string importUrl, int timeoutSeconds)
         {
+            using var cts = timeoutSeconds > 0 ? new CancellationTokenSource(TimeSpan.FromSeconds(timeoutSeconds)) : new CancellationTokenSource();
             var result = new MailboxImportResult();
             if (!item.HasData || item.Buffer == null)
             {
@@ -142,7 +156,7 @@ namespace CIPP
             var content = new ByteArrayContent(item.Buffer, item.Offset, item.Count);
             content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
             request.Content = content;
-            using var response = Client.SendAsync(request).GetAwaiter().GetResult();
+            using var response = Client.SendAsync(request, cts.Token).GetAwaiter().GetResult();
             result.StatusCode = (int)response.StatusCode;
             result.Success = response.IsSuccessStatusCode;
             result.RetryAfterSeconds = RetryAfter(response);

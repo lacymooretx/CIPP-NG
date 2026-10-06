@@ -28147,6 +28147,10 @@
                   "OperationId": {
                     "type": "string"
                   },
+                  "SoftSeconds": {
+                    "type": "string",
+                    "description": "Test hook: a small worker time budget forces lane hand-offs on a small copy. Not in the UI."
+                  },
                   "SourceUser": {
                     "$ref": "#/components/schemas/LabelValue"
                   },

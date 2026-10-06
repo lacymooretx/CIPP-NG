@@ -14,7 +14,9 @@ function Invoke-CIPPMailboxItemExport {
         [Parameter(Mandatory = $true)][string]$ExportUri,
         [Parameter(Mandatory = $true)][string]$Authorization,
         [Parameter(Mandatory = $true)][string]$ItemId,
-        [Parameter(Mandatory = $true)][string]$FolderId
+        [Parameter(Mandatory = $true)][string]$FolderId,
+        # Abandon the call after this many seconds (0 = client default); the caller passes its time budget.
+        [int]$TimeoutSeconds = 0
     )
-    [CIPP.CippMailboxTransfer]::Export($ExportUri, $Authorization, $ItemId, $FolderId)
+    [CIPP.CippMailboxTransfer]::Export($ExportUri, $Authorization, $ItemId, $FolderId, $TimeoutSeconds)
 }

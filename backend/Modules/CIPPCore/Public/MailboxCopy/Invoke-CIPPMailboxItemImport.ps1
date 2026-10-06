@@ -12,7 +12,9 @@ function Invoke-CIPPMailboxItemImport {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)]$Export,
-        [Parameter(Mandatory = $true)][string]$ImportUrl
+        [Parameter(Mandatory = $true)][string]$ImportUrl,
+        # Abandon the call after this many seconds (0 = client default); the caller passes its time budget.
+        [int]$TimeoutSeconds = 0
     )
-    [CIPP.CippMailboxTransfer]::Import($Export, $ImportUrl)
+    [CIPP.CippMailboxTransfer]::Import($Export, $ImportUrl, $TimeoutSeconds)
 }

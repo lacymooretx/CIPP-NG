@@ -168,8 +168,8 @@ Describe 'Start-CIPPMailboxCopy' {
 Describe 'Push-MailboxCopyChunk' {
     BeforeAll {
         function Get-GraphToken { param($tenantid, $AsApp, $SkipCache) @{ Authorization = 'Bearer t' } }
-        function Invoke-CIPPMailboxItemExport { param($ExportUri, $Authorization, $ItemId, $FolderId) }
-        function Invoke-CIPPMailboxItemImport { param($Export, $ImportUrl) }
+        function Invoke-CIPPMailboxItemExport { param($ExportUri, $Authorization, $ItemId, $FolderId, $TimeoutSeconds) }
+        function Invoke-CIPPMailboxItemImport { param($Export, $ImportUrl, $TimeoutSeconds) }
         function New-FakeExport([string]$Id, [bool]$HasData = $true, [int]$Status = 200, [string]$Body = '', [double]$RetryAfter = 0, [long]$Length = 100) {
             $X = [pscustomobject]@{ ItemId = $Id; HasData = $HasData; StatusCode = $Status; Body = $Body; RetryAfterSeconds = $RetryAfter; DataLength = $Length; Released = $false }
             $X | Add-Member -MemberType ScriptMethod -Name Release -Value { $this.Released = $true }
@@ -192,6 +192,7 @@ Describe 'Push-MailboxCopyChunk' {
         }
         Mock Add-CIPPAzDataTableEntity { $script:Saved.Add(($Entity | Select-Object *)) }
         Mock Start-Sleep { }
+        Mock Start-CIPPOrchestrator { }
         Mock New-GraphPOSTRequest {
             if ($uri -match 'createImportSession') { return [pscustomobject]@{ importUrl = "https://outlook/import/$($uri -replace '.*mailboxes/([^/]+)/.*','$1')"; expirationDateTime = [DateTime]::UtcNow.AddHours(1).ToString('o') } }
         }
@@ -340,6 +341,54 @@ Describe 'Push-MailboxCopyChunk' {
         (& $script:Final).Copied | Should -Be 0
         (& $script:Final).Failed | Should -Be 0
     }
+
+    It 'works through its lane in order (one worker per lane)' {
+        $script:Chunk2 = [pscustomobject]@{ PartitionKey = 'op1'; RowKey = 'c00002'; SrcFolderId = 'sf2'; DstFolderId = 'df2'; Ids = (ConvertTo-Json -InputObject @('z1|10', 'z2|10') -Compress); Done = 0; Copied = 0; Failed = 0; State = 'Pending'; Errors = '[]' }
+        $script:Chunk.Ids = (ConvertTo-Json -InputObject @('item1|10') -Compress)
+        Mock Get-CIPPAzDataTableEntity {
+            if ($Filter -match "PartitionKey eq 'Operation'") { return $script:Op }
+            if ($Filter -match "State ne 'Done'") { return @() }
+            if ($Filter -match "RowKey eq 'c00002'") { return $script:Chunk2 }
+            if ($Filter -match "RowKey eq 'c00001'") { return $script:Chunk }
+            @($script:Chunk, $script:Chunk2)
+        }
+        Push-MailboxCopyChunk -Item ([pscustomobject]@{ OperationId = 'op1'; TenantFilter = 't'; Lane = 'L'; LaneChunks = @('c00001', 'c00002'); LanePosition = 0 })
+        Should -Invoke Invoke-CIPPMailboxItemImport -Times 3 -Exactly
+        Should -Invoke Invoke-CIPPMailboxItemImport -Times 1 -Exactly -ParameterFilter { $Export.ItemId -eq 'z2' }
+        Should -Invoke Start-CIPPOrchestrator -Times 0 -Exactly
+    }
+
+    It 'hands the rest of the lane to exactly one successor when its time budget is spent' {
+        Push-MailboxCopyChunk -Item ([pscustomobject]@{ OperationId = 'op1'; TenantFilter = 't'; Lane = 'L'; LaneChunks = @('c00001', 'c00002'); LanePosition = 0; Hop = 3; SoftSeconds = 0 })
+        Should -Invoke Invoke-CIPPMailboxItemImport -Times 0 -Exactly
+        Should -Invoke Start-CIPPOrchestrator -Times 1 -Exactly -ParameterFilter {
+            $InputObject.OrchestratorName -eq 'L_h4' -and @($InputObject.Batch).Count -eq 1 -and $InputObject.Batch[0].LanePosition -eq 0 -and
+            $InputObject.Batch[0].Hop -eq 4 -and @($InputObject.Batch[0].LaneChunks).Count -eq 2 -and -not $InputObject.Sequential
+        }
+        (& $script:Final).State | Should -Be 'Running'
+    }
+
+    It 'never sleeps into the task limit: a long throttle wait becomes a hand-off, item not imported' {
+        $script:Chunk.Ids = (ConvertTo-Json -InputObject @('item1|10', 'item2|10') -Compress)
+        Mock Invoke-CIPPMailboxItemImport { [pscustomobject]@{ Success = $false; StatusCode = 429; Body = 'throttled'; RetryAfterSeconds = 290 } }
+        Push-MailboxCopyChunk -Item ([pscustomobject]@{ OperationId = 'op1'; TenantFilter = 't'; Lane = 'L'; LaneChunks = @('c00001'); HardSeconds = 300 })
+        Should -Invoke Start-Sleep -Times 0 -Exactly
+        Should -Invoke Start-CIPPOrchestrator -Times 1 -Exactly -ParameterFilter { $InputObject.Batch[0].LanePosition -eq 0 -and $InputObject.OrchestratorName -eq 'L_h1' }
+        $F = & $script:Final
+        $F.State | Should -Be 'Running'; $F.Done | Should -Be 0; $F.Copied | Should -Be 0; $F.Failed | Should -Be 0
+    }
+
+    It 'gives every call the time left as its timeout' {
+        $script:Chunk.Ids = (ConvertTo-Json -InputObject @('item1|10') -Compress)
+        Push-MailboxCopyChunk -Item ([pscustomobject]@{ OperationId = 'op1'; TenantFilter = 't'; LaneChunks = @('c00001'); HardSeconds = 600 })
+        Should -Invoke Invoke-CIPPMailboxItemExport -Times 1 -Exactly -ParameterFilter { $TimeoutSeconds -gt 500 -and $TimeoutSeconds -le 585 }
+        Should -Invoke Invoke-CIPPMailboxItemImport -Times 1 -Exactly -ParameterFilter { $TimeoutSeconds -gt 500 -and $TimeoutSeconds -le 585 }
+    }
+
+    It 'fails loudly instead of silently returning when its chunk cannot be read' {
+        Mock Get-CIPPAzDataTableEntity { if ($Filter -match "PartitionKey eq 'Operation'") { return $script:Op }; $null }
+        { Push-MailboxCopyChunk -Item ([pscustomobject]@{ OperationId = 'op1'; TenantFilter = 't'; ChunkKey = 'c00001' }) } | Should -Throw '*could not be read*'
+    }
 }
 
 Describe 'Push-MailboxCopyPlan' {
@@ -374,7 +423,7 @@ Describe 'Push-MailboxCopyPlan' {
         $Final.AlreadyPresent | Should -Be 2
         $Final.Status | Should -Be 'Copying'
         Should -Invoke New-GraphGetRequest -ParameterFilter { $uri -match '/beta/admin/exchange/mailboxes/MBX:d/folders/df/items' -and $uri -match '0x300B' }
-        Should -Invoke Start-CIPPOrchestrator -Times 1 -Exactly -ParameterFilter { $InputObject.Sequential -and $InputObject.Batch[0].ChunkKey -eq 'c00251' -and $InputObject.OrchestratorName -like '*_p250_lane0' }
+        Should -Invoke Start-CIPPOrchestrator -Times 1 -Exactly -ParameterFilter { @($InputObject.Batch).Count -eq 1 -and $InputObject.Batch[0].LaneChunks[0] -eq 'c00251' -and $InputObject.OrchestratorName -like '*_p250_lane0' }
     }
 
     It 'completes without starting lanes when everything is already there' {
@@ -406,8 +455,8 @@ Describe 'Push-MailboxCopyPlan' {
         Push-MailboxCopyPlan -Item ([pscustomobject]@{ OperationId = '11111111-2222-3333-4444-555555555555'; TenantFilter = 't' })
         # 3 chunks per folder -> 2 lanes for MBX:d and 2 lanes for MBX:da
         Should -Invoke Start-CIPPOrchestrator -Times 4 -Exactly
-        $Main = { $InputObject.Batch[0].ChunkKey -in @('c00001', 'c00002') }
-        $Arch = { $InputObject.Batch[0].ChunkKey -in @('c00004', 'c00005') }
+        $Main = { $InputObject.Batch[0].LaneChunks[0] -in @('c00001', 'c00002') }
+        $Arch = { $InputObject.Batch[0].LaneChunks[0] -in @('c00004', 'c00005') }
         Should -Invoke Start-CIPPOrchestrator -Times 2 -Exactly -ParameterFilter $Main
         Should -Invoke Start-CIPPOrchestrator -Times 2 -Exactly -ParameterFilter $Arch
     }

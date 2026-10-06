@@ -45,6 +45,8 @@ function Start-CIPPMailboxCopy {
         [bool]$IncludeJunk = $false,
         [bool]$IncludeArchive = $true,
         [ValidateSet('Archive', 'Primary')][string]$ArchiveDestination = 'Archive',
+        # Test hook: lane worker time budget in seconds (0 = default 900). Forces hand-offs on small copies.
+        [int]$SoftSeconds = 0,
         [string]$StartedBy = 'CIPP-API',
         $Headers,
         [string]$APIName = 'MailboxCopy'
@@ -257,6 +259,7 @@ function Start-CIPPMailboxCopy {
         ArchiveItems       = $(if ($ArchiveSection) { $ArchiveSection.ItemCount } else { 0 })
         FolderCount        = $Rows.Count
         PlannedItems       = $TotalItems
+        SoftSeconds        = $SoftSeconds
         Status             = 'Planning'
         StartedBy          = $StartedBy
         Started            = [DateTime]::UtcNow.ToString('o')
