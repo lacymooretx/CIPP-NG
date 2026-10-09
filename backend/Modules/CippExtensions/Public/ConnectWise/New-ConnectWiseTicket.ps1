@@ -56,8 +56,18 @@ function New-ConnectWiseTicket {
         }
     }
 
+    # CW rejects the whole ticket when summary exceeds 100 chars (MaxLengthField), and alert
+    # subjects like "<Operation> in <tenant> by ServicePrincipal_<guid>" routinely do. Truncate the
+    # summary only; the dedupe hash above stays on the full title, and the full title leads the
+    # description so nothing is lost.
+    $Summary = [string]$Title
+    if ($Summary.Length -gt 100) {
+        $Summary = $Summary.Substring(0, 97) + '...'
+        $Description = "$Title`n`n$Description"
+    }
+
     $TicketObject = @{
-        summary = $Title
+        summary = $Summary
         company = @{
             id = [int]($Client | Select-Object -Last 1)
         }
