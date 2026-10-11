@@ -48,6 +48,7 @@ function Set-CIPPResetPassword {
                     -TextUser $Options.TextUser `
                     -NotifySupervisor $Options.NotifySupervisor `
                     -DocumentInITGlue $Options.DocumentInITGlue `
+                    -DocumentInHudu $Options.DocumentInHudu `
                     -Reason 'Password reset' `
                     -Headers $Headers
 

@@ -7,7 +7,7 @@ function Send-CIPPPasswordDelivery {
     One entry point for everything that happens to a password after it has been set:
     push it to Password Pusher, have Password Pusher email and/or text the secret link
     to the user and optionally their supervisor, and write the password into the
-    tenant's mapped IT Glue organization.
+    tenant's mapped Hudu company (and, during the migration, IT Glue organization).
 
     Every step is independently fault tolerant. A failed text must not lose the
     password, and an unmapped IT Glue organization must not fail the reset -- each
@@ -58,6 +58,10 @@ function Send-CIPPPasswordDelivery {
     .PARAMETER DocumentInITGlue
     Write the password into the mapped IT Glue organization.
 
+    .PARAMETER DocumentInHudu
+    Write the password into the mapped Hudu company as 'M365 - <UPN>', attached to the
+    user's People asset when one matches. Added for the IT Glue -> Hudu migration.
+
     .PARAMETER Reason
     Short description of what produced this password, recorded in IT Glue and used as
     the push label.
@@ -97,6 +101,8 @@ function Send-CIPPPasswordDelivery {
         [bool]$NotifySupervisor = $false,
 
         [bool]$DocumentInITGlue = $true,
+
+        [bool]$DocumentInHudu = $false,
 
         [string]$Reason = 'Password reset',
 
@@ -205,7 +211,8 @@ function Send-CIPPPasswordDelivery {
 
     # --- document it --------------------------------------------------------------
     $ITGlue = $null
-    if ($DocumentInITGlue) {
+    $Hudu = $null
+    if ($DocumentInITGlue -or $DocumentInHudu) {
         # A direct API client authenticates as a bare app id, which is useless in a
         # documentation note. Resolve it to the client's name, the same way access
         # checks distinguish an interactive user from an API client.
@@ -225,11 +232,22 @@ function Send-CIPPPasswordDelivery {
             'This is the temporary password that was set. If the user was required to change it at next sign-in, this value is stale as soon as they do.'
         ) -join "`n"
 
-        $ITGlue = Set-ITGluePassword -TenantFilter $TenantFilter -UserPrincipalName $UserPrincipalName -Password $Password -DisplayName $DisplayName -Notes $Note
-        if ($ITGlue.Success) {
-            $Notices.Add("IT Glue record $($ITGlue.Action).")
-        } else {
-            $Warnings.Add($ITGlue.Message)
+        if ($DocumentInHudu) {
+            $Hudu = Set-CippHuduUserPassword -TenantFilter $TenantFilter -UserPrincipalName $UserPrincipalName -Password $Password -DisplayName $DisplayName -Notes $Note
+            if ($Hudu.Success) {
+                $Notices.Add("Hudu record $($Hudu.Action).")
+            } else {
+                $Warnings.Add($Hudu.Message)
+            }
+        }
+
+        if ($DocumentInITGlue) {
+            $ITGlue = Set-ITGluePassword -TenantFilter $TenantFilter -UserPrincipalName $UserPrincipalName -Password $Password -DisplayName $DisplayName -Notes $Note
+            if ($ITGlue.Success) {
+                $Notices.Add("IT Glue record $($ITGlue.Action).")
+            } else {
+                $Warnings.Add($ITGlue.Message)
+            }
         }
     }
 
@@ -243,6 +261,7 @@ function Send-CIPPPasswordDelivery {
         Dispatched   = if ($Push) { [bool]$Push.Dispatched } else { $false }
         Deliveries   = $Deliveries
         ITGlue       = $ITGlue
+        Hudu         = $Hudu
         Notices      = @($Notices)
         Warnings     = @($Warnings)
         Summary      = ($Summary -join ' ')

@@ -12,6 +12,15 @@ function Get-CIPPPasswordDeliveryOptions {
     When the PwPush extension is disabled, everything is off: without a push there is
     nothing to deliver.
 
+    Documentation destinations (IT Glue -> Hudu migration, 2026-10):
+      - DocumentInHudu defaults to PWPush.DocumentInHudu (falling back to
+        PWPush.DocumentInITGlue when the Hudu default has never been saved). A per-run
+        DocumentInHudu wins; a caller that predates Hudu and only sends DocumentInITGlue
+        is treated as asking "document it or not", so its value drives Hudu too.
+      - Each destination is only ever on while its extension is enabled. Disabling the
+        IT Glue extension therefore stops IT Glue password writes even from callers that
+        still send DocumentInITGlue = true, which is how the IT Glue side is retired.
+
     Aspendora fork addition.
 
     .PARAMETER Delivery
@@ -30,6 +39,7 @@ function Get-CIPPPasswordDeliveryOptions {
         TextUser         = $false
         NotifySupervisor = $false
         DocumentInITGlue = $false
+        DocumentInHudu   = $false
         RecipientEmail   = $null
         RecipientPhone   = $null
         SupervisorEmail  = $null
@@ -43,6 +53,11 @@ function Get-CIPPPasswordDeliveryOptions {
     $Resolved.TextUser = $Config.DispatchTextUser -eq $true
     $Resolved.NotifySupervisor = $Config.DispatchSupervisor -eq $true
     $Resolved.DocumentInITGlue = $Config.DocumentInITGlue -eq $true
+    $Resolved.DocumentInHudu = if ($null -ne $Config.DocumentInHudu -and "$($Config.DocumentInHudu)" -ne '') {
+        $Config.DocumentInHudu -eq $true
+    } else {
+        $Config.DocumentInITGlue -eq $true
+    }
 
     if ($Delivery) {
         foreach ($Property in @('EmailUser', 'TextUser', 'NotifySupervisor', 'DocumentInITGlue')) {
@@ -54,6 +69,15 @@ function Get-CIPPPasswordDeliveryOptions {
             # That made it impossible to turn a config-enabled channel off per run.
             if ($null -ne $Value -and "$Value" -ne '') { $Resolved.$Property = [bool]$Value }
         }
+        # Hudu: an explicit per-run DocumentInHudu wins; otherwise a per-run
+        # DocumentInITGlue (older callers: n8n, the welcome packet page) carries the
+        # caller's "document it" intent over to Hudu.
+        $HuduValue = $Delivery.DocumentInHudu
+        if ($null -ne $HuduValue -and "$HuduValue" -ne '') {
+            $Resolved.DocumentInHudu = [bool]$HuduValue
+        } elseif ($null -ne $Delivery.DocumentInITGlue -and "$($Delivery.DocumentInITGlue)" -ne '') {
+            $Resolved.DocumentInHudu = [bool]$Delivery.DocumentInITGlue
+        }
         # RecipientEmail may arrive as a single override from the dialog or as a list from
         # the API, so normalise to an array either way.
         $OverrideEmails = @($Delivery.RecipientEmail | Where-Object { ![string]::IsNullOrWhiteSpace($_) })
@@ -63,6 +87,13 @@ function Get-CIPPPasswordDeliveryOptions {
             $Value = $Delivery.$Property
             if (![string]::IsNullOrWhiteSpace($Value)) { $Resolved.$Property = $Value }
         }
+    }
+
+    # A destination whose extension is off is off, whatever was asked for.
+    $Full = $Config.FullConfiguration
+    if ($Full) {
+        if ($Full.ITGlue.Enabled -ne $true) { $Resolved.DocumentInITGlue = $false }
+        if ($Full.Hudu.Enabled -ne $true) { $Resolved.DocumentInHudu = $false }
     }
 
     return $Resolved

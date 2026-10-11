@@ -1392,6 +1392,17 @@
       },
       {
         "type": "switch",
+        "name": "PWPush.DocumentInHudu",
+        "label": "Default: save the password to the tenant's Hudu company (M365 - UPN, attached to the person)",
+        "condition": {
+          "field": "PWPush.Enabled",
+          "compareType": "is",
+          "compareValue": true,
+          "action": "disable"
+        }
+      },
+      {
+        "type": "switch",
         "name": "PWPush.DocumentInITGlue",
         "label": "Default: save the password to the tenant's IT Glue organization",
         "condition": {

@@ -87,7 +87,7 @@ const Page = () => {
   const resetPassword = ApiPostCall({
     onResult: () => {
       setConfirmingReset(false)
-      // The reset writes to IT Glue inside the same call, so the packet can be
+      // The reset writes to Hudu inside the same call, so the packet can be
       // re-read immediately -- that read is where the new password comes from.
       packetRequest.refetch()
     },
@@ -203,7 +203,7 @@ const Page = () => {
 
                 {hasPassword && (
                   <Typography variant="body2" color="text.secondary">
-                    Read from IT Glue record <strong>{packet.itGlueName}</strong>
+                    Read from {packet.source === 'ITGlue' ? 'IT Glue' : 'Hudu'} record <strong>{packet.itGlueName}</strong>
                     {passwordChanged ? `, last changed ${passwordChanged}` : ''}. If{' '}
                     {packet.user.firstName || 'the user'} has already changed it, generate a new one
                     instead.
@@ -278,7 +278,7 @@ const Page = () => {
                       target="_blank"
                       rel="noopener noreferrer"
                     >
-                      Open in IT Glue
+                      Open in {packet.source === 'ITGlue' ? 'IT Glue' : 'Hudu'}
                     </Button>
                   )}
                 </Stack>
@@ -287,7 +287,7 @@ const Page = () => {
                   <Alert severity="warning">
                     This replaces the password on the live account. Anything already signed in with
                     the old one keeps working until it next asks for credentials. The new password
-                    is written to IT Glue and printed here — it is not emailed or texted.
+                    is written to Hudu and printed here — it is not emailed or texted.
                   </Alert>
                 )}
 

@@ -839,7 +839,7 @@ const CippAddEditUser = (props) => {
             />
             <CippFormComponent
               type="switch"
-              label="Save the password to IT Glue"
+              label="Save the password to documentation (Hudu)"
               name="Delivery.DocumentInITGlue"
               formControl={formControl}
             />

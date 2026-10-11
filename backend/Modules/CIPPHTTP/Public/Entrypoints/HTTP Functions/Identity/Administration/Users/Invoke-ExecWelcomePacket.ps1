@@ -7,14 +7,15 @@ Function Invoke-ExecWelcomePacket {
     .DESCRIPTION
         Builds the printable new-hire welcome packet for a single user: identity from
         Graph, brand and support details from the tenant's welcome packet config, and
-        the live password read back from IT Glue.
+        the live password read back from Hudu (IT Glue as a fallback during the migration).
 
         Read-only by design. This endpoint never resets a password, even though it
         returns one. Resetting lives in ExecResetPass, which already generates,
         delivers and documents the credential under one audit trail; a second reset
         path here would be a second way for plaintext to escape and a second thing to
         keep correct. The frontend gets a fresh password by calling ExecResetPass with
-        DocumentInITGlue enabled and then re-reading this endpoint.
+        DocumentInITGlue enabled (which also drives DocumentInHudu) and then re-reading
+        this endpoint.
 
         ReadWrite rather than Read: the response carries a live credential. Read
         access to a user should not be enough to print their password.
@@ -83,8 +84,24 @@ Function Invoke-ExecWelcomePacket {
             warning      = $null
         }
 
-        $Stored = Get-ITGluePassword -TenantFilter $TenantFilter -UserPrincipalName $User.userPrincipalName
+        # Hudu first (the documentation system since the 2026-10 migration), IT Glue as a
+        # read-only fallback while it is still enabled. Both return the same shape.
+        $Stored = Get-CippHuduUserPassword -TenantFilter $TenantFilter -UserPrincipalName $User.userPrincipalName
+        $StoredSource = 'Hudu'
+        if (-not $Stored.Success) {
+            $HuduMiss = $Stored
+            $ItgStored = Get-ITGluePassword -TenantFilter $TenantFilter -UserPrincipalName $User.userPrincipalName
+            if ($ItgStored.Success) {
+                $Stored = $ItgStored
+                $StoredSource = 'ITGlue'
+            } elseif ($HuduMiss.Message -match 'not enabled') {
+                $Stored = $ItgStored
+                $StoredSource = 'ITGlue'
+            }
+        }
 
+        # itGlueUrl / itGlueName keep their names for the existing page; they hold
+        # whichever system the password was read from (see `source`).
         $Packet.itGlueUrl = $Stored.Url
         $Packet.itGlueName = $Stored.Name
         $Packet.isPortalRecord = $Stored.IsPortalRecord
@@ -92,7 +109,7 @@ Function Invoke-ExecWelcomePacket {
 
         if ($Stored.Success) {
             $Packet.user.password = $Stored.Password
-            $Packet.source = 'ITGlue'
+            $Packet.source = $StoredSource
             # Success can still carry advice -- a username-matched or duplicated record.
             $Packet.warning = $Stored.Message
         } else {

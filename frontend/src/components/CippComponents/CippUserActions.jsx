@@ -1263,9 +1263,9 @@ export const useCippUserActions = () => {
         {
           type: 'switch',
           name: 'Delivery.DocumentInITGlue',
-          label: "Save the password to the tenant's IT Glue organization",
+          label: "Save the password to the tenant's documentation (Hudu)",
           helperText:
-            'Updates the one M365 record for this user in place. Skipped with a warning when the tenant is not mapped to an IT Glue organization.',
+            'Updates the one M365 record for this user in place in the mapped Hudu company (and IT Glue while that extension is still enabled). Skipped with a warning when the tenant is not mapped.',
         },
       ],
       confirmText: 'Are you sure you want to reset the password for [userPrincipalName]?',

@@ -101,6 +101,7 @@ function New-CIPPUser {
                     -TextUser $Options.TextUser `
                     -NotifySupervisor $Options.NotifySupervisor `
                     -DocumentInITGlue $Options.DocumentInITGlue `
+                    -DocumentInHudu $Options.DocumentInHudu `
                     -Reason 'New user created' `
                     -Headers $Headers
 
