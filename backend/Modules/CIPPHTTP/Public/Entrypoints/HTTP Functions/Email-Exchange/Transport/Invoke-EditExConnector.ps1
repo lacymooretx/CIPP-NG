@@ -91,7 +91,7 @@ function Invoke-EditExConnector {
         $ErrorMessage = Get-CIPPException -Exception $_
         Write-LogMessage -Headers $Headers -API $APIName -tenant $TenantFilter -message "Failed editing Connector $($Guid). Error: $($ErrorMessage.NormalizedError)" -Sev Error -LogData $ErrorMessage
         $Result = $ErrorMessage.NormalizedError
-        $StatusCode = [HttpStatusCode]::Forbidden
+        $StatusCode = [HttpStatusCode]::InternalServerError
     }
 
     return ([HttpResponseContext]@{

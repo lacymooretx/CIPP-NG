@@ -4,8 +4,8 @@ function Invoke-PwPushRequest {
     Calls the Password Pusher REST API directly.
 
     .DESCRIPTION
-    The PassPushPosh module used by New-PwPushLink has no support for the dispatch
-    endpoints, so this is a thin authenticated wrapper over the raw API. It handles
+    Upstream's PwPush helpers do not cover the dispatch endpoints, so this is a
+    thin authenticated wrapper over the raw API. It handles
     both supported auth methods (X-User-Email/X-User-Token, or Bearer) and the
     Cloudflare ZTNA service-token headers when the instance sits behind a tunnel.
 

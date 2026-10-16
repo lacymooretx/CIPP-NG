@@ -63,6 +63,7 @@ function Invoke-AddWin32ScriptApp {
             })
     }
 
+    $Failed = 0
     $Results = foreach ($Tenant in $Tenants) {
         try {
             $CompleteObject = [PSCustomObject]@{
@@ -98,6 +99,7 @@ function Invoke-AddWin32ScriptApp {
             "Successfully added Win32 Script App for $($Tenant) to queue."
             Write-LogMessage -headers $Headers -API $APIName -tenant $Tenant -message "Successfully added Win32 Script App $AppName to queue" -Sev 'Info'
         } catch {
+            $Failed++
             Write-LogMessage -headers $Headers -API $APIName -tenant $Tenant -message "Failed to add Win32 Script App $AppName to queue. Error: $($_.Exception.Message)" -Sev 'Error'
             "Failed to add Win32 Script App for $($Tenant) to queue: $($_.Exception.Message)"
         }
@@ -106,7 +108,7 @@ function Invoke-AddWin32ScriptApp {
     $body = [PSCustomObject]@{ 'Results' = $Results }
 
     return ([HttpResponseContext]@{
-            StatusCode = [HttpStatusCode]::OK
+            StatusCode = Get-CippBulkStatusCode -Total @($Tenants).Count -Failed $Failed
             Body       = $body
         })
 }

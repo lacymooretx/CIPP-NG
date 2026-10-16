@@ -1,114 +1,64 @@
-# Storage quota alert on CIPP 11.0's AlertLifecycle.
-#
-# Notification decisions stay with the fork's banded logic (Select-CIPPStorageAlertToNotify: new,
-# worsened across 85/90/95, or a reminder after the re-notify window) because the lifecycle cannot
-# express bands or reminders. What the lifecycle adds, and what is asserted here, is:
-#   - an honest state: the full at-risk set is reconciled silently every run, so a mailbox that is
-#     still near quota shows Open and one that recovered shows Resolved;
-#   - snoozes set in the alert-management UI suppress this alert's notifications;
-#   - the reconcile never leaks into the notification output.
-# The real Get-CIPPMailboxQuotaRisk and Select-CIPPStorageAlertToNotify run here.
+# Pester tests for the SharePoint and OneDrive storage quota alerts.
+# Snoozes and alert lifecycle rows match items by Get-AlertContentHash, so an item that is still
+# over its threshold must hash the same from run to run even as the usage figures move.
 
 BeforeAll {
     $RepoRoot = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $PSCommandPath))
-    . (Join-Path $RepoRoot 'Tests/Alerts/AlertLifecycleHarness.ps1')
-    . (Join-Path $RepoRoot 'Modules/CIPPCore/Public/Storage/Get-CIPPMailboxQuotaRisk.ps1')
-    . (Join-Path $RepoRoot 'Modules/CIPPCore/Public/Storage/Select-CIPPStorageAlertToNotify.ps1')
-    . (Join-Path $RepoRoot 'Modules/CIPPAlerts/Public/Alerts/Get-CIPPAlertStorageQuota.ps1')
 
-    function Test-CIPPTenantManaged { param($TenantFilter) [pscustomobject]@{ IsManaged = $script:Managed } }
-    function New-GraphGetRequest {
-        param($tenantid, $AsApp, $uri)
-        if ($script:GraphThrows) { throw 'report unavailable' }
-        $script:Mailboxes
-    }
-    function New-Mailbox {
-        param($Upn, [double]$Percent)
-        $Hard = 100GB
-        [pscustomobject]@{
-            userPrincipalName                = $Upn
-            storageUsedInBytes               = [long]($Hard * $Percent / 100)
-            issueWarningQuotaInBytes         = [long](90GB)
-            prohibitSendReceiveQuotaInBytes  = [long]$Hard
-            recipientType                    = 'User'
-            hasArchive                       = $false
-        }
-    }
-    function Invoke-Alert { @(Get-CIPPAlertStorageQuota -TenantFilter 'contoso.com') }
-    function Get-QuotaState { Get-LifecycleState 'Get-CIPPAlertStorageQuota' }
+    function New-GraphGetRequest { param($uri, $tenantid, $scope, $extraHeaders, $asapp, [switch]$UseCertificate) }
+    function Get-SharePointAdminLink { param($Public, $tenantFilter) }
+    function Get-CippException { param($Exception) }
+    function Write-LogMessage { param($message, $API, $tenant, $sev, $LogData) }
+    function Write-AlertTrace { param($cmdletName, $tenantFilter, $data) }
+
+    . (Join-Path $RepoRoot 'Modules/CIPPCore/Public/GraphHelper/Get-AlertContentHash.ps1')
+    . (Join-Path $RepoRoot 'Modules/CIPPAlerts/Public/Alerts/Get-CIPPAlertSharepointQuota.ps1')
+    . (Join-Path $RepoRoot 'Modules/CIPPAlerts/Public/Alerts/Get-CIPPAlertOnedriveQuota.ps1')
 }
 
-Describe 'Get-CIPPAlertStorageQuota' {
+Describe 'Storage quota alert content hash' {
     BeforeEach {
-        Reset-AlertStore
-        $script:Managed = $true
-        $script:GraphThrows = $false
-        $script:Mailboxes = @()
+        $script:Captured = $null
+        Mock Get-SharePointAdminLink { [pscustomobject]@{ AdminUrl = 'https://contoso-admin.sharepoint.com' } }
+        Mock Write-AlertTrace {
+            param($cmdletName, $tenantFilter, $data)
+            $script:Captured = @($data | Where-Object { $null -ne $_ })
+        }
     }
 
-    It 'notifies a new at-risk mailbox once, then holds it' {
-        $script:Mailboxes = @(New-Mailbox 'amber@contoso.com' 91)
+    It 'keeps the SharePoint quota item hash stable as usage changes' {
+        Mock New-GraphGetRequest { [pscustomobject]@{ GeoUsedStorageMB = 950000; TenantStorageMB = 1000000 } }
+        Get-CIPPAlertSharepointQuota -InputValue 90 -TenantFilter 'contoso.onmicrosoft.com'
+        $First = $script:Captured
 
-        $First = Invoke-Alert
-        $First | Should -HaveCount 1
-        $First[0].UserPrincipalName | Should -Be 'amber@contoso.com'
-        $First[0].Notified | Should -Be 'new'
-        Invoke-Alert | Should -BeNullOrEmpty
+        Mock New-GraphGetRequest { [pscustomobject]@{ GeoUsedStorageMB = 960000; TenantStorageMB = 1000000 } }
+        Get-CIPPAlertSharepointQuota -InputValue 90 -TenantFilter 'contoso.onmicrosoft.com'
+        $Second = $script:Captured
+
+        $First.Count | Should -Be 1
+        $Second.Count | Should -Be 1
+        $First[0].StorageUsed | Should -Not -Be $Second[0].StorageUsed
+        (Get-AlertContentHash -AlertItem $Second[0]).ContentHash | Should -Be (Get-AlertContentHash -AlertItem $First[0]).ContentHash
     }
 
-    It 'notifies again when the mailbox crosses into a higher band' {
-        $script:Mailboxes = @(New-Mailbox 'amber@contoso.com' 91)
-        $null = Invoke-Alert
-        $script:Mailboxes = @(New-Mailbox 'amber@contoso.com' 96)
+    It 'keeps each OneDrive quota item hash stable as usage changes, and distinct per owner' {
+        $script:Used = 95GB
+        Mock New-GraphGetRequest {
+            @(
+                [pscustomobject]@{ ownerPrincipalName = 'a@contoso.com'; storageUsedInBytes = $script:Used; storageAllocatedInBytes = 100GB }
+                [pscustomobject]@{ ownerPrincipalName = 'b@contoso.com'; storageUsedInBytes = $script:Used; storageAllocatedInBytes = 100GB }
+            )
+        }
+        Get-CIPPAlertOneDriveQuota -InputValue 90 -TenantFilter 'contoso.onmicrosoft.com'
+        $First = $script:Captured
 
-        (Invoke-Alert)[0].Notified | Should -Be 'worsened'
-    }
+        $script:Used = 97GB
+        Get-CIPPAlertOneDriveQuota -InputValue 90 -TenantFilter 'contoso.onmicrosoft.com'
+        $Second = $script:Captured
 
-    It 'keeps the lifecycle honest: Open while at risk, Resolved once it recovers' {
-        $script:Mailboxes = @(New-Mailbox 'amber@contoso.com' 91)
-        $null = Invoke-Alert
-        $null = Invoke-Alert
-        (Get-QuotaState)['amber@contoso.com'] | Should -Be 'Open'
-
-        $script:Mailboxes = @(New-Mailbox 'amber@contoso.com' 40)
-        $null = Invoke-Alert
-        (Get-QuotaState)['amber@contoso.com'] | Should -Be 'Resolved'
-    }
-
-    It 'does not emit reconcile output as notifications' {
-        # The reconcile returns New items; if that leaked, a held mailbox would re-notify.
-        $script:Mailboxes = @(New-Mailbox 'amber@contoso.com' 91)
-        $null = Invoke-Alert
-        $script:Store['AlertLifecycle'] = @{}
-
-        Invoke-Alert | Should -BeNullOrEmpty
-    }
-
-    It 'honours a snooze set in the alert-management UI' {
-        $script:Mailboxes = @(New-Mailbox 'amber@contoso.com' 91), (New-Mailbox 'blair@contoso.com' 92)
-        $AmberHash = (Get-AlertContentHash -AlertItem @{ UserPrincipalName = 'amber@contoso.com' }).ContentHash
-        $script:Snoozes = @{ $AmberHash = [pscustomobject]@{ RowKey = 's1'; SnoozeUntil = '2099-01-01' } }
-
-        $Alerted = Invoke-Alert
-        $Alerted | Should -HaveCount 1
-        $Alerted[0].UserPrincipalName | Should -Be 'blair@contoso.com'
-    }
-
-    It 'resolves open items when the tenant goes out of scope' {
-        $script:Mailboxes = @(New-Mailbox 'amber@contoso.com' 91)
-        $null = Invoke-Alert
-        $script:Managed = $false
-
-        Invoke-Alert | Should -BeNullOrEmpty
-        (Get-QuotaState)['amber@contoso.com'] | Should -Be 'Resolved'
-    }
-
-    It 'does not reconcile when the usage report cannot be read' {
-        $script:Mailboxes = @(New-Mailbox 'amber@contoso.com' 91)
-        $null = Invoke-Alert
-        $script:GraphThrows = $true
-
-        Invoke-Alert | Should -BeNullOrEmpty
-        (Get-QuotaState)['amber@contoso.com'] | Should -Be 'Open'
+        $First.Count | Should -Be 2
+        $First[0].UsagePercent | Should -Not -Be $Second[0].UsagePercent
+        (Get-AlertContentHash -AlertItem $Second[0]).ContentHash | Should -Be (Get-AlertContentHash -AlertItem $First[0]).ContentHash
+        (Get-AlertContentHash -AlertItem $First[1]).ContentHash | Should -Not -Be (Get-AlertContentHash -AlertItem $First[0]).ContentHash
     }
 }

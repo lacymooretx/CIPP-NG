@@ -24,7 +24,7 @@ function Invoke-ListCSPLicenses {
         if (-not $StatusCode) { $StatusCode = [HttpStatusCode]::OK }
     } catch {
         $Result = "Unable to retrieve CSP licenses: $($_.Exception.Message)"
-        $StatusCode = [HttpStatusCode]::BadRequest
+        $StatusCode = [HttpStatusCode]::InternalServerError
     }
 
     return [HttpResponseContext]@{
