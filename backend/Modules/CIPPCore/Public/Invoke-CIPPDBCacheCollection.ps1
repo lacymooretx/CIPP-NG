@@ -124,6 +124,7 @@ function Invoke-CIPPDBCacheCollection {
             'ExoHostedContentFilterRule'
             'ExoGlobalQuarantinePolicy'
             'ExoOMEConfiguration'
+            'ExoIRMConfiguration'
             'ExoMailboxPlans'
             'ExoRetentionPolicyTags'
             'ExoRetentionPolicies'
@@ -188,10 +189,7 @@ function Invoke-CIPPDBCacheCollection {
         )
         SharePoint         = @(
             'SPOTenant'
-            'SPOSites'
-            'SPOTenantSyncClientRestriction'
             'SharePointAdminSettings'
-            'SharePointSiteUsage'
             'SharePointUsageReport'
             'SiteActivity'
             'OneDriveUsage'
