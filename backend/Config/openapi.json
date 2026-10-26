@@ -16232,6 +16232,14 @@
                       "type": "string",
                       "x-cipp-field-source": "storage"
                     },
+                    "ApprovedBy": {
+                      "type": "string",
+                      "x-cipp-field-source": "storage"
+                    },
+                    "ApprovedUtc": {
+                      "type": "string",
+                      "x-cipp-field-source": "storage"
+                    },
                     "colour": {
                       "x-cipp-field-source": "storage"
                     },
@@ -16285,6 +16293,9 @@
                       "x-cipp-field-source": "storage"
                     },
                     "Label": {
+                      "x-cipp-field-source": "storage"
+                    },
+                    "Live": {
                       "x-cipp-field-source": "storage"
                     },
                     "logo": {
@@ -17535,6 +17546,14 @@
                       "type": "string",
                       "x-cipp-field-source": "storage"
                     },
+                    "ApprovedBy": {
+                      "type": "string",
+                      "x-cipp-field-source": "storage"
+                    },
+                    "ApprovedUtc": {
+                      "type": "string",
+                      "x-cipp-field-source": "storage"
+                    },
                     "colour": {
                       "x-cipp-field-source": "storage"
                     },
@@ -17588,6 +17607,9 @@
                       "x-cipp-field-source": "storage"
                     },
                     "Label": {
+                      "x-cipp-field-source": "storage"
+                    },
+                    "Live": {
                       "x-cipp-field-source": "storage"
                     },
                     "logo": {
@@ -28176,6 +28198,14 @@
                       "type": "string",
                       "x-cipp-field-source": "storage"
                     },
+                    "ApprovedBy": {
+                      "type": "string",
+                      "x-cipp-field-source": "storage"
+                    },
+                    "ApprovedUtc": {
+                      "type": "string",
+                      "x-cipp-field-source": "storage"
+                    },
                     "colour": {
                       "x-cipp-field-source": "storage"
                     },
@@ -28229,6 +28259,9 @@
                       "x-cipp-field-source": "storage"
                     },
                     "Label": {
+                      "x-cipp-field-source": "storage"
+                    },
+                    "Live": {
                       "x-cipp-field-source": "storage"
                     },
                     "logo": {
@@ -28940,6 +28973,14 @@
                       "type": "string",
                       "x-cipp-field-source": "storage"
                     },
+                    "ApprovedBy": {
+                      "type": "string",
+                      "x-cipp-field-source": "storage"
+                    },
+                    "ApprovedUtc": {
+                      "type": "string",
+                      "x-cipp-field-source": "storage"
+                    },
                     "colour": {
                       "x-cipp-field-source": "storage"
                     },
@@ -28993,6 +29034,9 @@
                       "x-cipp-field-source": "storage"
                     },
                     "Label": {
+                      "x-cipp-field-source": "storage"
+                    },
+                    "Live": {
                       "x-cipp-field-source": "storage"
                     },
                     "logo": {
@@ -32955,6 +32999,103 @@
         "x-cipp-role": "Identity.User.ReadWrite"
       }
     },
+    "/api/ExecOneDriveSharingDigest": {
+      "post": {
+        "summary": "Preview, send, approve or revoke the weekly OneDrive sharing digest for a tenant",
+        "operationId": "ExecOneDriveSharingDigest",
+        "tags": [
+          "Teams-Sharepoint"
+        ],
+        "description": "Action=Status  (default) the tenant's digest settings, last scan and per-user link counts.\nAction=Preview renders without sending. With UserPrincipalName, returns that user's email HTML.\nAction=Send    runs the digest now: to the users when the tenant is approved, otherwise to the\n               preview recipient. PreviewRecipient forces a preview send to that address.\nAction=Approve switches the tenant to live (its users get their own digest).\nAction=Revoke  puts the tenant back into preview.\nAspendora fork addition.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "Action": {
+                    "type": "string"
+                  },
+                  "PreviewRecipient": {
+                    "type": "string"
+                  },
+                  "tenantFilter": {
+                    "type": "string"
+                  },
+                  "UserPrincipalName": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "tenantFilter"
+                ]
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "Action",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "PreviewRecipient",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/tenantFilter"
+          },
+          {
+            "name": "UserPrincipalName",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Not described statically: this endpoint returns the upstream response as-is, so its fields are determined by the upstream API rather than by CIPP. Call the endpoint to see the actual shape, or add a response schema in backend/Config/openapi-overrides."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - missing required field or invalid input"
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cipp-role": "Sharepoint.Admin.ReadWrite"
+      }
+    },
     "/api/ExecOneDriveShortCut": {
       "post": {
         "summary": "Creates a OneDrive shortcut to a SharePoint library for one or more users.",
@@ -33145,6 +33286,14 @@
                       "type": "string",
                       "x-cipp-field-source": "storage"
                     },
+                    "ApprovedBy": {
+                      "type": "string",
+                      "x-cipp-field-source": "storage"
+                    },
+                    "ApprovedUtc": {
+                      "type": "string",
+                      "x-cipp-field-source": "storage"
+                    },
                     "colour": {
                       "x-cipp-field-source": "storage"
                     },
@@ -33198,6 +33347,9 @@
                       "x-cipp-field-source": "storage"
                     },
                     "Label": {
+                      "x-cipp-field-source": "storage"
+                    },
+                    "Live": {
                       "x-cipp-field-source": "storage"
                     },
                     "logo": {
@@ -35695,6 +35847,14 @@
                       "type": "string",
                       "x-cipp-field-source": "storage"
                     },
+                    "ApprovedBy": {
+                      "type": "string",
+                      "x-cipp-field-source": "storage"
+                    },
+                    "ApprovedUtc": {
+                      "type": "string",
+                      "x-cipp-field-source": "storage"
+                    },
                     "colour": {
                       "x-cipp-field-source": "storage"
                     },
@@ -35748,6 +35908,9 @@
                       "x-cipp-field-source": "storage"
                     },
                     "Label": {
+                      "x-cipp-field-source": "storage"
+                    },
+                    "Live": {
                       "x-cipp-field-source": "storage"
                     },
                     "logo": {
@@ -37314,6 +37477,14 @@
                       "type": "string",
                       "x-cipp-field-source": "storage"
                     },
+                    "ApprovedBy": {
+                      "type": "string",
+                      "x-cipp-field-source": "storage"
+                    },
+                    "ApprovedUtc": {
+                      "type": "string",
+                      "x-cipp-field-source": "storage"
+                    },
                     "colour": {
                       "x-cipp-field-source": "storage"
                     },
@@ -37367,6 +37538,9 @@
                       "x-cipp-field-source": "storage"
                     },
                     "Label": {
+                      "x-cipp-field-source": "storage"
+                    },
+                    "Live": {
                       "x-cipp-field-source": "storage"
                     },
                     "logo": {
