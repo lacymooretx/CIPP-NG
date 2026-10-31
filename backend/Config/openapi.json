@@ -53545,6 +53545,63 @@
         "x-cipp-role": "Identity.Device.Read"
       }
     },
+    "/api/ListDeviceCodeSignIns": {
+      "get": {
+        "summary": "Device-code sign-ins for a tenant, summarised per user, app and device",
+        "operationId": "ListDeviceCodeSignIns",
+        "tags": [
+          "Identity > Reports"
+        ],
+        "description": "Reads the tenant's sign-in logs for authenticationProtocol 'deviceCode' over the last Days days (default 30,\nmaximum 30), one day at a time because the filter is unindexed and times out over long windows. Returns a\nsummary per user + app + device (count, successes, failures, first/last seen in US Central, IPs, locations)\nso legitimate device-code use can be excluded before the CIPP-8 \"block device code flow\" policy is enforced.\nTenants without Entra ID P1 return Licensed = false and a message instead of an error.\nReport only: nothing is changed. Aspendora fork addition (Vikunja CIPP-8).",
+        "parameters": [
+          {
+            "name": "Days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/tenantFilter"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "description": "Not described statically: this endpoint returns the upstream response as-is, so its fields are determined by the upstream API rather than by CIPP. Call the endpoint to see the actual shape, or add a response schema in backend/Config/openapi-overrides."
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - missing required field or invalid input"
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cipp-role": "Identity.AuditLog.Read"
+      }
+    },
     "/api/ListDeviceDetails": {
       "get": {
         "summary": "ListDeviceDetails",
