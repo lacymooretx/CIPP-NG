@@ -113,6 +113,10 @@ function Get-CIPPAlertBreakGlassActivity {
             try {
                 $Audits = @(New-GraphGetRequest -uri "https://graph.microsoft.com/v1.0/auditLogs/directoryAudits?`$filter=activityDateTime ge $Cutoff and $AuditFilter&`$top=100" -tenantid $TenantFilter -ErrorAction Stop | Where-Object { $_.id })
                 foreach ($A in $Audits) {
+                    # Exchange Online's directory sync ("Microsoft Substrate Management") logs routine 'Update user'
+                    # events that change nothing but TargetId.UserType. Skip exactly those; any other property counts.
+                    $Changed = @($A.targetResources | Where-Object { $_.id -eq $UserId } | ForEach-Object { $_.modifiedProperties } | Where-Object { $_.displayName -notin @('Included Updated Properties', 'TargetId.UserType') })
+                    if ($A.activityDisplayName -eq 'Update user' -and $A.initiatedBy.app.displayName -eq 'Microsoft Substrate Management' -and $Changed.Count -eq 0) { continue }
                     $Actor = $A.initiatedBy.user.userPrincipalName ?? $A.initiatedBy.app.displayName ?? 'unknown'
                     $ByAccount = [string]$A.initiatedBy.user.id -eq $UserId
                     $Rows.Add([pscustomobject]@{

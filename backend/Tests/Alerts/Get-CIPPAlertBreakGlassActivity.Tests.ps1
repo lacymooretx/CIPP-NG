@@ -69,6 +69,13 @@ Describe 'Get-CIPPAlertBreakGlassActivity' {
         $R[1].Message | Should -Match 'performed'
     }
 
+    It 'ignores no-op Substrate Management updates but keeps real changes by it' {
+        $Noop = [pscustomobject]@{ id = 'n1'; activityDateTime = '2026-10-31T17:00:00Z'; activityDisplayName = 'Update user'; result = 'success'; initiatedBy = @{ app = @{ displayName = 'Microsoft Substrate Management' } }; targetResources = @(@{ id = 'bg1'; modifiedProperties = @(@{ displayName = 'Included Updated Properties' }, @{ displayName = 'TargetId.UserType' }) }) }
+        $Real = [pscustomobject]@{ id = 'r1'; activityDateTime = '2026-10-31T17:00:00Z'; activityDisplayName = 'Update user'; result = 'success'; initiatedBy = @{ app = @{ displayName = 'Microsoft Substrate Management' } }; targetResources = @(@{ id = 'bg1'; modifiedProperties = @(@{ displayName = 'StrongAuthenticationMethod' }) }) }
+        $script:AuditsTarget = @($Noop, $Real)
+        (@(Get-CIPPAlertBreakGlassActivity -TenantFilter 'contoso.com')).Id | Should -Be @('Audit|r1')
+    }
+
     It 'raises a disabled or deleted account' {
         $script:UserMode = 'disabled'
         (Get-CIPPAlertBreakGlassActivity -TenantFilter 'contoso.com').Type | Should -Be 'AccountDisabled'
