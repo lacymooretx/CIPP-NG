@@ -1004,5 +1004,20 @@
         "inputName": "CompromiseSweepMaxPerCycle"
       }
     ]
+  },
+  {
+    "name": "BreakGlassActivity",
+    "label": "Alert on any sign-in by, or change to, a registered break-glass account",
+    "recommendedRunInterval": "30m",
+    "requiresInput": true,
+    "multipleInput": true,
+    "inputs": [
+      {
+        "inputType": "textField",
+        "inputLabel": "Hours of sign-in and audit history to scan each run (default: 2). Events are de-duplicated, so overlap loses nothing and catches events that reach the logs late.",
+        "inputName": "BreakGlassLookbackHours"
+      }
+    ],
+    "description": "Raises a High alert for every sign-in (success or failure) by a registered break-glass account, every directory change to or by it, and if it is disabled or deleted. Register accounts per tenant with ExecBreakGlassAccounts (Action=Add)."
   }
 ]

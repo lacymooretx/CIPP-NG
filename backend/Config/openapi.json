@@ -17768,6 +17768,117 @@
         "x-cipp-role": "CIPP.BreachLookup.Read"
       }
     },
+    "/api/ExecBreakGlassAccounts": {
+      "post": {
+        "summary": "Register a tenant's break-glass (emergency access) accounts for the break-glass activity alert",
+        "operationId": "ExecBreakGlassAccounts",
+        "tags": [
+          "Identity > Administration > Users"
+        ],
+        "description": "Action=List    (default) registered accounts for tenantFilter (AllTenants lists every tenant).\nAction=Add     registers UserPrincipalName (or UserId) in tenantFilter, with an optional Note.\nAction=Remove  unregisters UserId (or UserPrincipalName).\nAction=Suggest proposes likely break-glass accounts: the user CIPP's CA analysis sees excluded most\n               often from All-users policies, plus accounts whose name looks like break-glass/emergency.\nRegistered accounts are watched by the BreakGlassActivity alert. Aspendora fork addition (Vikunja CIPP-3).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "Action": {
+                    "type": "string"
+                  },
+                  "Note": {
+                    "type": "string"
+                  },
+                  "tenantFilter": {
+                    "type": "string"
+                  },
+                  "UserId": {
+                    "type": "string"
+                  },
+                  "UserPrincipalName": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "tenantFilter"
+                ]
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "Action",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Note",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/tenantFilter"
+          },
+          {
+            "name": "UserId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "UserPrincipalName",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Not described statically: this endpoint returns the upstream response as-is, so its fields are determined by the upstream API rather than by CIPP. Call the endpoint to see the actual shape, or add a response schema in backend/Config/openapi-overrides."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - missing required field or invalid input"
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cipp-role": "Identity.User.ReadWrite"
+      }
+    },
     "/api/ExecBulkLicense": {
       "post": {
         "summary": "ExecBulkLicense",
