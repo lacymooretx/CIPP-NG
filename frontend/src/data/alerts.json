@@ -1031,5 +1031,11 @@
     "label": "Alert when EWS is off or unset while apps still use it",
     "recommendedRunInterval": "1d",
     "description": "Microsoft's EWS shutdown flips an unset EwsEnabled to False and EWS stops within about an hour. This alerts when EwsEnabled is False (Error) or unset (Warning) in a tenant where apps hold EWS permissions (backup, email security, iOS Mail). Pin with ListEwsStatus Action=Pin."
+  },
+  {
+    "name": "OIBDrift",
+    "label": "Alert on outdated or retired OpenIntuneBaseline (OIB) policies",
+    "recommendedRunInterval": "7d",
+    "description": "Weekly check of the tenant's \"Win - OIB -\" Intune policies against the latest OpenIntuneBaseline Windows release on GitHub. Alerts on policies older than the version in that release (Outdated) and on policies the release deprecated or dropped (Retired). OIB policies the tenant has not deployed are not alerted on, and tenants with no OIB policies produce nothing. Report only."
   }
 ]

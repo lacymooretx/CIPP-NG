@@ -63354,6 +63354,79 @@
         "x-cipp-role": "Tenant.Administration.ReadWrite"
       }
     },
+    "/api/ListOIBDrift": {
+      "get": {
+        "summary": "OpenIntuneBaseline (OIB) version drift for a tenant or for the CIPP Intune template library",
+        "operationId": "ListOIBDrift",
+        "tags": [
+          "Endpoint > MEM"
+        ],
+        "description": "Compares every \"Win - OIB -\" item with the latest OIB Windows release on GitHub (windows-v* tag, cached a\nday in the CIPPOIBRelease table). Matching is by the OIBID in the description, then by name without the\nversion. Each finding has a State: Current, Outdated (with CurrentVersion -> LatestVersion), Retired\n(deprecated in or absent from the release), Newer, Unknown (no version), or Missing (in the release, not\nhere; informational, partial adoption is normal).\nPass tenantFilter for a tenant's deployed Intune policies, or TemplateLibrary=true (no tenant) for the\nIntuneTemplate rows in the CIPP template library. RefreshRelease=true bypasses the release cache;\nExcludeMissing=true drops the Missing rows. Report only: nothing is changed.\nAspendora fork addition (Vikunja CIPP-20).",
+        "parameters": [
+          {
+            "name": "ExcludeMissing",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "RefreshRelease",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "TemplateLibrary",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/tenantFilter"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "description": "Not described statically: this endpoint returns the upstream response as-is, so its fields are determined by the upstream API rather than by CIPP. Call the endpoint to see the actual shape, or add a response schema in backend/Config/openapi-overrides."
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - missing required field or invalid input"
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cipp-role": "Endpoint.MEM.Read"
+      }
+    },
     "/api/ListOneDriveCopies": {
       "get": {
         "summary": "ListOneDriveCopies",
