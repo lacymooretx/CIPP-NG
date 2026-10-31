@@ -18,9 +18,9 @@ function Invoke-ListGDAPHealth {
     [CmdletBinding()]
     param($Request, $TriggerMetadata)
 
-    $Refresh = [string]($Request.Query.Refresh ?? $Request.Body.Refresh) -eq 'true'
-    $Preview = [string]($Request.Query.Preview ?? $Request.Body.Preview) -eq 'true'
-    $Resend = [string]($Request.Query.Resend ?? $Request.Body.Resend) -eq 'true'
+    $Refresh = ($Request.Query.Refresh ?? $Request.Body.Refresh) -eq $true
+    $Preview = ($Request.Query.Preview ?? $Request.Body.Preview) -eq $true
+    $Resend = ($Request.Query.Resend ?? $Request.Body.Resend) -eq $true
 
     try {
         if ($Preview) {

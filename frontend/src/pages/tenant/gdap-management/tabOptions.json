@@ -10,6 +10,11 @@
     "icon": "Share"
   },
   {
+    "label": "Health",
+    "path": "/tenant/gdap-management/health",
+    "icon": "VerifiedUser"
+  },
+  {
     "label": "Role Templates",
     "path": "/tenant/gdap-management/role-templates",
     "icon": "Description"
