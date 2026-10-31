@@ -25,6 +25,14 @@ export const getIntuneDeviceActions = ({ tenantFilter } = {}) => [
     external: true,
   },
   {
+    // Aspendora fork addition (Vikunja CIPP-19): read-only effective policy view.
+    label: 'View Effective Policy',
+    link: `/endpoint/MEM/effective-policy?deviceId=[id]`,
+    color: 'info',
+    icon: <CippIcons.Policy />,
+    multiPost: false,
+  },
+  {
     label: 'Change Primary User',
     type: 'POST',
     icon: <CippIcons.ManageAccounts />,
