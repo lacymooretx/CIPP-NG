@@ -55678,7 +55678,7 @@
         "tags": [
           "Tenant > GDAP"
         ],
-        "description": "Returns the latest daily GDAP health report: relationships expiring at 30/14/7 days or already lapsed,\nauto-extend that Microsoft has not applied, managed tenants with no active relationship, removed access\nassignments, tenants whose Graph calls fail, and CIPP-SAM token or credential problems.\nRefresh=true runs the check now and sends alerts for new findings, the same as the daily timer.\nPreview=true runs the check now without alerting or changing stored state.\nAspendora fork addition (Vikunja CIPP-2).",
+        "description": "Returns the latest daily GDAP health report: relationships expiring at 30/14/7 days or already lapsed,\nauto-extend that Microsoft has not applied, managed tenants with no active relationship, removed access\nassignments, tenants whose Graph calls fail, and CIPP-SAM token or credential problems.\nRefresh=true runs the check now and sends alerts for new findings, the same as the daily timer.\nPreview=true runs the check now without alerting or changing stored state.\nResend=true runs the check now and re-sends every open Error/Warning finding.\nAspendora fork addition (Vikunja CIPP-2).",
         "parameters": [
           {
             "name": "Preview",
@@ -55690,6 +55690,14 @@
           },
           {
             "name": "Refresh",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Resend",
             "in": "query",
             "required": false,
             "schema": {

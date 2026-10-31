@@ -138,12 +138,12 @@ Describe 'Invoke-CIPPGDAPHealthCheck alerting and state' {
         function Remove-AzDataTableEntity { param($TableName, $Entity, [switch]$Force) foreach ($E in $Entity) { $script:Store.Remove("$($E.PartitionKey)|$($E.RowKey)") } }
         function New-GraphGetRequest { param($uri, $tenantid, $NoAuthCheck) if ($uri -match 'delegatedAdminRelationships') { if ($script:RelFail) { throw 'boom' }; return $script:Rels }; return @{ id = 'x' } }
         function New-GraphBulkRequest { param($tenantid, $NoAuthCheck, $Requests) foreach ($R in $Requests) { @{ id = $R.id; status = 200; body = @{ value = @(@{ id = 'a1'; status = 'active' }) } } } }
-        function Get-Tenants { @(New-Tenant 'c1') }
+        function Get-Tenants { param([switch]$IncludeAll) @(New-Tenant 'c1'); if ($IncludeAll) { [pscustomobject]@{ customerId = 'partner'; defaultDomainName = 'partner.com'; delegatedPrivilegeStatus = 'directTenant' } } }
         function Get-CIPPAuthentication { }
         function Test-CIPPSAMSecret { param([switch]$IncludeRefreshGrant) @{ ready = $true; reason = 'ready' } }
         function Get-CIPPSAMCredentials { [pscustomobject]@{ OwnSecretKeyId = 'k1'; Credentials = @([pscustomobject]@{ keyId = 'k1'; type = 'Secret'; endDateTime = $script:Now.AddDays(300).ToString('o') }) } }
         function Get-CippException { param($Exception) @{ NormalizedError = "$Exception" } }
-        function Send-CIPPAlert { param($Type, $Title, $HTMLContent, $JSONContent, $TenantFilter, $APIName, $PSAConsolidationKey) $script:Sent.Add([pscustomobject]@{ Type = $Type; Title = $Title }) }
+        function Send-CIPPAlert { param($Type, $Title, $HTMLContent, $JSONContent, $TenantFilter, $APIName, $PSAConsolidationKey) $script:Sent.Add([pscustomobject]@{ Type = $Type; Title = $Title; Tenant = $TenantFilter }) }
         function Write-LogMessage { param($API, $tenant, $message, $Sev, $LogData) }
     }
 
@@ -151,6 +151,8 @@ Describe 'Invoke-CIPPGDAPHealthCheck alerting and state' {
         $R = Invoke-CIPPGDAPHealthCheck
         $R.Alerted | Should -Be @('Expiring|r1|14')
         $script:Sent.Type | Should -Be @('email', 'psa', 'webhook')
+        # The PSA lookup matches on default domain, so the partner's domain must be sent, not its id.
+        @($script:Sent.Tenant | Select-Object -Unique) | Should -Be @('partner.com')
         $script:Sent.Clear()
         $null = Invoke-CIPPGDAPHealthCheck
         $script:Sent | Should -BeNullOrEmpty
@@ -183,6 +185,14 @@ Describe 'Invoke-CIPPGDAPHealthCheck alerting and state' {
         $script:Store.Keys | Should -Contain 'Finding|Expiring|r1|14'
         $R.Alerted | Should -Contain 'SamAuthFailing'
         $R.Findings.Key | Should -Not -Contain 'NoActiveRelationship|c1'
+    }
+
+    It 'Resend re-sends findings that were already alerted' {
+        $null = Invoke-CIPPGDAPHealthCheck
+        $script:Sent.Clear()
+        $R = Invoke-CIPPGDAPHealthCheck -Resend
+        $R.Alerted | Should -Be @('Expiring|r1|14')
+        $script:Sent[0].Title | Should -Match 'open issue'
     }
 
     It 'SkipAlerts sends nothing and writes nothing' {

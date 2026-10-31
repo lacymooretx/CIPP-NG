@@ -8,6 +8,7 @@ function Invoke-CIPPGDAPHealthCheck {
         Only new findings (and still-open "access is broken" findings every RealertDays) are sent, as one
         consolidated email/PSA/webhook alert. State and the latest report are kept in table GDAPHealthState.
         -SkipAlerts evaluates and returns the report without sending or touching state.
+        -Resend sends every open Error/Warning finding now, whether or not it was alerted before.
         Aspendora fork addition (Vikunja CIPP-2).
     .FUNCTIONALITY
         Internal
@@ -15,6 +16,8 @@ function Invoke-CIPPGDAPHealthCheck {
     [CmdletBinding()]
     param(
         [switch]$SkipAlerts,
+        # Send every open Error/Warning finding now, even ones already alerted.
+        [switch]$Resend,
         [int]$RealertDays = 7,
         $APIName = 'GDAP Health'
     )
@@ -147,7 +150,7 @@ function Invoke-CIPPGDAPHealthCheck {
         if ($Finding.Severity -eq 'Info') { continue }
         $Row = $StateByKey[$Finding.Key]
         # Never alerted (new, or every channel failed last time) means due.
-        $Due = -not $Row -or -not $Row.LastAlerted
+        $Due = $Resend -or -not $Row -or -not $Row.LastAlerted
         if (-not $Due -and $Finding.Realert) {
             try { $Due = ([datetimeoffset]$Row.LastAlerted).UtcDateTime -lt $Now.AddDays(-$RealertDays) } catch { $Due = $true }
         }
@@ -158,19 +161,23 @@ function Invoke-CIPPGDAPHealthCheck {
     $AlertSent = $false
     if ($ToAlert.Count -gt 0 -or ($CollectionErrors.Count -gt 0 -and $RelationshipError)) {
         $Title = if ($ToAlert.Count -gt 0) {
-            "GDAP health: $($ToAlert.Count) new issue(s), $(@($ToAlert | Where-Object Severity -EQ 'Error').Count) error(s)"
+            "GDAP health: $($ToAlert.Count) $(if ($Resend) { 'open' } else { 'new' }) issue(s), $(@($ToAlert | Where-Object Severity -EQ 'Error').Count) error(s)"
         } else { 'GDAP health check could not list GDAP relationships' }
         $Rows = @($ToAlert | Select-Object Severity, Tenant, Category, Relationship, @{ n = 'Ends'; e = { if ($_.EndDateTime) { ([datetimeoffset]$_.EndDateTime).UtcDateTime.ToString('yyyy-MM-dd') } } }, Message)
-        $Intro = "<p>The daily GDAP and token health check found $($ToAlert.Count) new issue(s). Open issues total: $($Summary.Errors) error(s), $($Summary.Warnings) warning(s). The full report is at /api/ListGDAPHealth.</p>"
+        $Intro = "<p>The daily GDAP and token health check found $($ToAlert.Count) $(if ($Resend) { 'open' } else { 'new' }) issue(s). Open issues total: $($Summary.Errors) error(s), $($Summary.Warnings) warning(s). The full report is at /api/ListGDAPHealth.</p>"
         $ErrorsHtml = if ($CollectionErrors.Count -gt 0) { "<p><b>Collection problems:</b></p><ul>$(($CollectionErrors | ForEach-Object { "<li>$([System.Net.WebUtility]::HtmlEncode($_))</li>" }) -join '')</ul>" } else { '' }
         $Html = "$Intro$(if ($Rows) { $Rows | ConvertTo-Html -Fragment | Out-String })$ErrorsHtml"
         $Json = ConvertTo-Json -InputObject ([pscustomobject]@{ title = $Title; summary = $Summary; findings = @($ToAlert); collectionErrors = @($CollectionErrors) }) -Depth 6 -Compress
+        # The PSA extensions resolve the ticket's company by the tenant's default domain, so a tenant id
+        # never matches a mapping. Send as the partner tenant's domain (map it under Extensions > ConnectWise).
+        $AlertTenant = (@(Get-Tenants -IncludeAll) | Where-Object { $_.customerId -eq $PartnerTenantId } | Select-Object -First 1).defaultDomainName
+        if (-not $AlertTenant) { $AlertTenant = $PartnerTenantId }
         foreach ($Channel in 'email', 'psa', 'webhook') {
             try {
                 if ($Channel -eq 'webhook') {
-                    $null = Send-CIPPAlert -Type $Channel -Title $Title -JSONContent $Json -TenantFilter $PartnerTenantId -APIName $APIName
+                    $null = Send-CIPPAlert -Type $Channel -Title $Title -JSONContent $Json -TenantFilter $AlertTenant -APIName $APIName
                 } else {
-                    $null = Send-CIPPAlert -Type $Channel -Title $Title -HTMLContent $Html -TenantFilter $PartnerTenantId -APIName $APIName -PSAConsolidationKey 'GDAPHealth'
+                    $null = Send-CIPPAlert -Type $Channel -Title $Title -HTMLContent $Html -TenantFilter $AlertTenant -APIName $APIName -PSAConsolidationKey 'GDAPHealth'
                 }
                 $AlertSent = $true
             } catch {

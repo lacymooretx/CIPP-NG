@@ -12,6 +12,7 @@ function Invoke-ListGDAPHealth {
         assignments, tenants whose Graph calls fail, and CIPP-SAM token or credential problems.
         Refresh=true runs the check now and sends alerts for new findings, the same as the daily timer.
         Preview=true runs the check now without alerting or changing stored state.
+        Resend=true runs the check now and re-sends every open Error/Warning finding.
         Aspendora fork addition (Vikunja CIPP-2).
     #>
     [CmdletBinding()]
@@ -19,10 +20,13 @@ function Invoke-ListGDAPHealth {
 
     $Refresh = [string]($Request.Query.Refresh ?? $Request.Body.Refresh) -eq 'true'
     $Preview = [string]($Request.Query.Preview ?? $Request.Body.Preview) -eq 'true'
+    $Resend = [string]($Request.Query.Resend ?? $Request.Body.Resend) -eq 'true'
 
     try {
         if ($Preview) {
             $Report = Invoke-CIPPGDAPHealthCheck -SkipAlerts
+        } elseif ($Resend) {
+            $Report = Invoke-CIPPGDAPHealthCheck -Resend
         } elseif ($Refresh) {
             $Report = Invoke-CIPPGDAPHealthCheck
         } else {
