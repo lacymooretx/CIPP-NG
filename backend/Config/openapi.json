@@ -55671,6 +55671,105 @@
         "x-cipp-any-tenant": true
       }
     },
+    "/api/ListGDAPHealth": {
+      "get": {
+        "summary": "GDAP relationship, partner token and SAM credential health report",
+        "operationId": "ListGDAPHealth",
+        "tags": [
+          "Tenant > GDAP"
+        ],
+        "description": "Returns the latest daily GDAP health report: relationships expiring at 30/14/7 days or already lapsed,\nauto-extend that Microsoft has not applied, managed tenants with no active relationship, removed access\nassignments, tenants whose Graph calls fail, and CIPP-SAM token or credential problems.\nRefresh=true runs the check now and sends alerts for new findings, the same as the daily timer.\nPreview=true runs the check now without alerting or changing stored state.\nAspendora fork addition (Vikunja CIPP-2).",
+        "parameters": [
+          {
+            "name": "Preview",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Refresh",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "description": "Derived from the fields written into the storage table it reads. Fields taken from the storage writers may be omitted by this endpoint, and the response may carry computed fields not listed here.",
+                    "properties": {
+                      "ETag": {
+                        "type": "string",
+                        "x-cipp-field-source": "storage"
+                      },
+                      "FindingKey": {
+                        "type": "string",
+                        "x-cipp-field-source": "storage"
+                      },
+                      "FirstSeen": {
+                        "type": "string",
+                        "x-cipp-field-source": "storage"
+                      },
+                      "LastAlerted": {
+                        "type": "string",
+                        "x-cipp-field-source": "storage"
+                      },
+                      "LastSeen": {
+                        "x-cipp-field-source": "storage"
+                      },
+                      "Message": {
+                        "type": "string",
+                        "x-cipp-field-source": "storage"
+                      },
+                      "PartitionKey": {
+                        "x-cipp-field-source": "storage"
+                      },
+                      "RowKey": {
+                        "x-cipp-field-source": "storage"
+                      },
+                      "Severity": {
+                        "type": "string",
+                        "x-cipp-field-source": "storage"
+                      },
+                      "Timestamp": {
+                        "type": "string",
+                        "x-cipp-field-source": "storage"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cipp-role": "Tenant.Relationship.Read",
+        "x-cipp-any-tenant": true
+      }
+    },
     "/api/ListGDAPInvite": {
       "get": {
         "summary": "ListGDAPInvite",

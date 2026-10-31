@@ -107,6 +107,15 @@
     "IsSystem": true
   },
   {
+    "Id": "5b0f7c2e-9a41-4d1e-b6c3-2f8e0d4a7c19",
+    "Command": "Start-GDAPHealthMonitorTimer",
+    "Description": "Daily GDAP relationship, partner token and SAM credential health check (Aspendora fork)",
+    "Cron": "0 0 12 * * *",
+    "Priority": 8,
+    "RunOnProcessor": true,
+    "IsSystem": true
+  },
+  {
     "Id": "ebe981b6-4417-406e-a1a5-7b8279058841",
     "Command": "Start-CIPPGraphSubscriptionRenewalTimer",
     "Description": "Orchestrator to renew Graph subscriptions",
