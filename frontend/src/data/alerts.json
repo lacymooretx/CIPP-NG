@@ -1019,5 +1019,11 @@
       }
     ],
     "description": "Raises a High alert for every sign-in (success or failure) by a registered break-glass account, every directory change to or by it, and if it is disabled or deleted. Register accounts per tenant with ExecBreakGlassAccounts (Action=Add)."
+  },
+  {
+    "name": "BreakGlassPosture",
+    "label": "Alert on weak break-glass (emergency access) setup",
+    "recommendedRunInterval": "7d",
+    "description": "Weekly check of the registered break-glass accounts: at least two, cloud-only on *.onmicrosoft.com, permanent Global Administrator, excluded from every enabled Conditional Access policy, non-expiring password, FIDO2 and no person-bound MFA, tested in the last 90 days. Also flags other accounts excluded from many All-users CA policies. Report only."
   }
 ]

@@ -49334,6 +49334,55 @@
         "x-cipp-role": "CIPP.BreachLookup.Read"
       }
     },
+    "/api/ListBreakGlassPosture": {
+      "get": {
+        "summary": "Break-glass (emergency access) posture check for a tenant",
+        "operationId": "ListBreakGlassPosture",
+        "tags": [
+          "Identity > Administration > Users"
+        ],
+        "description": "Checks the tenant's registered break-glass accounts: at least two; cloud-only on *.onmicrosoft.com; permanent\nactive Global Administrator (not PIM-eligible only); excluded from every enabled Conditional Access policy\n(users, groups and roles resolved); password never expires; FIDO2 and no person-bound methods; a successful\nsign-in within 90 days. Also flags other accounts excluded from many All-users CA policies.\nReport only: nothing is changed. Aspendora fork addition (Vikunja CIPP-4).",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/tenantFilter"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "description": "Not described statically: this endpoint returns the upstream response as-is, so its fields are determined by the upstream API rather than by CIPP. Call the endpoint to see the actual shape, or add a response schema in backend/Config/openapi-overrides."
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - missing required field or invalid input"
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cipp-role": "Identity.User.Read"
+      }
+    },
     "/api/ListCAGapAnalysis": {
       "get": {
         "summary": "ListCAGapAnalysis",
