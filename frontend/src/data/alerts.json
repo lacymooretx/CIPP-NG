@@ -1037,5 +1037,20 @@
     "label": "Alert on admins without phishing-resistant MFA",
     "recommendedRunInterval": "7d",
     "description": "Weekly check of every holder of a privileged directory role (active and PIM-eligible, group assignments expanded): no passkey, FIDO2 key, Windows Hello for Business, Platform Credential or certificate (Error for Global, Privileged Role and Privileged Authentication Administrator); admin account also licensed or mail-enabled; Global Admin count outside 2-4; passkeys disabled or not self-service; AAGUID restrictions blocking Microsoft Authenticator passkeys. Report only; see ListPhishResistantMfa."
+  },
+  {
+    "name": "OAuthHighRiskGrant",
+    "label": "Alert on high-risk OAuth grants and AI connectors with mail or file access",
+    "recommendedRunInterval": "1d",
+    "requiresInput": true,
+    "multipleInput": true,
+    "inputs": [
+      {
+        "inputType": "textField",
+        "inputLabel": "Allow-list: comma-separated appIds or app names (* wildcards allowed, e.g. Backup Application *). Supports custom variables like %oauthallowlist%.",
+        "inputName": "OAuthRiskAllowList"
+      }
+    ],
+    "description": "Daily live scan of every app's OAuth grants (ListOAuthGrantRisk). Raises apps scored Critical (app-only mailbox, file or directory access with no user signed in) or High (tenant-wide risky delegated consent, unverified publisher), and any AI connector with mail, files or sites scopes, unless allow-listed. Each app notifies once per scope set and resolves when the grant is removed. Includes blast radius and a suggested action (disable the service principal first: it keeps the config)."
   }
 ]
