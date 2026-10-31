@@ -17,7 +17,38 @@ function Get-CIPPAlertNewRiskyUsers {
         # Check if tenant has P2 capabilities
         $Capabilities = Get-CIPPTenantCapabilities -TenantFilter $TenantFilter
         if (-not ($Capabilities.AAD_PREMIUM_P2 -eq $true)) {
-            Write-LogMessage -API 'Alerts' -tenant $($TenantFilter) -message 'Tenant does not have Azure AD Premium P2 licensing required for risky users detection' -sev Warning
+            # Aspendora fork addition (Vikunja CIPP-8): without P2, identityProtection/riskyUsers refuses with
+            # "Required license not available", but riskDetections still answers. Alert on whatever risk
+            # detections it returns, as an event stream keyed on the detection id.
+            # Low-risk and already-closed detections are skipped; a level of 'hidden' (licence-limited) is kept.
+            $Since = (Get-Date).ToUniversalTime().AddDays(-7).ToString('yyyy-MM-ddTHH:mm:ssZ')
+            try {
+                $Detections = @(New-GraphGetRequest -uri "https://graph.microsoft.com/v1.0/identityProtection/riskDetections?`$filter=detectedDateTime ge $Since&`$top=500" -tenantid $TenantFilter -ErrorAction Stop | Where-Object { $_.id })
+            } catch {
+                Write-LogMessage -API 'Alerts' -tenant $($TenantFilter) -message "Tenant has no Entra ID P2 and risk detections could not be read either: $((Get-CippException -Exception $_).NormalizedError)" -sev Warning
+                return
+            }
+            $AlertData = foreach ($D in $Detections) {
+                if ($D.riskLevel -in @('low', 'none')) { continue }
+                if ($D.riskState -in @('dismissed', 'remediated', 'confirmedSafe')) { continue }
+                $Where = @($D.location.city, $D.location.countryOrRegion) | Where-Object { $_ }
+                [PSCustomObject]@{
+                    Id      = "RiskDetection|$($D.id)"
+                    Message = "Risk detection for $($D.userPrincipalName): $($D.riskEventType) ($($D.riskLevel))"
+                    Details = @{
+                        RiskEventType = $D.riskEventType
+                        RiskLevel     = $D.riskLevel
+                        RiskState     = $D.riskState
+                        Detected      = $D.detectedDateTime
+                        IPAddress     = $D.ipAddress
+                        Location      = ($Where -join ', ')
+                        Source        = 'riskDetections (tenant has no Entra ID P2; risky-user state is not available)'
+                        Severity      = if ($D.riskLevel -eq 'high') { 'Critical' } else { 'Warning' }
+                    }
+                    Tenant  = $TenantFilter
+                }
+            }
+            Write-AlertTrace -cmdletName $MyInvocation.MyCommand -tenantFilter $TenantFilter -data @($AlertData | Where-Object { $_ }) -Append
             return
         }
 

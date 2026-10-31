@@ -1,0 +1,47 @@
+{
+  "displayName": "Aspendora - Token Protection - Windows desktop apps (EXO, SPO, Teams) (CIPP-8)",
+  "state": "enabledForReportingButNotEnforced",
+  "conditions": {
+    "signInRiskLevels": [],
+    "userRiskLevels": [],
+    "servicePrincipalRiskLevels": [],
+    "clientAppTypes": [
+      "mobileAppsAndDesktopClients"
+    ],
+    "platforms": {
+      "includePlatforms": [
+        "windows"
+      ],
+      "excludePlatforms": []
+    },
+    "locations": null,
+    "devices": null,
+    "clientApplications": null,
+    "users": {
+      "includeUsers": [
+        "All"
+      ],
+      "excludeUsers": [],
+      "includeGroups": [],
+      "excludeGroups": [],
+      "includeRoles": [],
+      "excludeRoles": []
+    },
+    "applications": {
+      "includeApplications": [
+        "00000002-0000-0ff1-ce00-000000000000",
+        "00000003-0000-0ff1-ce00-000000000000",
+        "cc15fd57-2c6c-4117-a88c-83b1d56b4bbe"
+      ],
+      "excludeApplications": [],
+      "includeUserActions": [],
+      "includeAuthenticationContextClassReferences": []
+    }
+  },
+  "grantControls": null,
+  "sessionControls": {
+    "secureSignInSession": {
+      "isEnabled": true
+    }
+  }
+}
