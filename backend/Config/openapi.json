@@ -58691,6 +58691,63 @@
         "x-cipp-role": "Endpoint.MEM.Read"
       }
     },
+    "/api/ListIntuneEffectivePolicy": {
+      "get": {
+        "summary": "Effective Intune policy for one device",
+        "operationId": "ListIntuneEffectivePolicy",
+        "tags": [
+          "Endpoint > MEM"
+        ],
+        "description": "For one device (Intune managed device id, Entra deviceId or Entra object id), lists every Intune policy and\nassigned app that targets it through the device's or its primary user's transitive group membership, All\nDevices or All Users, with the group it came through, the assignment filter and whether CIPP could evaluate\nit, the exclusion that cancels it (exclusions win), and the device's reported status where Intune exposes\none. Policies for another platform are skipped. Also flags Settings Catalog settings set by two or more\napplicable policies (Conflict when the values differ, Overlap when they agree).\nReport only: nothing is changed. Aspendora fork addition (Vikunja CIPP-19).",
+        "parameters": [
+          {
+            "name": "DeviceId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/tenantFilter"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "description": "Not described statically: this endpoint returns the upstream response as-is, so its fields are determined by the upstream API rather than by CIPP. Call the endpoint to see the actual shape, or add a response schema in backend/Config/openapi-overrides."
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - missing required field or invalid input"
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cipp-role": "Endpoint.MEM.Read"
+      }
+    },
     "/api/ListIntuneIntents": {
       "get": {
         "summary": "ListIntuneIntents",
@@ -58886,6 +58943,55 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cipp-role": "Endpoint.MEM.Read"
+      }
+    },
+    "/api/ListIntunePolicyHygiene": {
+      "get": {
+        "summary": "Intune policy assignment hygiene for a tenant",
+        "operationId": "ListIntunePolicyHygiene",
+        "tags": [
+          "Endpoint > MEM"
+        ],
+        "description": "Finds Intune policies with no assignments, policies assigned only through exclusions, and assignments\n(policies and assigned apps) pointing at groups that no longer exist or have no members. Returns the\nfindings with a count summary by category and policy type.\nReport only: nothing is changed. Aspendora fork addition (Vikunja CIPP-19).",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/tenantFilter"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "description": "Not described statically: this endpoint returns the upstream response as-is, so its fields are determined by the upstream API rather than by CIPP. Call the endpoint to see the actual shape, or add a response schema in backend/Config/openapi-overrides."
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - missing required field or invalid input"
           },
           "401": {
             "description": "Unauthorized - invalid or missing bearer token"
