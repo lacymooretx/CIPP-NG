@@ -1052,5 +1052,11 @@
       }
     ],
     "description": "Daily live scan of every app's OAuth grants (ListOAuthGrantRisk). Raises apps scored Critical (app-only mailbox, file or directory access with no user signed in) or High (tenant-wide risky delegated consent, unverified publisher), and any AI connector with mail, files or sites scopes, unless allow-listed. Each app notifies once per scope set and resolves when the grant is removed. Includes blast radius and a suggested action (disable the service principal first: it keeps the config)."
+  },
+  {
+    "name": "OIBDrift",
+    "label": "Alert on outdated or retired OpenIntuneBaseline (OIB) policies",
+    "recommendedRunInterval": "7d",
+    "description": "Weekly check of the tenant's \"Win - OIB -\" Intune policies against the latest OpenIntuneBaseline Windows release on GitHub. Alerts on policies older than the version in that release (Outdated) and on policies the release deprecated or dropped (Retired). OIB policies the tenant has not deployed are not alerted on, and tenants with no OIB policies produce nothing. Report only."
   }
 ]
