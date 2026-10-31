@@ -63963,6 +63963,55 @@
         "x-cipp-role": "Identity.User.Read"
       }
     },
+    "/api/ListPhishResistantMfa": {
+      "get": {
+        "summary": "Phishing-resistant MFA report for a tenant's admins",
+        "operationId": "ListPhishResistantMfa",
+        "tags": [
+          "Identity > Administration > Users"
+        ],
+        "description": "Lists every holder of a privileged directory role (Global, Privileged Role, Privileged Authentication,\nSecurity, Exchange, SharePoint, User, Authentication, Conditional Access, Application, Cloud Application,\nIntune, Helpdesk and Billing Administrator), active and PIM-eligible, with group assignments expanded, and\nwhether each has a phishing-resistant method (passkey/FIDO2, Windows Hello for Business, Platform Credential,\ncertificate). Flags admins without one, admin accounts that also have a licence or mailbox, a Global Admin\ncount outside 2-4, passkeys disabled or not self-service, AAGUID restrictions that block Microsoft\nAuthenticator passkeys, and a disabled registration campaign. Returns Summary, Admins, Findings and Errors.\nReport only: nothing is changed. Aspendora fork addition (Vikunja CIPP-7).",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/tenantFilter"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "description": "Not described statically: this endpoint returns the upstream response as-is, so its fields are determined by the upstream API rather than by CIPP. Call the endpoint to see the actual shape, or add a response schema in backend/Config/openapi-overrides."
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - missing required field or invalid input"
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cipp-role": "Identity.User.Read"
+      }
+    },
     "/api/ListPIMRoles": {
       "get": {
         "summary": "List Entra directory roles grouped with their PIM assignment breakdown.",

@@ -1031,5 +1031,11 @@
     "label": "Alert when EWS is off or unset while apps still use it",
     "recommendedRunInterval": "1d",
     "description": "Microsoft's EWS shutdown flips an unset EwsEnabled to False and EWS stops within about an hour. This alerts when EwsEnabled is False (Error) or unset (Warning) in a tenant where apps hold EWS permissions (backup, email security, iOS Mail). Pin with ListEwsStatus Action=Pin."
+  },
+  {
+    "name": "PhishResistantAdmins",
+    "label": "Alert on admins without phishing-resistant MFA",
+    "recommendedRunInterval": "7d",
+    "description": "Weekly check of every holder of a privileged directory role (active and PIM-eligible, group assignments expanded): no passkey, FIDO2 key, Windows Hello for Business, Platform Credential or certificate (Error for Global, Privileged Role and Privileged Authentication Administrator); admin account also licensed or mail-enabled; Global Admin count outside 2-4; passkeys disabled or not self-service; AAGUID restrictions blocking Microsoft Authenticator passkeys. Report only; see ListPhishResistantMfa."
   }
 ]
