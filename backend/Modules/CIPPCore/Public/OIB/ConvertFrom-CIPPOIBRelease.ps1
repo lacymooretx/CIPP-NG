@@ -48,7 +48,7 @@ function ConvertFrom-CIPPOIBRelease {
     $Policies = [System.Collections.Generic.List[object]]::new()
     $Seen = @{}
     foreach ($Path in $Paths) {
-        if ($Path -notmatch '^WINDOWS/IntuneManagement/(?<type>[^/]+)/(?<file>[^/]+)\.json$') { continue }
+        if (-not ($Path -match '^WINDOWS/IntuneManagement/(?<type>[^/]+)/(?<file>[^/]+)\.json$')) { continue }
         $Name = $Matches.file
         $Type = $Matches.type
         if (-not (ConvertFrom-CIPPOIBPolicyName -Name $Name).IsOib) { continue }

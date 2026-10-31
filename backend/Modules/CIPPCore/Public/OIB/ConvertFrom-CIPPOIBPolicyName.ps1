@@ -33,17 +33,19 @@ function ConvertFrom-CIPPOIBPolicyName {
     if ([string]::IsNullOrWhiteSpace($Name)) { return [pscustomobject]$Result }
 
     $Clean = ($Name -replace '\s+', ' ').Trim()
-    if ($Clean -notmatch '^Win ?- ?OIB ?- ?(?<body>.+)$') { return [pscustomobject]$Result }
+    # -match (not -notmatch): only a successful -match is guaranteed to populate $Matches.
+    if (-not ($Clean -match '^Win ?- ?OIB ?- ?(?<body>.+)$')) { return [pscustomobject]$Result }
     $Body = $Matches.body
     $Result.IsOib = $true
 
     # Greedy body: the LAST " - v<digits>" token is the version.
     if ($Body -match '^(?<core>.+) ?- ?v(?<ver>\d+(?:\.\d+){0,3})(?![\d.])(?<rest>.*)$') {
-        $Core = $Matches.core.Trim().TrimEnd('-').Trim()
-        $Ver = $Matches.ver
-        if ($Ver -notmatch '\.') { $Ver = "$Ver.0" }
+        # Copy every group first: any later -match/-notmatch overwrites $Matches.
+        $Core = ([string]$Matches.core).Trim().TrimEnd('-').Trim()
+        $Ver = [string]$Matches.ver
+        $Rest = ([string]$Matches.rest).Trim()
+        if (-not $Ver.Contains('.')) { $Ver = "$Ver.0" }
         $Result.Version = $Ver
-        $Rest = $Matches.rest.Trim()
         if ($Rest) { $Result.Suffix = $Rest }
     } else {
         $Core = $Body.Trim()
