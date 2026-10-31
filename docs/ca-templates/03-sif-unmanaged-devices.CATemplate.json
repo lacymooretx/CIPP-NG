@@ -1,0 +1,53 @@
+{
+  "displayName": "Aspendora - Sign-in frequency 12h and no persistent browser on unmanaged devices (CIPP-8)",
+  "state": "enabledForReportingButNotEnforced",
+  "conditions": {
+    "signInRiskLevels": [],
+    "userRiskLevels": [],
+    "servicePrincipalRiskLevels": [],
+    "clientAppTypes": [
+      "all"
+    ],
+    "platforms": null,
+    "locations": null,
+    "devices": {
+      "deviceFilter": {
+        "mode": "include",
+        "rule": "device.isCompliant -ne True -and device.trustType -ne \"ServerAD\""
+      }
+    },
+    "clientApplications": null,
+    "users": {
+      "includeUsers": [
+        "All"
+      ],
+      "excludeUsers": [],
+      "includeGroups": [],
+      "excludeGroups": [],
+      "includeRoles": [],
+      "excludeRoles": []
+    },
+    "applications": {
+      "includeApplications": [
+        "All"
+      ],
+      "excludeApplications": [],
+      "includeUserActions": [],
+      "includeAuthenticationContextClassReferences": []
+    }
+  },
+  "grantControls": null,
+  "sessionControls": {
+    "signInFrequency": {
+      "isEnabled": true,
+      "authenticationType": "primaryAndSecondaryAuthentication",
+      "frequencyInterval": "timeBased",
+      "type": "hours",
+      "value": 12
+    },
+    "persistentBrowser": {
+      "isEnabled": true,
+      "mode": "never"
+    }
+  }
+}

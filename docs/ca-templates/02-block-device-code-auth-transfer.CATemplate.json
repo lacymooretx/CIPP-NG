@@ -1,0 +1,46 @@
+{
+  "displayName": "Aspendora - Block device code flow and authentication transfer (CIPP-8)",
+  "state": "enabledForReportingButNotEnforced",
+  "conditions": {
+    "signInRiskLevels": [],
+    "userRiskLevels": [],
+    "servicePrincipalRiskLevels": [],
+    "clientAppTypes": [
+      "all"
+    ],
+    "platforms": null,
+    "locations": null,
+    "devices": null,
+    "clientApplications": null,
+    "users": {
+      "includeUsers": [
+        "All"
+      ],
+      "excludeUsers": [],
+      "includeGroups": [],
+      "excludeGroups": [],
+      "includeRoles": [],
+      "excludeRoles": []
+    },
+    "applications": {
+      "includeApplications": [
+        "All"
+      ],
+      "excludeApplications": [],
+      "includeUserActions": [],
+      "includeAuthenticationContextClassReferences": []
+    },
+    "authenticationFlows": {
+      "transferMethods": "deviceCodeFlow,authenticationTransfer"
+    }
+  },
+  "grantControls": {
+    "operator": "OR",
+    "builtInControls": [
+      "block"
+    ],
+    "customAuthenticationFactors": [],
+    "termsOfUse": []
+  },
+  "sessionControls": null
+}
