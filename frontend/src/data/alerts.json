@@ -1031,5 +1031,20 @@
     "label": "Alert when EWS is off or unset while apps still use it",
     "recommendedRunInterval": "1d",
     "description": "Microsoft's EWS shutdown flips an unset EwsEnabled to False and EWS stops within about an hour. This alerts when EwsEnabled is False (Error) or unset (Warning) in a tenant where apps hold EWS permissions (backup, email security, iOS Mail). Pin with ListEwsStatus Action=Pin."
+  },
+  {
+    "name": "OAuthHighRiskGrant",
+    "label": "Alert on high-risk OAuth grants and AI connectors with mail or file access",
+    "recommendedRunInterval": "1d",
+    "requiresInput": true,
+    "multipleInput": true,
+    "inputs": [
+      {
+        "inputType": "textField",
+        "inputLabel": "Allow-list: comma-separated appIds or app names (* wildcards allowed, e.g. Backup Application *). Supports custom variables like %oauthallowlist%.",
+        "inputName": "OAuthRiskAllowList"
+      }
+    ],
+    "description": "Daily live scan of every app's OAuth grants (ListOAuthGrantRisk). Raises apps scored Critical (app-only mailbox, file or directory access with no user signed in) or High (tenant-wide risky delegated consent, unverified publisher), and any AI connector with mail, files or sites scopes, unless allow-listed. Each app notifies once per scope set and resolves when the grant is removed. Includes blast radius and a suggested action (disable the service principal first: it keeps the config)."
   }
 ]

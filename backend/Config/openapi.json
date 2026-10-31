@@ -63131,6 +63131,63 @@
         "x-cipp-role": "Tenant.Application.Read"
       }
     },
+    "/api/ListOAuthGrantRisk": {
+      "get": {
+        "summary": "Risk-scored OAuth grants (app-only and delegated) per client app, with AI/SaaS connectors flagged",
+        "operationId": "ListOAuthGrantRisk",
+        "tags": [
+          "Tenant > Reports"
+        ],
+        "description": "Live Graph inventory of every client app's application permissions on Microsoft Graph, Exchange Online and\nSharePoint, and its delegated grants (tenant-wide or per user), scored by Measure-CIPPOAuthGrantRisk: app-only\nmailbox/file/directory access is Critical, tenant-wide high-risk delegated consent is High. Each app has\nreasons, a blast-radius sentence and a suggested action; AI connectors are matched against Config/ShadowAI.json.\nApps are sorted by score. MinRisk (Critical, High, Medium or Low; default Low = all) drops lower-scored apps.\nReport only: nothing is changed. Aspendora fork addition (Vikunja CIPP-11).",
+        "parameters": [
+          {
+            "name": "MinRisk",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/tenantFilter"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "description": "Not described statically: this endpoint returns the upstream response as-is, so its fields are determined by the upstream API rather than by CIPP. Call the endpoint to see the actual shape, or add a response schema in backend/Config/openapi-overrides."
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - missing required field or invalid input"
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cipp-role": "Tenant.Application.Read"
+      }
+    },
     "/api/ListObjectHistory": {
       "get": {
         "summary": "In progress concept - Rvd\nReturns a transformed timeline of audit events for any tenant object over a configurable period.",
