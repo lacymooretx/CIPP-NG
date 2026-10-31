@@ -5,7 +5,7 @@ import {
   Delete,
   PlaylistAdd,
   Refresh,
-  RemoveCircleOutline,
+  RemoveCircleOutlined as RemoveCircleOutline,
   RocketLaunch,
   SystemUpdateAlt,
 } from '@mui/icons-material'

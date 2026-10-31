@@ -1,0 +1,12 @@
+[
+  {
+    "label": "Registered accounts",
+    "path": "/identity/administration/break-glass",
+    "icon": "Shield"
+  },
+  {
+    "label": "Posture",
+    "path": "/identity/administration/break-glass/posture",
+    "icon": "Security"
+  }
+]

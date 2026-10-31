@@ -42,6 +42,11 @@ export const nativeMenuItems = [
             permissions: ['Identity.User.*'],
           },
           {
+            title: 'Break-glass Accounts',
+            path: '/identity/administration/break-glass',
+            permissions: ['Identity.User.*'],
+          },
+          {
             title: 'Groups',
             path: '/identity/administration/groups',
             permissions: ['Identity.Group.*'],
