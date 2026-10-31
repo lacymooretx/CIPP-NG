@@ -20,7 +20,9 @@ function Invoke-ExecDeleteGDAPRelationship {
         $Relationship = New-GraphGetRequest -NoAuthCheck $true -uri "https://graph.microsoft.com/beta/tenantRelationships/delegatedAdminRelationships/$($GDAPId)" -tenantid $env:TenantID
         if ($Relationship.status -eq 'created') {
             $null = New-GraphPostRequest -NoAuthCheck $true -uri "https://graph.microsoft.com/beta/tenantRelationships/delegatedAdminRelationships/$($GDAPId)" -type DELETE -tenantid $env:TenantID -AddedHeaders @{ 'If-Match' = $Relationship.'@odata.etag' }
-            $Result = "Success. Unaccepted GDAP invite $($Relationship.displayName) ($($GDAPId)) has been deleted"
+            # Microsoft accepts the DELETE but has been seen to leave the invite in 'created' for a while
+            # afterwards (2026-10-31), so report the request, not the outcome.
+            $Result = "Delete requested for unaccepted GDAP invite $($Relationship.displayName) ($($GDAPId)). Microsoft accepted it; it can take a while to disappear from the list."
         } else {
             $null = New-GraphPostRequest -NoAuthCheck $True -uri "https://graph.microsoft.com/beta/tenantRelationships/delegatedAdminRelationships/$($GDAPId)/requests" -type POST -body '{"action":"terminate"}' -tenantid $env:TenantID
             $Result = "Success. GDAP relationship for $($GDAPId) been revoked"

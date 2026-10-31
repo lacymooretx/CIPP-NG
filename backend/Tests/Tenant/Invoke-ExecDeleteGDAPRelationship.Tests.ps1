@@ -38,7 +38,7 @@ Describe 'Invoke-ExecDeleteGDAPRelationship' {
         $script:Calls[0].Type | Should -Be 'DELETE'
         $script:Calls[0].Uri | Should -Match 'delegatedAdminRelationships/rel-1$'
         $script:Calls[0].Headers.'If-Match' | Should -Be 'W/"abc"'
-        $R.Body.Results | Should -Match 'deleted'
+        $R.Body.Results | Should -Match 'Delete requested'
     }
 
     It 'terminates an active relationship' {
