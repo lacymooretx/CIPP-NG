@@ -743,6 +743,17 @@ export const nativeMenuItems = [
             docsPath: 'endpoint/mem/approval-requests',
             permissions: ['Endpoint.MEM.*'],
           },
+          // Aspendora fork addition (Vikunja CIPP-19): read-only Intune assignment views.
+          {
+            title: 'Effective Policy',
+            path: '/endpoint/MEM/effective-policy',
+            permissions: ['Endpoint.MEM.*'],
+          },
+          {
+            title: 'Intune Hygiene',
+            path: '/endpoint/MEM/intune-hygiene',
+            permissions: ['Endpoint.MEM.*'],
+          },
         ],
       },
       {
