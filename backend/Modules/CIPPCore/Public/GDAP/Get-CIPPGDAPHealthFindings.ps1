@@ -37,7 +37,10 @@ function Get-CIPPGDAPHealthFindings {
         # A SAM credential this close to expiry means the weekly rotation (which fires at 30 days) has failed.
         [int]$SamCredentialWarnDays = 14,
         # The relationship list could not be read: skip the coverage rule instead of flagging every tenant.
-        [switch]$RelationshipsUnavailable
+        [switch]$RelationshipsUnavailable,
+        # Customer tenant ids an operator chose to ignore (e.g. a former or never-managed customer).
+        # Their relationships produce no findings at all.
+        [string[]]$IgnoredCustomers = @()
     )
 
     $GlobalAdminRoleId = '62e90394-69f5-4237-9190-012177145e10'
@@ -88,6 +91,7 @@ function Get-CIPPGDAPHealthFindings {
 
     foreach ($Relationship in $Relationships) {
         $CustomerId = [string]$Relationship.customer.tenantId
+        if ($CustomerId -and $CustomerId -in $IgnoredCustomers) { continue }
         $Managed = $ManagedTenants.ContainsKey($CustomerId)
         $TenantName = if ($Managed) { $ManagedTenants[$CustomerId].displayName } elseif ($Relationship.customer.displayName) { $Relationship.customer.displayName } else { 'a customer not yet identified' }
         $TenantLabel = "$TenantName$(if (-not $Managed) { ' (not managed in CIPP)' })"
@@ -148,13 +152,14 @@ function Get-CIPPGDAPHealthFindings {
             $Relationship = $Relationships | Where-Object { [string]$_.id -eq $LostId } | Select-Object -First 1
             if (-not $Relationship) { $Relationship = [pscustomobject]@{ id = $LostId; displayName = $LostId; status = 'missing'; customer = [pscustomobject]@{ tenantId = ''; displayName = '' } } }
             $CustomerId = [string]$Relationship.customer.tenantId
+            if ($CustomerId -and $CustomerId -in $IgnoredCustomers) { continue }
             $Managed = $ManagedTenants.ContainsKey($CustomerId)
             & $AddFinding "RelationshipLost|$LostId" 'RelationshipLost' ($Managed ? 'Error' : 'Warning') "GDAP relationship '$($Relationship.displayName)' for $($Relationship.customer.displayName) was active at the last check and is now $($Relationship.status)." $Relationship $CustomerId $Relationship.customer.displayName $false
         }
     }
 
     # Managed tenants with no active relationship at all.
-    foreach ($CustomerId in @(if (-not $RelationshipsUnavailable) { $ManagedTenants.Keys })) {
+    foreach ($CustomerId in @(if (-not $RelationshipsUnavailable) { $ManagedTenants.Keys | Where-Object { $_ -notin $IgnoredCustomers } })) {
         $Active = @($ByCustomer[$CustomerId] | Where-Object { $_.status -eq 'active' })
         if ($Active.Count -eq 0) {
             $Tenant = $ManagedTenants[$CustomerId]

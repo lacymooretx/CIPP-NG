@@ -24843,6 +24843,105 @@
         "x-cipp-any-tenant": true
       }
     },
+    "/api/ExecGDAPHealthIgnore": {
+      "post": {
+        "summary": "Ignore (or stop ignoring) a GDAP customer in the GDAP health check",
+        "operationId": "ExecGDAPHealthIgnore",
+        "tags": [
+          "Tenant > GDAP"
+        ],
+        "description": "Action=Ignore   stops the GDAP health check reporting anything for the customer's relationships\n                (for a former customer, or one we never manage). Name and Reason are recorded.\nAction=Unignore reports on the customer again.\nAction=List     (default) lists ignored customers.\nOpen findings for the customer clear on the next check. Nothing in Partner Center changes.\nAspendora fork addition (Vikunja CIPP-2).",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "Action": {
+                    "type": "string"
+                  },
+                  "Name": {
+                    "type": "string"
+                  },
+                  "Reason": {
+                    "type": "string"
+                  },
+                  "TenantId": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "Action",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Name",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Reason",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "TenantId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardResults"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - missing required field or invalid input"
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cipp-role": "Tenant.Relationship.ReadWrite",
+        "x-cipp-any-tenant": true
+      }
+    },
     "/api/ExecGDAPInvite": {
       "post": {
         "summary": "ExecGDAPInvite",

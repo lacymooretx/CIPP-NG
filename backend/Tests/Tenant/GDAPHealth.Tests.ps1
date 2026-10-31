@@ -113,6 +113,14 @@ Describe 'Get-CIPPGDAPHealthFindings' {
         @($F | Where-Object Severity -NE 'Error') | Should -BeNullOrEmpty
     }
 
+    It 'reports nothing at all for an ignored customer, managed or not' {
+        $Prev = @{ ActiveRelationshipIds = @('r1', 'r2'); AssignmentIds = @{} }
+        $Rels = @((New-Rel 'r1' 'c1' -EndDays -3), (New-Rel 'r2' 'x9' -Status 'terminated'), (New-Rel 'p1' 'x9' -Status 'created'))
+        $F = Find @{ Relationships = $Rels; Tenants = @(New-Tenant 'c1'); Previous = $Prev; IgnoredCustomers = @('c1', 'x9') }
+        $F | Should -BeNullOrEmpty
+        (Find @{ Relationships = @(); Tenants = @(New-Tenant 'c1'); IgnoredCustomers = @('c1') }) | Should -BeNullOrEmpty
+    }
+
     It 'does not flag a SAM credential with more than 14 days left' {
         $Sam = @{ Ready = $true; CredentialType = 'Secret'; CredentialExpires = $script:Now.AddDays(40).ToString('o') }
         (Find @{ Relationships = @(New-Rel 'r1' 'c1'); Tenants = @(New-Tenant 'c1'); SamStatus = $Sam }) | Should -BeNullOrEmpty
@@ -193,6 +201,15 @@ Describe 'Invoke-CIPPGDAPHealthCheck alerting and state' {
         $R = Invoke-CIPPGDAPHealthCheck -Resend
         $R.Alerted | Should -Be @('Expiring|r1|14')
         $script:Sent[0].Title | Should -Match 'open issue'
+    }
+
+    It 'clears an ignored customer''s open finding and lists it in the report' {
+        $null = Invoke-CIPPGDAPHealthCheck
+        $script:Store['Ignore|c1'] = [pscustomobject]@{ PartitionKey = 'Ignore'; RowKey = 'c1'; Name = 'Cust c1'; Reason = 'left' }
+        $R = Invoke-CIPPGDAPHealthCheck
+        $R.Findings | Should -BeNullOrEmpty
+        $R.Ignored.TenantId | Should -Be @('c1')
+        $script:Store.Keys | Should -Not -Contain 'Finding|Expiring|r1|14'
     }
 
     It 'SkipAlerts sends nothing and writes nothing' {

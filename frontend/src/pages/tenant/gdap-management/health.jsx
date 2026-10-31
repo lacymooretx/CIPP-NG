@@ -39,6 +39,25 @@ const actions = [
     icon: <CippIcons.Launch />,
     condition: (row) => Boolean(row?.RelationshipId && row?.TenantId),
   },
+  {
+    label: "Ignore this customer",
+    type: "POST",
+    url: "/api/ExecGDAPHealthIgnore",
+    data: { Action: "!Ignore", TenantId: "TenantId", Name: "Tenant" },
+    fields: [
+      {
+        name: "Reason",
+        label: "Reason (e.g. former customer, never managed)",
+        type: "textField",
+      },
+    ],
+    confirmText:
+      "Stop reporting on [Tenant]? Nothing changes in Partner Center; its findings clear at the next check. You can undo this under Ignored customers below.",
+    color: "warning",
+    icon: <CippIcons.VisibilityOff />,
+    relatedQueryKeys: [queryKey],
+    condition: (row) => Boolean(row?.TenantId) && row?.Category !== "SamAuth" && row?.Category !== "SamCredential",
+  },
 ];
 
 const simpleColumns = [
@@ -60,11 +79,13 @@ const filters = [
 const Page = () => {
   const report = ApiGetCall({ url: "/api/ListGDAPHealth", queryKey });
   const runCheck = ApiPostCall({ relatedQueryKeys: [queryKey] });
+  const unignore = ApiPostCall({ relatedQueryKeys: [queryKey] });
   const data = report.data ?? {};
   const findings = Array.isArray(data.Findings) ? data.Findings : [];
   const summary = data.Summary ?? {};
   const generated = data.GeneratedUtc ? new Date(data.GeneratedUtc).toLocaleString() : "Never";
   const collectionErrors = Array.isArray(data.CollectionErrors) ? data.CollectionErrors : [];
+  const ignored = Array.isArray(data.Ignored) ? data.Ignored : [];
 
   return (
     <Container maxWidth={false} sx={{ flexGrow: 1, py: 2 }}>
@@ -115,6 +136,41 @@ const Page = () => {
             }
           />
         </Grid>
+        {ignored.length > 0 && (
+          <Grid size={12}>
+            <Typography variant="subtitle2" sx={{ mb: 1 }}>
+              Ignored customers (no findings are reported for these)
+            </Typography>
+            <Stack spacing={1}>
+              {ignored.map((item) => (
+                <Stack key={item.TenantId} direction="row" spacing={2} alignItems="center">
+                  <Typography variant="body2" sx={{ minWidth: 240 }}>
+                    {item.Name || item.TenantId}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ flexGrow: 1 }}>
+                    {item.Reason || "No reason given"}
+                    {item.IgnoredBy ? ` (by ${item.IgnoredBy})` : ""}
+                  </Typography>
+                  <Button
+                    size="small"
+                    disabled={unignore.isPending}
+                    onClick={() =>
+                      unignore.mutate({
+                        url: "/api/ExecGDAPHealthIgnore",
+                        data: { Action: "Unignore", TenantId: item.TenantId },
+                      })
+                    }
+                  >
+                    Unignore
+                  </Button>
+                </Stack>
+              ))}
+            </Stack>
+            <Typography variant="caption" color="text.secondary">
+              Changes take effect at the next check (Run check now, or the daily run).
+            </Typography>
+          </Grid>
+        )}
       </Grid>
     </Container>
   );

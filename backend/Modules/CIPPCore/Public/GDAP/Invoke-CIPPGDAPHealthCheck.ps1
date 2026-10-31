@@ -111,6 +111,10 @@ function Invoke-CIPPGDAPHealthCheck {
         $CollectionErrors.Add("Reading CIPP-SAM credentials failed: $($_.Exception.Message)")
     }
 
+    # Customers an operator chose to ignore (ExecGDAPHealthIgnore).
+    $Ignored = @(Get-CIPPAzDataTableEntity @Table -Filter "PartitionKey eq 'Ignore'")
+    $IgnoredIds = @($Ignored | ForEach-Object { [string]$_.RowKey })
+
     $FindingParams = @{
         Relationships     = @($Relationships)
         AccessAssignments = $AccessAssignments
@@ -120,6 +124,7 @@ function Invoke-CIPPGDAPHealthCheck {
         Previous          = if ($Relationships) { $Previous } else { $null }
         PartnerTenantId   = $PartnerTenantId
         Now               = $Now
+        IgnoredCustomers  = $IgnoredIds
     }
     if ($RelationshipError) { $FindingParams.RelationshipsUnavailable = $true }
     $Findings = @(Get-CIPPGDAPHealthFindings @FindingParams)
@@ -137,6 +142,7 @@ function Invoke-CIPPGDAPHealthCheck {
         Summary          = $Summary
         Findings         = $Findings
         CollectionErrors = @($CollectionErrors)
+        Ignored          = @($Ignored | ForEach-Object { [pscustomobject]@{ TenantId = $_.RowKey; Name = $_.Name; Reason = $_.Reason; IgnoredBy = $_.IgnoredBy; IgnoredUtc = $_.IgnoredUtc } })
         Alerted          = @()
     }
     if ($SkipAlerts) { return [pscustomobject]$Report }
