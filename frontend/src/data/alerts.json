@@ -1025,5 +1025,11 @@
     "label": "Alert on weak break-glass (emergency access) setup",
     "recommendedRunInterval": "7d",
     "description": "Weekly check of the registered break-glass accounts: at least two, cloud-only on *.onmicrosoft.com, permanent Global Administrator, excluded from every enabled Conditional Access policy, non-expiring password, FIDO2 and no person-bound MFA, tested in the last 90 days. Also flags other accounts excluded from many All-users CA policies. Report only."
+  },
+  {
+    "name": "EwsEnabled",
+    "label": "Alert when EWS is off or unset while apps still use it",
+    "recommendedRunInterval": "1d",
+    "description": "Microsoft's EWS shutdown flips an unset EwsEnabled to False and EWS stops within about an hour. This alerts when EwsEnabled is False (Error) or unset (Warning) in a tenant where apps hold EWS permissions (backup, email security, iOS Mail). Pin with ListEwsStatus Action=Pin."
   }
 ]

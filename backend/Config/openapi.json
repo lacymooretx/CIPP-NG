@@ -54839,6 +54839,91 @@
         "x-cipp-role": "Exchange.Equipment.Read"
       }
     },
+    "/api/ListEwsStatus": {
+      "post": {
+        "summary": "Exchange Web Services (EWS) status for a tenant, with an optional one-click pin",
+        "operationId": "ListEwsStatus",
+        "tags": [
+          "Email-Exchange > Administration"
+        ],
+        "description": "Default: EwsEnabled (True / False / unset), the apps holding EWS permissions (full_access_as_app or\nEWS.AccessAsUser.All) and findings. IncludeUsage=true also scans 7 days of the audit log for EWS mailbox reads\n(slow). Action=Pin sets EwsEnabled to True so Microsoft's rollout cannot switch EWS off underneath those apps;\nit takes about an hour to apply. Aspendora fork addition (Vikunja CIPP-29).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "Action": {
+                    "type": "string"
+                  },
+                  "IncludeUsage": {
+                    "type": "string"
+                  },
+                  "tenantFilter": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "tenantFilter"
+                ]
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "Action",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "IncludeUsage",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/tenantFilter"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardResults"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - missing required field or invalid input"
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cipp-role": "Exchange.Mailbox.ReadWrite"
+      }
+    },
     "/api/ListExchangeConnectors": {
       "get": {
         "summary": "ListExchangeConnectors",
