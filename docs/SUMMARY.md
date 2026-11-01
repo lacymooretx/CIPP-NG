@@ -121,6 +121,7 @@
     * [Guest Inventory](user-documentation/identity/reports/guest-inventory.md)
     * [SMS/Voice MFA Readiness](user-documentation/identity/reports/sms-mfa-readiness.md)
     * [Role Assignment Report](user-documentation/identity/reports/role-assignment-report.md)
+    * [Sign-in Failure Explainer](user-documentation/identity/reports/signin-explainer.md)
 * [Tenant Administration](user-documentation/tenant/README.md)
   * [Administration](user-documentation/tenant/administration/README.md)
     * [Tenants](user-documentation/tenant/administration/tenants/README.md)

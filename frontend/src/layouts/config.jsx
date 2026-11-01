@@ -150,6 +150,12 @@ export const nativeMenuItems = [
             path: '/identity/reports/role-assignment-report',
             permissions: ['Identity.Role.*'],
           },
+          // Aspendora fork addition (Vikunja CIPP-10): helpdesk sign-in failure explainer.
+          {
+            title: 'Sign-in Failure Explainer',
+            path: '/identity/reports/signin-explainer',
+            permissions: ['Identity.User.*'],
+          },
         ],
       },
     ],
