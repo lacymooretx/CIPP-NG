@@ -1,0 +1,31 @@
+{
+  "_comment": "Aspendora fork addition (Vikunja CIPP-30). Abused top-level domains used by the TLD block templates (Config/TenantAllowBlockListTemplates/AbusedTlds-*.json) and the ListTldExposure audit. Keep the templates in step with this list; backend/Tests/Email/AbusedTldTemplates.Tests.ps1 fails if they drift. senderRisk/urlRisk = false-positive risk for US SMB clients (Low / Medium / High).",
+  "version": "2026-10-31",
+  "sources": [
+    "Spamhaus 'Most abused top level domains' (spamhaus.org/reputation-statistics/cctlds)",
+    "Interisle Consulting 'Phishing Landscape' 2023-2025 (new gTLD and Freenom ccTLD abuse)",
+    "Microsoft Learn: tenant-allow-block-list-email-spoof-configure (*.TLD sender syntax) and tenant-allow-block-list-urls-configure (*.TLD/* URL syntax)"
+  ],
+  "tlds": [
+    { "tld": "zip", "senderRisk": "Low", "urlRisk": "High", "note": "Google gTLD that looks like a file extension. Almost no mail is sent from .zip domains, but a URL block can match plain-text file names such as 'report.zip' in a message body, and Microsoft may refuse *.zip/* as a file extension. URL block is in its own template." },
+    { "tld": "mov", "senderRisk": "Low", "urlRisk": "High", "note": "Same issue as .zip ('clip.mov' in body text). URL block is in its own template." },
+    { "tld": "top", "senderRisk": "Low", "urlRisk": "Medium", "note": "Consistently in the top abused gTLDs. A few legitimate APAC suppliers and some marketing link domains use it." },
+    { "tld": "xyz", "senderRisk": "Medium", "urlRisk": "Medium", "note": "Cheap and heavily abused, but also used by real startups, crypto/web3 vendors and some SaaS (e.g. abc.xyz). Check ListTldExposure before enforcing." },
+    { "tld": "click", "senderRisk": "Low", "urlRisk": "Medium", "note": "Abused for phishing landing pages; some email service providers and link shorteners use .click tracking domains, so the URL block can catch marketing mail." },
+    { "tld": "sbs", "senderRisk": "Low", "urlRisk": "Low", "note": "High abuse rate, little legitimate US business use." },
+    { "tld": "cfd", "senderRisk": "Low", "urlRisk": "Low", "note": "High abuse rate, little legitimate US business use." },
+    { "tld": "bond", "senderRisk": "Low", "urlRisk": "Low", "note": "High abuse rate. Some financial-services marketing has used it." },
+    { "tld": "cyou", "senderRisk": "Low", "urlRisk": "Low", "note": "High abuse rate, little legitimate use." },
+    { "tld": "icu", "senderRisk": "Low", "urlRisk": "Low", "note": "Long-running spam source." },
+    { "tld": "buzz", "senderRisk": "Low", "urlRisk": "Low", "note": "High abuse rate; occasional media/marketing use." },
+    { "tld": "rest", "senderRisk": "Low", "urlRisk": "Low", "note": "High abuse rate, little legitimate use." },
+    { "tld": "quest", "senderRisk": "Low", "urlRisk": "Low", "note": "High abuse rate; some gaming sites." },
+    { "tld": "lol", "senderRisk": "Low", "urlRisk": "Low", "note": "High abuse rate; some meme/gaming sites." },
+    { "tld": "country", "senderRisk": "Low", "urlRisk": "Low", "note": "Historically one of the worst ratios of abuse to registrations." },
+    { "tld": "gq", "senderRisk": "Low", "urlRisk": "Low", "note": "Former Freenom free ccTLD (Equatorial Guinea); mostly abuse." },
+    { "tld": "cf", "senderRisk": "Low", "urlRisk": "Low", "note": "Former Freenom free ccTLD (Central African Republic); mostly abuse." },
+    { "tld": "tk", "senderRisk": "Low", "urlRisk": "Low", "note": "Former Freenom free ccTLD (Tokelau); mostly abuse." },
+    { "tld": "ml", "senderRisk": "Low", "urlRisk": "Low", "note": "Former Freenom free ccTLD (Mali); mostly abuse. Rare legitimate Mali government/business mail." },
+    { "tld": "ga", "senderRisk": "Low", "urlRisk": "Low", "note": "Former Freenom free ccTLD (Gabon); mostly abuse." }
+  ]
+}

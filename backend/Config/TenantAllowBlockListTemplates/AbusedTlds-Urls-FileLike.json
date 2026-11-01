@@ -1,0 +1,11 @@
+{
+  "GUID": "18fc3dc5-16e2-4d7e-8033-1efd632192e9",
+  "templateName": "Abused TLDs - URLs .zip/.mov (Aspendora CIPP-30, HIGH false-positive risk)",
+  "description": "Blocks links under .zip and .mov. HIGH false-positive risk: plain-text file names such as 'invoice.zip' or 'clip.mov' in a message body can be read as links and quarantine the message. Microsoft's URL syntax also disallows file extensions, so these entries may be refused - test in one tenant first. Aspendora fork addition (Vikunja CIPP-30).",
+  "listType": "Url",
+  "listMethod": "Block",
+  "entries": "*.zip/*,*.mov/*",
+  "notes": "CIPP-30 .zip/.mov URL block (high FP risk).",
+  "NoExpiration": true,
+  "RemoveAfter": false
+}
