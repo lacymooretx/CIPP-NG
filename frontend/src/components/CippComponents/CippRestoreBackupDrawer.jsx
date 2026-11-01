@@ -40,6 +40,7 @@ export const CippRestoreBackupDrawer = ({
       CippCustomVariables: true,
       CippStandards: true,
       overwrite: false,
+      safeRestore: false,
       webhook: false,
       email: false,
       psa: false,
@@ -72,6 +73,7 @@ export const CippRestoreBackupDrawer = ({
         CippCustomVariables: true,
         CippStandards: true,
         overwrite: false,
+        safeRestore: false,
         webhook: false,
         email: false,
         psa: false,
@@ -116,6 +118,8 @@ export const CippRestoreBackupDrawer = ({
           CippScriptedAlerts: values.CippScriptedAlerts,
           CippCustomVariables: values.CippCustomVariables,
           overwrite: values.overwrite,
+          // Aspendora fork addition (Vikunja CIPP-23): only sent when chosen, so the default restore payload is unchanged.
+          ...(values.safeRestore === true ? { safeRestore: true } : {}),
         },
       },
       ScheduledTime: unixTime,
@@ -151,6 +155,7 @@ export const CippRestoreBackupDrawer = ({
       CippCustomVariables: true,
       CippStandards: true,
       overwrite: false,
+      safeRestore: false,
       webhook: false,
       email: false,
       psa: false,
@@ -339,6 +344,31 @@ export const CippRestoreBackupDrawer = ({
                 name="CippCustomVariables"
                 formControl={formControl}
               />
+            </Grid>
+
+            {/* Safe restore-as-new - Aspendora fork addition (Vikunja CIPP-23) */}
+            <Grid size={{ xs: 12 }}>
+              <CippFormComponent
+                type="switch"
+                label="Safe restore-as-new (never overwrite)"
+                name="safeRestore"
+                formControl={formControl}
+              />
+              <CippFormCondition
+                formControl={formControl}
+                field="safeRestore"
+                compareType="is"
+                compareValue={true}
+              >
+                <Alert severity="info">
+                  Restores only the selected Conditional Access and Intune policies, each as a new policy named
+                  &quot;&lt;name&gt; (restored YYYY-MM-DD)&quot;. Existing policies are never changed, policies identical
+                  to one already in the tenant are skipped, Conditional Access copies are created disabled with no
+                  user or group targeting, and Intune copies have no assignments. The backup is verified first.
+                  Users, groups, mail and CIPP settings are not restored in this mode, and the overwrite setting is
+                  ignored. Use Preview restore on the backup to see exactly what will be created.
+                </Alert>
+              </CippFormCondition>
             </Grid>
 
             {/* Overwrite Existing Entries */}

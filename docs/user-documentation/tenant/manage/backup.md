@@ -66,6 +66,9 @@ Each backup is shown as a card, most recent first. Use the refresh button to pul
 | Preview           | Opens a flyout showing the contents of the backup as structured JSON.     |
 | Download          | Downloads the backup as a JSON file.                                      |
 | Restore           | Opens the restore flyout for the selected backup.                         |
+| Verify            | Checks the backup against the hashes and item counts recorded when it was written. See Verify below. |
+| Compare           | Diffs this backup against another backup of the same tenant, object by object. See Compare below. |
+| Preview restore   | Shows what restoring this backup would do to the tenant as it is now, without writing anything. |
 
 ## Restore Configuration Backup
 
@@ -75,6 +78,7 @@ Restoring writes the selected components from a backup back into the tenant. The
 | -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Backups for \<tenant>      | The backup to restore from. Opening the flyout from a backup card pre-selects that backup.                                                            |
 | Restore Settings           | The components to restore, matching the component list used when scheduling a backup. Switch off anything you do not want written back.               |
+| Safe restore-as-new        | Restores the selected Conditional Access and Intune policies as new copies and never changes an existing object. See Safe restore-as-new below. Off by default. |
 | Overwrite existing entries | Replaces existing objects with the versions held in the backup. Leave this off to skip anything that already exists and restore only what is missing. |
 | Send Restore results to    | Where the outcome is reported once the restore has run: Webhook, E-mail, or PSA.                                                                      |
 
@@ -85,5 +89,50 @@ Restoring Teams Phone Number Assignments re-assigns each backed-up number to the
 {% hint style="warning" %}
 Overwriting replaces current settings with those in the backup rather than merging them. Where users are included in the restore, every property on the account is overwritten with the backed-up values. To protect a component, switch it off in Restore Settings or leave Overwrite existing entries off.
 {% endhint %}
+
+## Verify
+
+Every backup written since this feature was added stores a SHA-256 hash of the backup file, a SHA-256 hash of every object in it and the number of objects per component, in a manifest kept next to the backup. Verify reads the backup back and recomputes them.
+
+| Result                | Meaning                                                                                              |
+| --------------------- | ---------------------------------------------------------------------------------------------------- |
+| Verified              | The file and every object match what was recorded, and every component has the expected count.      |
+| Corrupt               | The file, the manifest or at least one object no longer matches its recorded hash, or the file is not valid JSON. |
+| Missing               | The backup file could not be read, or objects recorded at write time are no longer in it.            |
+| CountMismatch         | A component holds a different number of objects than recorded, without any hash mismatch.           |
+| Unverified (pre-hash) | The backup was taken before hashing existed. It can still be compared, previewed and restored.       |
+
+The per-component table names any missing, corrupt or unexpected objects. Object hashes are taken over a canonical form of the JSON (sorted keys), so they do not depend on property order.
+
+## Compare
+
+Pick another backup of the same tenant. The older of the two is the base, so Added means added since the older backup. Each object is listed as Added, Removed or Changed, and a changed object lists every property that differs with its old and new value. Intune and Conditional Access policies are matched by name, users and groups by object id.
+
+Ids, created/modified timestamps, version numbers and @odata annotations are ignored. Assignments are ignored unless **Include assignments** is on. Arrays that hold the same values in a different order count as unchanged.
+
+## Preview restore
+
+Reads the tenant's current state with the same capture the backup uses (read-only) and classifies every backed-up object:
+
+| Classification | Meaning                                                                                          |
+| -------------- | ------------------------------------------------------------------------------------------------ |
+| Create         | Nothing with that name or identity exists in the tenant now.                                     |
+| Identical      | It exists and matches the backup.                                                                |
+| Conflict       | Something with the same name exists with different settings. Before is the tenant, After is the backup. |
+
+Each object also shows what the restore would do. With Safe restore-as-new off, this is what the standard restore does today - note that the standard restore **overwrites an Intune policy with the same name whatever the overwrite setting**. Preview defaults to the Conditional Access and Intune components; large components (users, Intune configuration) can take a minute to read.
+
+## Safe restore-as-new
+
+An opt-in restore mode for Conditional Access and Intune policies that cannot damage what is already there:
+
+* The backup is verified first. A Corrupt or Missing backup is not restored.
+* Policies identical to one already in the tenant are skipped.
+* Every other policy is created as a **new** policy named `<name> (restored YYYY-MM-DD)` (US Central date; ` #2`, ` #3` are added if that name is taken). Existing policies are never modified.
+* Conditional Access copies are created **disabled**, with user and group targeting replaced by "None" and workload-identity targeting removed. Named locations they reference are matched, or created if missing.
+* Intune copies are created with **no assignments**.
+* Users, groups, mail policies and CIPP settings are not restored in this mode, and Overwrite existing entries is ignored.
+
+Run Preview restore with Safe restore-as-new on to see exactly which copies will be created. After the restore, review each copy, add its assignments or targeting, enable it, and delete the original or the copy.
 
 {% include "../../../../.gitbook/includes/feature-request.md" %}
