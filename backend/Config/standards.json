@@ -9350,5 +9350,19 @@
       "SCCM",
       "MICROSOFTINTUNEPLAN1"
     ]
+  },
+  {
+    "name": "standards.DisableKeepMeSignedIn",
+    "cat": "Entra (AAD) Standards",
+    "tag": [],
+    "helpText": "Turns off the 'Stay signed in?' (KMSI) prompt on the Microsoft sign-in page (company branding 'Show option to remain signed in' = No). With the prompt shown, a user who clicks Yes gets a persistent browser cookie that can keep the session alive for up to 90 days, including on shared or unmanaged computers. The report also says whether a sign-in frequency or 'never persistent browser' Conditional Access session policy is enforced, because the tenant is most exposed when neither control is in place.",
+    "docsDescription": "Sets `isKeepMeSignedInDisabled` to true on the default company branding localization (Graph beta `organization/{id}/branding/localizations/0`). A tenant with no branding localization shows the prompt (Microsoft's default); remediation creates the default localization with only this setting. Report and alert runs never create branding. Conditional Access session policies are listed for context and not changed. Users on Entra-joined or registered devices keep single sign-on through the Primary Refresh Token, so the main effect is on browsers on unmanaged computers.",
+    "addedComponent": [],
+    "label": "Hide the 'Stay signed in?' prompt",
+    "impact": "Low Impact",
+    "impactColour": "info",
+    "addedDate": "2026-11-01",
+    "powershellEquivalent": "Update-MgBetaOrganizationBrandingLocalization -IsKeepMeSignedInDisabled",
+    "recommendedBy": []
   }
 ]
