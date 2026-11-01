@@ -1350,5 +1350,20 @@
       }
     ],
     "description": "Schedule on the partner tenant: reads every tenant's cached Message Center posts, deduplicates them by MC id and raises posts that need action (act-by date, high severity), retirements and security changes once each, listing the tenants affected and the admin center link. Deadline posts notify again when they come due. Informational posts never alert; see Tenant > Reports > Message Center Digest."
+  },
+  {
+    "name": "OooExposure",
+    "label": "Alert on out-of-office replies that expose colleagues, phone numbers or payment contacts to external senders",
+    "recommendedRunInterval": "4h",
+    "requiresInput": true,
+    "multipleInput": true,
+    "inputs": [
+      {
+        "inputType": "switch",
+        "inputLabel": "Also raise external (audience All) replies with no contact or payment cues (Medium)",
+        "inputName": "OooExposureIncludeMedium"
+      }
+    ],
+    "description": "Raises mailboxes whose automatic reply goes to every external sender and names a colleague's address, a phone number or a finance cue (invoices, payments, wires, payroll). Each out-of-office period notifies once; the alert carries flags and a masked snippet, never the message. Fix on Email > Reports > Out-of-office Exposure."
   }
 ]
