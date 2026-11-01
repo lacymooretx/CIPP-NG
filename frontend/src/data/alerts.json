@@ -1310,5 +1310,20 @@
       }
     ],
     "description": "Raises update rings with Windows drivers set to Block and Settings Catalog policies setting \"Exclude WU Drivers In Quality Update\" to Exclude. Either stops devices receiving drivers and firmware regardless of the driver update profile. Report only."
+  },
+  {
+    "name": "OooExposure",
+    "label": "Alert on out-of-office replies that expose colleagues, phone numbers or payment contacts to external senders",
+    "recommendedRunInterval": "4h",
+    "requiresInput": true,
+    "multipleInput": true,
+    "inputs": [
+      {
+        "inputType": "switch",
+        "inputLabel": "Also raise external (audience All) replies with no contact or payment cues (Medium)",
+        "inputName": "OooExposureIncludeMedium"
+      }
+    ],
+    "description": "Raises mailboxes whose automatic reply goes to every external sender and names a colleague's address, a phone number or a finance cue (invoices, payments, wires, payroll). Each out-of-office period notifies once; the alert carries flags and a masked snippet, never the message. Fix on Email > Reports > Out-of-office Exposure."
   }
 ]

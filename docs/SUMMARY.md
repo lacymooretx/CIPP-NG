@@ -367,6 +367,7 @@
     * [Anti-Phishing Filters](user-documentation/email/reports/antiphishing-filters.md)
     * [Malware Filters](user-documentation/email/reports/malware-filters.md)
     * [Abused TLD Exposure](user-documentation/email/reports/tld-exposure.md)
+    * [Out-of-office Exposure](user-documentation/email/reports/ooo-exposure.md)
     * [Safe Attachment Filters](user-documentation/email/reports/safeattachments-filters.md)
     * [Shared Mailbox with Enabled Account](user-documentation/email/reports/sharedmailboxenabledaccount.md)
     * [ActiveSync Devices](user-documentation/email/reports/activesync-devices.md)

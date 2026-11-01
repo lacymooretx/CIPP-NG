@@ -1143,6 +1143,12 @@ export const nativeMenuItems = [
             path: '/email/reports/tld-exposure',
             permissions: ['Exchange.SpamFilter.*'],
           },
+          // Aspendora fork addition (Vikunja CIPP-40): external out-of-office replies that expose BEC targets.
+          {
+            title: 'Out-of-office Exposure',
+            path: '/email/reports/ooo-exposure',
+            permissions: ['Exchange.Mailbox.*'],
+          },
           {
             title: 'Safe Attachments Filters',
             path: '/email/reports/safeattachments-filters',
