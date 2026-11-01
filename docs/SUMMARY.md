@@ -204,6 +204,7 @@
     * [Consented Applications](user-documentation/tenant/reports/application-consent.md)
     * [Graph / Office Reports](user-documentation/tenant/reports/graph-office-reports.md)
     * [Custom Test Report](user-documentation/tenant/reports/custom-test-report.md)
+    * [Message Center Digest](user-documentation/tenant/reports/message-center-digest.md)
   * [Manage Tenant](user-documentation/tenant/manage/README.md)
     * [Edit Tenant](user-documentation/tenant/manage/edit.md)
     * [Manage Drift](user-documentation/tenant/manage/drift.md)

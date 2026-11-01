@@ -1310,5 +1310,30 @@
       }
     ],
     "description": "Raises update rings with Windows drivers set to Block and Settings Catalog policies setting \"Exclude WU Drivers In Quality Update\" to Exclude. Either stops devices receiving drivers and firmware regardless of the driver update profile. Report only."
+  },
+  {
+    "name": "MessageCenterDigest",
+    "label": "Weekly Message Center digest: action required, retirements and security changes",
+    "recommendedRunInterval": "7d",
+    "requiresInput": true,
+    "multipleInput": true,
+    "inputs": [
+      {
+        "inputType": "number",
+        "inputLabel": "Mark deadlines within X days as due (default: 30)",
+        "inputName": "MCDigestDeadlineDays"
+      },
+      {
+        "inputType": "number",
+        "inputLabel": "Days to look back for new or updated posts (default: 7)",
+        "inputName": "MCDigestLookbackDays"
+      },
+      {
+        "inputType": "switch",
+        "inputLabel": "Digest all managed tenants even when not run on the partner tenant",
+        "inputName": "MCDigestAllTenants"
+      }
+    ],
+    "description": "Schedule on the partner tenant: reads every tenant's cached Message Center posts, deduplicates them by MC id and raises posts that need action (act-by date, high severity), retirements and security changes once each, listing the tenants affected and the admin center link. Deadline posts notify again when they come due. Informational posts never alert; see Tenant > Reports > Message Center Digest."
   }
 ]
