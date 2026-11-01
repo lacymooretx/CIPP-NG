@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Alert, Box } from "@mui/material";
+import { Alert, Box, Button, Checkbox, FormControlLabel, Stack } from "@mui/material";
 import { useForm } from "react-hook-form";
 import { useRouter } from "next/router";
 import { Layout as DashboardLayout } from "../../../../layouts/index";
@@ -11,6 +11,7 @@ import CippCAPolicyBuilder, {
   extractCAPolicyJSON,
 } from "../../../../components/CippComponents/CippCAPolicyBuilder";
 import { useSettings } from "../../../../hooks/use-settings.js";
+import { CippCAPreflightDrawer } from "../../../../components/CippComponents/CippCAPreflightDrawer";
 
 // The assignment arrays Graph stores as object IDs. The special tokens (All, None,
 // GuestsOrExternalUsers) share these arrays and are left as they are.
@@ -53,6 +54,11 @@ const EditCAPolicy = () => {
   const [directoryNames, setDirectoryNames] = useState(null);
 
   const formControl = useForm({ mode: "onChange" });
+  // Aspendora fork addition (Vikunja CIPP-5): saving with state On runs the CA pre-flight server-side.
+  const [preflightOverride, setPreflightOverride] = useState(false);
+  const [preflightOpen, setPreflightOpen] = useState(false);
+  const watchedState = formControl.watch("state");
+  const targetState = watchedState?.value ?? watchedState;
   const { mutateAsync: lookupDirectoryObjects } = ApiPostCall({});
 
   // Fetch the current policies for this tenant
@@ -114,6 +120,7 @@ const EditCAPolicy = () => {
       tenantFilter,
       PolicyId: policyId,
       PolicyBody: cleaned,
+      PreflightOverride: preflightOverride,
     };
   };
 
@@ -141,6 +148,40 @@ const EditCAPolicy = () => {
             directorySearch
           />
         )}
+        {policyData && targetState === "enabled" && (
+          <Alert severity="warning" sx={{ mt: 2 }}>
+            <Stack spacing={1}>
+              <span>
+                Saving with the policy On runs the lockout pre-flight (break-glass excluded, a Global
+                Admin can still sign in, What-If, 7 days in report-only). A failing save is refused
+                unless you tick the override, which is logged with your name. The pre-flight button
+                checks the version saved in the tenant, not unsaved edits.
+              </span>
+              <Box>
+                <Button size="small" variant="outlined" onClick={() => setPreflightOpen(true)}>
+                  Run pre-flight on the saved policy
+                </Button>
+              </Box>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={preflightOverride}
+                    onChange={(event) => setPreflightOverride(event.target.checked)}
+                  />
+                }
+                label="Override a failed pre-flight for this save (logged)"
+              />
+            </Stack>
+          </Alert>
+        )}
+        <CippCAPreflightDrawer
+          policyId={policyId}
+          policyName={policyData?.displayName}
+          policyState={policyData?.state}
+          tenantFilter={tenantFilter}
+          visible={preflightOpen}
+          onClose={() => setPreflightOpen(false)}
+        />
       </Box>
     </CippFormPage>
   );

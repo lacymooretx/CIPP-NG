@@ -208,6 +208,14 @@ export const CippCADeployDrawer = ({
             label="Disable Security Defaults if enabled when creating policy"
             formControl={formControl}
           />
+          {/* Aspendora fork addition (Vikunja CIPP-5): a policy that ends up On is pre-flighted per tenant. */}
+          <CippFormComponent
+            type="switch"
+            name="PreflightOverride"
+            label="Override a failed lockout pre-flight (logged with your name)"
+            formControl={formControl}
+            helperText="When the policy ends up On, CIPP first checks per tenant that break-glass accounts are excluded, a Global Admin can still sign in, the What-If for you and break-glass, and 7 days in report-only. A tenant that fails is skipped unless this is on."
+          />
           <CippFormCondition
             formControl={formControl}
             field="replacename"
