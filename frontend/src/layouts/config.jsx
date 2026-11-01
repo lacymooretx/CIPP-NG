@@ -1143,6 +1143,12 @@ export const nativeMenuItems = [
             path: '/email/reports/tld-exposure',
             permissions: ['Exchange.SpamFilter.*'],
           },
+          // Aspendora fork addition (Vikunja CIPP-36): Exchange Online provisioning check for new tenants / SKUs.
+          {
+            title: 'Exchange Provisioning',
+            path: '/email/reports/exo-provisioning',
+            permissions: ['Exchange.Mailbox.*'],
+          },
           {
             title: 'Safe Attachments Filters',
             path: '/email/reports/safeattachments-filters',

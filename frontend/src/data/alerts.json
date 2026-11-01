@@ -1310,5 +1310,20 @@
       }
     ],
     "description": "Raises update rings with Windows drivers set to Block and Settings Catalog policies setting \"Exclude WU Drivers In Quality Update\" to Exclude. Either stops devices receiving drivers and firmware regardless of the driver update profile. Report only."
+  },
+  {
+    "name": "ExoProvisioning",
+    "label": "Alert when Exchange Online did not provision correctly (new tenant or SKU)",
+    "recommendedRunInterval": "1d",
+    "requiresInput": true,
+    "multipleInput": true,
+    "inputs": [
+      {
+        "inputType": "number",
+        "inputLabel": "Hours a user must be licensed before a missing mailbox is raised (default: 24)",
+        "inputName": "ExoProvisioningGraceHours"
+      }
+    ],
+    "description": "Checks that Get-OrganizationConfig answers for a tenant licensed for Exchange, the built-in role groups and core management roles exist, Organization Management holds its roles, verified email domains are accepted domains, and users licensed for a mailbox have one. Tenants without an Exchange licence produce nothing. Report only: run the Exchange role repair from Email > Reports > Exchange Provisioning."
   }
 ]
