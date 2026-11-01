@@ -298,6 +298,7 @@
     * [Work from Anywhere](user-documentation/endpoint/reports/work-from-anywhere.md)
     * [Autopilot Deployments](user-documentation/endpoint/reports/autopilot-deployment.md)
     * [Discovered Apps](user-documentation/endpoint/reports/detected-apps.md)
+    * [Personal Devices](user-documentation/endpoint/reports/personal-devices.md)
 * [Teams & SharePoint](user-documentation/teams-share/README.md)
   * [OneDrive](user-documentation/teams-share/onedrive.md)
   * [SharePoint](user-documentation/teams-share/sharepoint/README.md)
