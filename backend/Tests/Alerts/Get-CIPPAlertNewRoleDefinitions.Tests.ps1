@@ -6,6 +6,7 @@ BeforeAll {
     . (Join-Path $RepoRoot 'Tests/Alerts/AlertLifecycleHarness.ps1')
     . (Join-Path $RepoRoot 'Modules/CIPPCore/Public/Tools/ConvertTo-CIPPBoolean.ps1')
     . (Join-Path $RepoRoot 'Modules/CIPPAlerts/Public/Alerts/Get-CIPPAlertNewRoleDefinitions.ps1')
+    . (Join-Path $RepoRoot 'Modules/CIPPCore/Public/Alerts/Get-CIPPAlertFailureSeverity.ps1')
 
     function New-GraphGetRequest {
         [CmdletBinding()] param($uri, $tenantid)

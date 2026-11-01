@@ -68,6 +68,6 @@ function Get-CIPPAlertNewRoleDefinitions {
         Add-CIPPAzDataTableEntity @Table -Force -Entity $Entities | Out-Null
         $Notify
     } catch {
-        Write-LogMessage -API 'Alerts' -tenant $TenantFilter -message "New role definitions check failed: $((Get-CippException -Exception $_).NormalizedError)" -sev Error -LogData (Get-CippException -Exception $_)
+        Write-LogMessage -API 'Alerts' -tenant $TenantFilter -message "New role definitions check failed: $((Get-CippException -Exception $_).NormalizedError)" -sev (Get-CIPPAlertFailureSeverity -ErrorText "$((Get-CippException -Exception $_).NormalizedError) $_") -LogData (Get-CippException -Exception $_)
     }
 }

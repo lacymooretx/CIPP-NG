@@ -51,6 +51,6 @@ function Get-CIPPAlertDefenderPendingRemediation {
         Write-AlertTrace -cmdletName ([string]$MyInvocation.MyCommand) -tenantFilter $TenantFilter -data $Rows
     } catch {
         $Err = Get-CippException -Exception $_
-        Write-LogMessage -API 'Alerts' -tenant $TenantFilter -message "Defender pending remediation check failed: $($Err.NormalizedError)" -sev Error -LogData $Err
+        Write-LogMessage -API 'Alerts' -tenant $TenantFilter -message "Defender pending remediation check failed: $($Err.NormalizedError)" -sev (Get-CIPPAlertFailureSeverity -ErrorText "$((Get-CippException -Exception $_).NormalizedError) $_") -LogData $Err
     }
 }

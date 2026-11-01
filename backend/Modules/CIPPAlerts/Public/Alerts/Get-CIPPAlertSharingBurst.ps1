@@ -63,6 +63,6 @@ function Get-CIPPAlertSharingBurst {
         $New | Sort-Object @{ Expression = { if ($_.Severity -eq 'High') { 0 } else { 1 } } }, @{ Expression = { [int]$_.ExternalRecipients }; Descending = $true } | Select-Object -First $MaxSurfaced
     } catch {
         $ErrorMessage = Get-CippException -Exception $_
-        Write-LogMessage -API 'Alerts' -tenant $TenantFilter -message "Sharing burst alert failed for $($TenantFilter): $($ErrorMessage.NormalizedError)" -sev Error -LogData $ErrorMessage
+        Write-LogMessage -API 'Alerts' -tenant $TenantFilter -message "Sharing burst alert failed for $($TenantFilter): $($ErrorMessage.NormalizedError)" -sev (Get-CIPPAlertFailureSeverity -ErrorText "$((Get-CippException -Exception $_).NormalizedError) $_") -LogData $ErrorMessage
     }
 }

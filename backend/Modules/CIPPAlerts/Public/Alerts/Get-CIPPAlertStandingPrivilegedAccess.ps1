@@ -42,6 +42,6 @@ function Get-CIPPAlertStandingPrivilegedAccess {
             })
         Write-AlertTrace -cmdletName ([string]$MyInvocation.MyCommand) -tenantFilter $TenantFilter -data $Rows
     } catch {
-        Write-LogMessage -API 'Alerts' -tenant $TenantFilter -message "Standing privileged access check failed: $((Get-CippException -Exception $_).NormalizedError)" -sev Error -LogData (Get-CippException -Exception $_)
+        Write-LogMessage -API 'Alerts' -tenant $TenantFilter -message "Standing privileged access check failed: $((Get-CippException -Exception $_).NormalizedError)" -sev (Get-CIPPAlertFailureSeverity -ErrorText "$((Get-CippException -Exception $_).NormalizedError) $_") -LogData (Get-CippException -Exception $_)
     }
 }
