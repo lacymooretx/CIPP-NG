@@ -1386,5 +1386,20 @@
       }
     ],
     "description": "Raises mailboxes whose automatic reply goes to every external sender and names a colleague's address, a phone number or a finance cue (invoices, payments, wires, payroll). Each out-of-office period notifies once; the alert carries flags and a masked snippet, never the message. Fix on Email > Reports > Out-of-office Exposure."
+  },
+  {
+    "name": "PersonalDevices",
+    "label": "Alert on personally owned devices enrolled in Intune (BYOD)",
+    "recommendedRunInterval": "7d",
+    "requiresInput": true,
+    "multipleInput": true,
+    "inputs": [
+      {
+        "inputType": "switch",
+        "inputLabel": "Only raise Windows and macOS devices (personal phones are allowed on purpose)",
+        "inputName": "PersonalDevicesComputersOnly"
+      }
+    ],
+    "description": "Raises each managed device whose owner type is personal, once, and clears when it is retired or changed to corporate. Says whether a Windows device was enrolled by adding a work account and which control would stop new ones (default platform restriction, Disable MDM enrollment when adding work or school account). See Endpoint > Reports > Personal Devices."
   }
 ]

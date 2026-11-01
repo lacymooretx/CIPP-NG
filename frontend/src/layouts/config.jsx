@@ -837,6 +837,12 @@ export const nativeMenuItems = [
             path: '/endpoint/reports/detected-apps',
             permissions: ['Endpoint.MEM.*'],
           },
+          // Aspendora fork addition (Vikunja CIPP-21): personally owned devices and the BYOD enrollment controls.
+          {
+            title: 'Personal Devices',
+            path: '/endpoint/reports/personal-devices',
+            permissions: ['Endpoint.Device.*'],
+          },
         ],
       },
     ],
