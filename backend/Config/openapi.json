@@ -59174,6 +59174,63 @@
         "x-cipp-role": "Identity.Group.Read"
       }
     },
+    "/api/ListGuestInventory": {
+      "get": {
+        "summary": "Guest inventory with origin, redemption state, memberships and a recommended cleanup action",
+        "operationId": "ListGuestInventory",
+        "tags": [
+          "Identity > Reports"
+        ],
+        "description": "Read only. Lists every guest in one tenant with invitation state and age, sign-in activity (Entra ID P1 tenants),\naccount type (personal Microsoft account, email one-time passcode, work/school), consumer email domains, the\ninviting user and whether that user is still enabled, group and Team memberships, and a recommended action\n(REMOVE, DISABLE, REVIEW, KEEP) with the reason. Also returns tenant context: SharePoint/OneDrive Entra B2B\nintegration, SharePoint sharing level, who may invite guests and the guest user role. Single tenant only.\nAspendora fork addition (Vikunja CIPP-14).",
+        "parameters": [
+          {
+            "name": "pendingDays",
+            "in": "query",
+            "description": "Days an invitation may stay unredeemed before the guest is recommended for REMOVE. Defaults to 30.",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "staleDays",
+            "in": "query",
+            "description": "Days without a sign-in before an enabled guest is recommended for DISABLE. Defaults to 90.",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/tenantFilter"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardResults"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cipp-role": "Identity.User.Read"
+      }
+    },
     "/api/ListGuestUsers": {
       "get": {
         "summary": "List guest users with lifecycle status",

@@ -134,7 +134,12 @@ export const nativeMenuItems = [
             path: '/identity/reports/group-usage',
             permissions: ['Identity.Group.*'],
           },
-          // Aspendora fork additions (Vikunja CIPP-6, CIPP-15).
+          // Aspendora fork additions (Vikunja CIPP-6, CIPP-14, CIPP-15).
+          {
+            title: 'Guest Inventory',
+            path: '/identity/reports/guest-inventory',
+            permissions: ['Identity.User.*'],
+          },
           {
             title: 'SMS/Voice MFA Readiness',
             path: '/identity/reports/sms-mfa-readiness',

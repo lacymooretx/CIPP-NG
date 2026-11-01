@@ -118,6 +118,7 @@
     * [Microsoft Entra Connect Report](user-documentation/identity/reports/azure-ad-connect-report.md)
     * [Risk Detections](user-documentation/identity/reports/risk-detections.md)
     * [Group Usage Report](user-documentation/identity/reports/group-usage.md)
+    * [Guest Inventory](user-documentation/identity/reports/guest-inventory.md)
     * [SMS/Voice MFA Readiness](user-documentation/identity/reports/sms-mfa-readiness.md)
     * [Role Assignment Report](user-documentation/identity/reports/role-assignment-report.md)
 * [Tenant Administration](user-documentation/tenant/README.md)

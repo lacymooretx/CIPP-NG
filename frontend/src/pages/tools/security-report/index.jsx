@@ -63,6 +63,7 @@ const REPORT_TYPES = [
   { label: "App Consent Posture Report", value: "AppConsent" },
   { label: "Windows Update Ring Health Report", value: "UpdateRingHealth" },
   { label: "Stale Device Report", value: "StaleDevices" },
+  { label: "Guest Access Review", value: "GuestReview" },
   { label: "Azure Posture Report", value: "AzurePosture" },
 ].map((r) => ({ ...r, endpoint: ENDPOINT, command: COMMAND }));
 
