@@ -112,7 +112,7 @@ const ObjectList = ({ objects, statusField, extra }) => {
       {objects.map((o) => (
         <Accordion key={`${o.Type}-${o.Key}`} disableGutters variant="outlined">
           <AccordionSummary expandIcon={<CippIcons.ExpandMore />}>
-            <Stack direction="row" spacing={1} alignItems="center" sx={{ flexWrap: "wrap" }}>
+            <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
               <StatusChip status={o[statusField]} />
               <Chip label={componentLabel(o.Type)} size="small" />
               <Typography variant="body2" sx={{ fontWeight: 600 }}>
@@ -363,7 +363,7 @@ const PreviewPanel = ({ backup }) => {
           {r.NotPreviewed?.length > 0 && (
             <Alert severity="info">Not previewable: {r.NotPreviewed.map(componentLabel).join(", ")}</Alert>
           )}
-          <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
+          <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
             <Chip label={`${r.Summary.Create} new`} color="success" size="small" />
             <Chip label={`${r.Summary.Conflict} conflicting`} color="warning" size="small" />
             <Chip label={`${r.Summary.Identical} identical`} size="small" />
