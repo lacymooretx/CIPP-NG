@@ -1122,9 +1122,14 @@
         "inputType": "number",
         "inputLabel": "Alert when Authenticator/passkey coverage drops more than this many percentage points below its best (default: 5)",
         "inputName": "SmsCoverageDropPercent"
+      },
+      {
+        "inputType": "number",
+        "inputLabel": "Alert when the next SMS/voice retirement date (1 Feb 2027, or 1 Jul 2027 for Global Admins and external users) is this many days away or less and users still rely only on SMS/voice (default: 90)",
+        "inputName": "SmsRetirementWarnDays"
       }
     ],
-    "description": "Weekly readiness check before disabling SMS/voice MFA (Entra ID P1 needed for the registration report). Raises admins whose only MFA is SMS/voice or who have none, admins defaulting to SMS/voice, one consolidated row for users relying only on SMS/voice and one for licensed users without MFA, and a drop in Authenticator/passkey coverage. The first run records the coverage baseline. Report only; see ListSmsMfaReadiness."
+    "description": "Weekly readiness check before disabling SMS/voice MFA (Entra ID P1 needed for the registration report). Raises admins whose only MFA is SMS/voice or who have none, admins defaulting to SMS/voice, one consolidated row for users relying only on SMS/voice and one for licensed users without MFA, and a drop in Authenticator/passkey coverage. Rows carry the user's Microsoft SMS/voice retirement date and days remaining, and one row per tenant is raised once the nearest retirement date with phone-only users is within the warning window. The first run records the coverage baseline. Report only; see ListSmsMfaReadiness."
   },
   {
     "name": "StandingPrivilegedAccess",

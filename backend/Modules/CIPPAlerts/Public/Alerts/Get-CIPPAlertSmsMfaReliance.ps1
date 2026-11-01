@@ -14,6 +14,11 @@ function Get-CIPPAlertSmsMfaReliance {
         run only records the baseline. The baseline ratchets up as coverage improves; a drop that persists for 28
         days becomes the new baseline, so a permanent change (e.g. staff leaving) stops being reported.
 
+        SMS/voice retirement (CIPP-46): every row carries RetirementDate and DaysRemaining (US Central) where one
+        applies, and one row 'SmsRetirementDeadline|<date>' (Error for 2027-02-01, Warning for 2027-07-01) is raised
+        while the nearest retirement date that still has phone-only accounts is within SmsRetirementWarnDays
+        (default 90) - or has passed with accounts still on SMS/voice.
+
         Each row has a stable Id, so the lifecycle notifies once per problem and resolves it when fixed; counts in
         the message do not re-notify. A run with collection errors does not report, because "could not check" is
         not "clear". Report only: nothing in the tenant is changed. Aspendora fork addition (Vikunja CIPP-6).
@@ -36,11 +41,70 @@ function Get-CIPPAlertSmsMfaReliance {
         }
         Save-CIPPSmsMfaReadinessSummary -TenantFilter $TenantFilter -Report $Report
 
+        # Retirement date per user (CIPP-46), to date the per-admin and per-tenant rows below.
+        $UserDates = @{}
+        foreach ($U in @($Report.Users)) {
+            if ($U.Id -and $U.RetirementDate) { $UserDates[[string]$U.Id] = $U }
+        }
+        $PhoneOnlyDates = @($Report.Users | Where-Object { $_.Category -eq 'PhoneOnly' -and -not $_.IsAdmin -and $_.RetirementDate } | Sort-Object RetirementDate)
+
         $Rows = [System.Collections.Generic.List[object]]::new()
         foreach ($F in @($Report.Findings | Where-Object { $_.Severity -in @('Error', 'Warning') })) {
+            # The SmsRetirement* findings are covered by the single deadline row below, which only fires inside the
+            # warning window; raising them here as well would notify every tenant with phone-only users on the day
+            # this shipped, duplicating PhoneOnlyUsers.
+            if ([string]$F.Key -like 'SmsRetirement*') { continue }
+            $Dated = $null
+            $Key = [string]$F.Key
+            if ($Key.Contains('|')) { $Dated = $UserDates[$Key.Substring($Key.IndexOf('|') + 1)] }
+            elseif ($Key -in @('PhoneOnlyUsers', 'SmsOffUsersDependent') -and $PhoneOnlyDates.Count -gt 0) { $Dated = $PhoneOnlyDates[0] }
             # Account, not UserPrincipalName: the lifecycle hashes UserPrincipalName before Id, which would merge
-            # two findings about the same admin.
-            $Rows.Add([pscustomobject]@{ Id = $F.Key; Severity = $F.Severity; Check = $F.Check; Account = $F.Account; Message = $F.Message; Fix = $F.Fix })
+            # two findings about the same admin. RetirementDate/DaysRemaining are extra columns only: the lifecycle
+            # hashes Id, so the weekly countdown does not re-notify existing rows.
+            $Rows.Add([pscustomobject]@{
+                    Id             = $F.Key
+                    Severity       = $F.Severity
+                    Check          = $F.Check
+                    Account        = $F.Account
+                    Message        = $F.Message
+                    Fix            = $F.Fix
+                    RetirementDate = if ($Dated) { [string]$Dated.RetirementDate } else { '' }
+                    DaysRemaining  = if ($Dated) { $Dated.DaysRemaining } else { $null }
+                })
+        }
+
+        # --- Retirement deadline (CIPP-46) ---
+        # One row per tenant while the nearest retirement date that still has phone-only accounts is within
+        # SmsRetirementWarnDays (default 90). Id = 'SmsRetirementDeadline|<date>': stable for the whole run-up to
+        # one date (count and days change weekly without re-notifying), resolves when those accounts are fixed,
+        # and gives the July date its own notification once February is clear.
+        $WarnDays = 90
+        $RawDays = $InputValue.SmsRetirementWarnDays
+        if ($null -ne $RawDays -and [string]$RawDays -ne '') {
+            $ParsedDays = 0
+            if ([int]::TryParse([string]$RawDays, [System.Globalization.NumberStyles]::Integer, [cultureinfo]::InvariantCulture, [ref]$ParsedDays) -and $ParsedDays -gt 0) { $WarnDays = $ParsedDays }
+        }
+        $S = $Report.Summary
+        if ($S.NearestDeadline -and $null -ne $S.NearestDeadlineDaysRemaining -and [int]$S.NearestDeadlineDaysRemaining -le $WarnDays) {
+            $DaysLeft = [int]$S.NearestDeadlineDaysRemaining
+            $IsFeb = [string]$S.NearestDeadline -eq '2027-02-01'
+            $Who = if ($IsFeb) { 'account(s)' } else { 'Global Administrator or external account(s)' }
+            $When = if ($DaysLeft -gt 0) { "in $DaysLeft day(s), on $($S.NearestDeadline)" } elseif ($DaysLeft -eq 0) { "today, $($S.NearestDeadline)" } else { "since $($S.NearestDeadline) ($(-$DaysLeft) day(s) ago)" }
+            $Context = @(
+                "opt-out $($S.PasskeyDynamicMigrationOptOut)"
+                "registration campaign $($S.RegistrationCampaignState)$(if ($S.RegistrationCampaignMethods) { " ($($S.RegistrationCampaignMethods))" })"
+                "passkeys $($S.PasskeyState)"
+            ) -join ', '
+            $Rows.Add([pscustomobject]@{
+                    Id             = "SmsRetirementDeadline|$($S.NearestDeadline)"
+                    Severity       = if ($IsFeb) { 'Error' } else { 'Warning' }
+                    Check          = 'SMS/voice retirement deadline'
+                    Account        = ''
+                    Message        = "$($S.NearestDeadlineUsers) $Who whose only MFA method is SMS/voice get a blocking passkey registration at sign-in $When. Tenant: $Context."
+                    Fix            = 'Open Identity > Reports > SMS/Voice MFA Readiness for the list, and get each user onto a passkey or Windows Hello before the date.'
+                    RetirementDate = [string]$S.NearestDeadline
+                    DaysRemaining  = $DaysLeft
+                })
         }
 
         # --- Coverage regression ---

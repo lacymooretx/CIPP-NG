@@ -12,6 +12,11 @@ function Invoke-ListSmsMfaReadiness {
         Authenticator/passkey/Windows Hello, counts), Users (every enabled member with Category PhoneOnly,
         DefaultPhone, NoMfa or Ready), Findings (admins on SMS/voice or without MFA, users relying only on SMS/voice,
         users without MFA, readiness), RegisteredByMethod and Errors.
+        Retirement of Microsoft-provided SMS/voice (CIPP-46): each user with a phone method carries RetirementDate
+        (2027-02-01, or 2027-07-01 for Global Administrators and external users), DaysRemaining (US Central) and
+        RetirementBasis; Guests lists enabled guests whose only MFA is SMS/voice; Summary adds per-date counts,
+        NearestDeadline, ReadyByFeb2027, PasskeyDynamicMigrationOptOut (true/false/unknown), Passkey (FIDO2)
+        state and scope, registration campaign state and target, and TelephonyProvider.
         tenantFilter=AllTenants: returns the stored per-tenant summaries (Results) written by the last single-tenant
         view or SmsMfaReliance alert run, with CheckedUtc; tenants never checked are not listed.
         Report only: nothing in the tenant is changed. Aspendora fork addition (Vikunja CIPP-6).
@@ -29,7 +34,8 @@ function Invoke-ListSmsMfaReadiness {
             $AllowedIds = @(Test-CIPPAccess -Request $Request -TenantList)
             $Allowed = @(Get-Tenants | Where-Object { $AllowedIds -contains 'AllTenants' -or $_.customerId -in $AllowedIds } | ForEach-Object { [string]$_.defaultDomainName })
             $Rows = @(Get-CIPPAzDataTableEntity @Table -Filter "PartitionKey eq 'Summary'" | Where-Object { $_.RowKey -in $Allowed } |
-                    Select-Object Tenant, CheckedUtc, ReadyToDisableSms, ReadyToDisableVoice, ReadyToDisableBoth, SmsState, VoiceState, UsersEnabled, CoveragePercent, PhoneOnly, SmsDependent, VoiceDependent, DefaultPhone, NoMfa, AdminsPhoneOnly, AdminsNoMfa, Errors, Warnings |
+                    Select-Object Tenant, CheckedUtc, ReadyToDisableSms, ReadyToDisableVoice, ReadyToDisableBoth, SmsState, VoiceState, UsersEnabled, CoveragePercent, PhoneOnly, SmsDependent, VoiceDependent, DefaultPhone, NoMfa, AdminsPhoneOnly, AdminsNoMfa, Errors, Warnings,
+                    ReadyByFeb2027, RetirementFebruary2027, RetirementJuly2027, NearestDeadline, NearestDeadlineDaysRemaining, PasskeyDynamicMigrationOptOut, PasskeyState, PasskeyScope, RegistrationCampaignState, RegistrationCampaignMethods, RegistrationCampaignOk, TelephonyProvider |
                     Sort-Object Tenant)
             return ([HttpResponseContext]@{ StatusCode = [HttpStatusCode]::OK; Body = @{ Results = $Rows } })
         }

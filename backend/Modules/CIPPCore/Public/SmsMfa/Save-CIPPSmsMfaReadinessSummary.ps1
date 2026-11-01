@@ -38,6 +38,20 @@ function Save-CIPPSmsMfaReadinessSummary {
             ReadyToDisableSms      = [bool]$S.ReadyToDisableSms
             ReadyToDisableVoice    = [bool]$S.ReadyToDisableVoice
             ReadyToDisableBoth     = [bool]$S.ReadyToDisableBoth
+            # CIPP-46. Strings for the nullable values: Azure Tables has no null, and an absent property reads
+            # back as missing rather than as "unknown".
+            RetirementFebruary2027        = [int]$S.RetirementFebruary2027
+            RetirementJuly2027            = [int]$S.RetirementJuly2027
+            NearestDeadline               = [string]$S.NearestDeadline
+            NearestDeadlineDaysRemaining  = [string]$S.NearestDeadlineDaysRemaining
+            ReadyByFeb2027                = [bool]$S.ReadyByFeb2027
+            PasskeyDynamicMigrationOptOut = [string]$S.PasskeyDynamicMigrationOptOut
+            PasskeyState                  = [string]$S.PasskeyState
+            PasskeyScope                  = [string]$S.PasskeyScope
+            RegistrationCampaignState     = [string]$S.RegistrationCampaignState
+            RegistrationCampaignMethods   = [string]$S.RegistrationCampaignMethods
+            RegistrationCampaignOk        = [bool]$S.RegistrationCampaignOk
+            TelephonyProvider             = [string]$S.TelephonyProvider
             Errors                 = @($Report.Findings | Where-Object Severity -EQ 'Error').Count
             Warnings               = @($Report.Findings | Where-Object Severity -EQ 'Warning').Count
         } | Out-Null
