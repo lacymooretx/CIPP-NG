@@ -775,6 +775,13 @@ export const nativeMenuItems = [
             path: '/endpoint/MEM/intune-hygiene',
             permissions: ['Endpoint.MEM.*'],
           },
+          // Aspendora fork addition (Vikunja CIPP-28): settings that misbehave on cloud-only (Entra joined) devices.
+          {
+            title: 'Cloud-only Lint',
+            path: '/endpoint/MEM/cloud-only-lint',
+            docsPath: 'endpoint/mem/cloud-only-lint',
+            permissions: ['Endpoint.MEM.*'],
+          },
           // Aspendora fork addition (Vikunja CIPP-24): driver and firmware update review queue.
           {
             title: 'Driver Updates',

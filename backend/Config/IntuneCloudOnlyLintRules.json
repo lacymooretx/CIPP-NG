@@ -1,0 +1,155 @@
+{
+  "_comment": "Aspendora fork (Vikunja CIPP-28). Intune settings known to misbehave, or to do nothing, on Microsoft Entra joined (cloud-only) devices and Entra ID users. Read by Test-CIPPIntuneCloudOnlyLint. Every rule must cite a Microsoft Learn source; keep the list short and defensible rather than long. Match fields: settingDefinitionIds / settingDefinitionIdPrefixes (Settings Catalog settingDefinitionId, lower case, nested children included); values (accepted choice suffixes or simple values, empty = any value); omaUris (custom OMA-URI profiles, -like wildcard patterns, case-insensitive; '*' stands in for {TenantId}); omaValues (-like patterns on the OMA value, empty = any); admxDefinitionIds / admxDisplayNames / admxCategoryPathPrefixes (Administrative Templates; built-in definition ids are the same in every tenant); admxEnabledOnly (only flag when the ADMX setting is Enabled). appliesWhen: CloudOnlyDevices = matters when the tenant has Entra joined (not hybrid) Windows devices; NoOnPremisesDirectory = matters only when the tenant has no on-premises Active Directory (no directory sync).",
+  "version": 1,
+  "rules": [
+    {
+      "id": "CLOUDONLY-001",
+      "title": "Display information about previous logons during user logon",
+      "severity": "High",
+      "appliesWhen": "CloudOnlyDevices",
+      "match": {
+        "settingDefinitionIds": ["device_vendor_msft_policy_config_admx_winlogon_displaylastlogoninfodescription"],
+        "values": ["1"],
+        "omaUris": ["./Device/Vendor/MSFT/Policy/Config/ADMX_WinLogon/DisplayLastLogonInfoDescription"],
+        "omaValues": ["*<enabled*"],
+        "admxDefinitionIds": ["c888f824-9937-46f5-a797-6a9e08a8b290"],
+        "admxDisplayNames": ["Display information about previous logons during user logon"],
+        "admxEnabledOnly": true
+      },
+      "symptom": "Entra ID users see a 'Windows couldn't retrieve information about previous logons' message after every sign-in and must acknowledge it before they get the desktop. Users raise tickets about it.",
+      "why": "Microsoft documents this setting only for local accounts and Active Directory domain accounts (domain functional level 2008 or later): the last-logon data comes from the local account database or a domain controller. An Entra ID account on an Entra joined device has neither, so Windows cannot retrieve it. The CSP is ADMX_WinLogon/DisplayLastLogonInfoDescription (registry DisplayLastLogonInfo), not an InteractiveLogon security option.",
+      "alternative": "Disable or remove it for cloud-only devices. For sign-in history use the Entra sign-in logs (Entra admin center > Monitoring > Sign-in logs, or the user's sign-in logs in CIPP); for on-device auditing use Security event IDs 4624/4625.",
+      "sources": [
+        "https://learn.microsoft.com/en-us/windows/client-management/mdm/policy-csp-admx-winlogon#displaylastlogoninfodescription"
+      ]
+    },
+    {
+      "id": "CLOUDONLY-002",
+      "title": "Windows LAPS backs up the password to Active Directory",
+      "severity": "High",
+      "appliesWhen": "CloudOnlyDevices",
+      "match": {
+        "settingDefinitionIds": ["device_vendor_msft_laps_policies_backupdirectory"],
+        "values": ["2"],
+        "omaUris": ["./Device/Vendor/MSFT/LAPS/Policies/BackupDirectory"],
+        "omaValues": ["2"]
+      },
+      "symptom": "On an Entra joined device the local administrator password is never stored anywhere you can read it: Intune and Entra show no LAPS password for the device.",
+      "why": "BackupDirectory 2 means 'Active Directory only'. Microsoft's LAPS CSP applicability table limits the Active Directory settings to hybrid joined devices; a cloud-only device has no domain to write the password to.",
+      "alternative": "Set Backup Directory to 1 (Microsoft Entra ID) for Entra joined devices, and read the password from Intune, Entra or CIPP (Get LAPS password).",
+      "sources": [
+        "https://learn.microsoft.com/en-us/windows/client-management/mdm/laps-csp#policiesbackupdirectory",
+        "https://learn.microsoft.com/en-us/windows/client-management/mdm/laps-csp#settings-applicability"
+      ]
+    },
+    {
+      "id": "CLOUDONLY-003",
+      "title": "Windows LAPS settings that only apply to Active Directory backup",
+      "severity": "Info",
+      "appliesWhen": "CloudOnlyDevices",
+      "match": {
+        "settingDefinitionIds": [
+          "device_vendor_msft_laps_policies_adpasswordencryptionenabled",
+          "device_vendor_msft_laps_policies_adpasswordencryptionprincipal",
+          "device_vendor_msft_laps_policies_adencryptedpasswordhistorysize",
+          "device_vendor_msft_laps_policies_passwordexpirationprotectionenabled"
+        ],
+        "omaUris": [
+          "./Device/Vendor/MSFT/LAPS/Policies/ADPasswordEncryptionEnabled",
+          "./Device/Vendor/MSFT/LAPS/Policies/ADPasswordEncryptionPrincipal",
+          "./Device/Vendor/MSFT/LAPS/Policies/ADEncryptedPasswordHistorySize",
+          "./Device/Vendor/MSFT/LAPS/Policies/PasswordExpirationProtectionEnabled"
+        ]
+      },
+      "symptom": "No effect on Entra joined devices.",
+      "why": "Microsoft's LAPS CSP applicability table marks ADPasswordEncryptionEnabled, ADPasswordEncryptionPrincipal, ADEncryptedPasswordHistorySize and PasswordExpirationProtectionEnabled as 'No' for Azure (Entra) joined devices; they are honoured only for hybrid joined devices backing up to Active Directory.",
+      "alternative": "Leave them out of policies for cloud-only devices. The settings that apply to Entra joined devices are BackupDirectory, PasswordAgeDays, PasswordLength, PasswordComplexity, AdministratorAccountName and the post-authentication actions.",
+      "sources": [
+        "https://learn.microsoft.com/en-us/windows/client-management/mdm/laps-csp#settings-applicability"
+      ]
+    },
+    {
+      "id": "CLOUDONLY-004",
+      "title": "Always wait for the network at computer startup and logon",
+      "severity": "Low",
+      "appliesWhen": "CloudOnlyDevices",
+      "match": {
+        "settingDefinitionIds": ["device_vendor_msft_policy_config_admx_logon_syncforegroundpolicy"],
+        "values": ["1"],
+        "omaUris": ["./Device/Vendor/MSFT/Policy/Config/ADMX_Logon/SyncForegroundPolicy"],
+        "omaValues": ["*<enabled*"],
+        "admxDefinitionIds": ["304e5605-d07e-4b5f-b03d-81c38b458f54"],
+        "admxDisplayNames": ["Always wait for the network at computer startup and logon"],
+        "admxEnabledOnly": true
+      },
+      "symptom": "Startup and sign-in wait for the network to initialise, with nothing to gain on a cloud-only device.",
+      "why": "The setting makes Group Policy processing synchronous so that Folder Redirection, Software Installation and roaming profiles from Active Directory Group Policy apply in one logon. Entra joined devices receive no domain Group Policy; Intune MDM policy does not use this processing.",
+      "alternative": "Remove it. Use OneDrive Known Folder Move instead of Folder Redirection, and Intune app deployment instead of GPO Software Installation.",
+      "sources": [
+        "https://learn.microsoft.com/en-us/windows/client-management/mdm/policy-csp-admx-logon#syncforegroundpolicy"
+      ]
+    },
+    {
+      "id": "CLOUDONLY-005",
+      "title": "Net Logon domain controller locator settings",
+      "severity": "Info",
+      "appliesWhen": "NoOnPremisesDirectory",
+      "match": {
+        "settingDefinitionIdPrefixes": ["device_vendor_msft_policy_config_admx_netlogon_"],
+        "omaUris": ["./Device/Vendor/MSFT/Policy/Config/ADMX_Netlogon/*"],
+        "admxCategoryPathPrefixes": ["\\System\\Net Logon"]
+      },
+      "symptom": "No effect when there is no Active Directory domain.",
+      "why": "The ADMX_Netlogon settings tune how the Net Logon service locates and caches Active Directory domain controllers (site name, DC discovery retries, DC locator DNS records). With no on-premises directory there is no domain controller to find.",
+      "alternative": "Remove them from cloud-only tenants. Keep them only where Entra joined devices reach on-premises AD resources.",
+      "sources": [
+        "https://learn.microsoft.com/en-us/windows/client-management/mdm/policy-csp-admx-netlogon"
+      ]
+    },
+    {
+      "id": "CLOUDONLY-006",
+      "title": "Cloud Kerberos trust / cloud Kerberos ticket retrieval",
+      "severity": "Info",
+      "appliesWhen": "NoOnPremisesDirectory",
+      "match": {
+        "settingDefinitionIds": [
+          "device_vendor_msft_passportforwork_{tenantid}_policies_usecloudtrustforonpremauth",
+          "device_vendor_msft_policy_config_kerberos_cloudkerberosticketretrievalenabled"
+        ],
+        "values": ["true", "1"],
+        "omaUris": [
+          "./Device/Vendor/MSFT/PassportForWork/*/Policies/UseCloudTrustForOnPremAuth",
+          "./Device/Vendor/MSFT/Policy/Config/Kerberos/CloudKerberosTicketRetrievalEnabled"
+        ],
+        "omaValues": ["true", "1"]
+      },
+      "symptom": "No effect in a tenant without on-premises Active Directory. Sign-in still works; there is simply nothing on-premises to give single sign-on to.",
+      "why": "Cloud Kerberos trust exists to give Entra and hybrid joined devices SSO to Active Directory resources. It needs a Microsoft Entra Kerberos server object in the AD domain and read-write domain controllers in each site. Microsoft notes that without Entra Kerberos a user on an Entra joined device can sign in but has no SSO to on-premises resources.",
+      "alternative": "Leave it unconfigured in cloud-only tenants (harmless, but it suggests an on-premises dependency that does not exist). Configure it only when the tenant has AD and Entra Kerberos is deployed.",
+      "sources": [
+        "https://learn.microsoft.com/en-us/windows/security/identity-protection/hello-for-business/deploy/hybrid-cloud-kerberos-trust",
+        "https://learn.microsoft.com/en-us/windows/security/identity-protection/hello-for-business/policy-settings",
+        "https://learn.microsoft.com/en-us/windows/client-management/mdm/policy-csp-kerberos#cloudkerberosticketretrievalenabled"
+      ]
+    },
+    {
+      "id": "CLOUDONLY-007",
+      "title": "Windows Hello for Business: use certificate for on-premises authentication",
+      "severity": "Low",
+      "appliesWhen": "NoOnPremisesDirectory",
+      "match": {
+        "settingDefinitionIds": ["device_vendor_msft_passportforwork_{tenantid}_policies_usecertificateforonpremauth"],
+        "values": ["true", "1"],
+        "omaUris": ["./Device/Vendor/MSFT/PassportForWork/*/Policies/UseCertificateForOnPremAuth"],
+        "omaValues": ["true", "1"]
+      },
+      "symptom": "Windows Hello for Business tries to enrol a sign-in certificate for on-premises authentication that has no on-premises directory to authenticate to, and the setting overrides cloud Kerberos trust if both are set.",
+      "why": "This setting switches Windows Hello for Business to the certificate trust model, whose only purpose is a certificate for on-premises (Active Directory) authentication. Microsoft notes certificate trust takes precedence over cloud Kerberos trust when both are enabled.",
+      "alternative": "Leave it disabled or unconfigured for cloud-only devices; Windows Hello for Business needs no trust model to sign in to Entra ID.",
+      "sources": [
+        "https://learn.microsoft.com/en-us/windows/security/identity-protection/hello-for-business/policy-settings",
+        "https://learn.microsoft.com/en-us/windows/security/identity-protection/hello-for-business/deploy/hybrid-cloud-kerberos-trust"
+      ]
+    }
+  ]
+}

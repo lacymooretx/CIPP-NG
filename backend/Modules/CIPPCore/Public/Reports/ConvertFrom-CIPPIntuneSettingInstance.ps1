@@ -20,6 +20,10 @@ function ConvertFrom-CIPPIntuneSettingInstance {
 
         Handles every settingInstance shape Intune currently emits, and recurses through
         group collections and choice children.
+
+        Each row also carries DefinitionId (the instance's settingDefinitionId) and RawValue
+        (the unconverted value) so rule engines such as Test-CIPPIntuneCloudOnlyLint can
+        match on the real identifiers instead of the readable label.
     .PARAMETER Instance
         A settingInstance object (or a `settings` array element that contains one).
     .FUNCTIONALITY
@@ -71,21 +75,21 @@ function ConvertFrom-CIPPIntuneSettingInstance {
 
     switch -Wildcard ($OdataType) {
         '*ChoiceSettingInstance' {
-            $Results.Add(@{ Setting = $LabelText; Value = (Format-SettingValue ([string]$Instance.choiceSettingValue.value)) })
+            $Results.Add(@{ Setting = $LabelText; Value = (Format-SettingValue ([string]$Instance.choiceSettingValue.value)); DefinitionId = $DefinitionId; RawValue = $Instance.choiceSettingValue.value })
             foreach ($Child in @($Instance.choiceSettingValue.children)) {
                 foreach ($R in (ConvertFrom-CIPPIntuneSettingInstance -Instance $Child -Depth ($Depth + 1))) { $Results.Add($R) }
             }
         }
         '*SimpleSettingInstance' {
-            $Results.Add(@{ Setting = $LabelText; Value = (Format-SettingValue ([string]$Instance.simpleSettingValue.value)) })
+            $Results.Add(@{ Setting = $LabelText; Value = (Format-SettingValue ([string]$Instance.simpleSettingValue.value)); DefinitionId = $DefinitionId; RawValue = $Instance.simpleSettingValue.value })
         }
         '*SimpleSettingCollectionInstance' {
             $Values = @($Instance.simpleSettingCollectionValue | ForEach-Object { [string]$_.value }) | Where-Object { $_ }
-            $Results.Add(@{ Setting = $LabelText; Value = ($Values -join ', ') })
+            $Results.Add(@{ Setting = $LabelText; Value = ($Values -join ', '); DefinitionId = $DefinitionId; RawValue = @($Values) })
         }
         '*ChoiceSettingCollectionInstance' {
             foreach ($Choice in @($Instance.choiceSettingCollectionValue)) {
-                $Results.Add(@{ Setting = $LabelText; Value = (Format-SettingValue ([string]$Choice.value)) })
+                $Results.Add(@{ Setting = $LabelText; Value = (Format-SettingValue ([string]$Choice.value)); DefinitionId = $DefinitionId; RawValue = $Choice.value })
                 foreach ($Child in @($Choice.children)) {
                     foreach ($R in (ConvertFrom-CIPPIntuneSettingInstance -Instance $Child -Depth ($Depth + 1))) { $Results.Add($R) }
                 }
@@ -106,7 +110,7 @@ function ConvertFrom-CIPPIntuneSettingInstance {
         }
         default {
             # Unknown shape: document that the setting is configured rather than drop it.
-            $Results.Add(@{ Setting = $LabelText; Value = '(configured)' })
+            $Results.Add(@{ Setting = $LabelText; Value = '(configured)'; DefinitionId = $DefinitionId; RawValue = $null })
         }
     }
 

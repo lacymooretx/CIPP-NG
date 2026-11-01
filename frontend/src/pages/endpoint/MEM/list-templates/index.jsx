@@ -66,6 +66,13 @@ const Page = () => {
       icon: <CippIcons.ShieldCheckIcon />,
       color: 'info',
     },
+    // Aspendora fork addition (Vikunja CIPP-28): open the cloud-only lint for this template (read-only).
+    {
+      label: 'Cloud-only Lint',
+      link: '/endpoint/MEM/cloud-only-lint?templateId=[GUID]',
+      icon: <CippIcons.Warning />,
+      color: 'info',
+    },
     {
       label: 'Edit Template Name and Description',
       type: 'POST',
@@ -266,7 +273,17 @@ const Page = () => {
     size: 'lg',
   }
 
-  const simpleColumns = ['displayName', 'isSynced', 'source', 'package', 'description', 'Type', 'usage']
+  // cloudOnlyWarnings: Aspendora fork (Vikunja CIPP-28), advisory lint result from ListIntuneTemplates.
+  const simpleColumns = [
+    'displayName',
+    'isSynced',
+    'source',
+    'package',
+    'description',
+    'Type',
+    'usage',
+    'cloudOnlyWarnings',
+  ]
 
   const filterList = [
     {
