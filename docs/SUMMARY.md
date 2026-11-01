@@ -220,6 +220,7 @@
     * [Alerts](user-documentation/security/incidents/list-alerts.md)
     * [Defender Alerts](user-documentation/security/incidents/list-mdo-alerts.md)
     * [Check Alerts](user-documentation/security/incidents/list-check-alerts.md)
+    * [Session Timeline](user-documentation/security/incidents/session-timeline.md)
   * [Defender](user-documentation/security/defender/README.md)
     * [Defender Status](user-documentation/security/defender/list-defender.md)
     * [Defender Deployment](user-documentation/security/defender/deployment.md)
