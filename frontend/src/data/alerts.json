@@ -1283,6 +1283,21 @@
     "description": "Uses Intune's built-in \"Has a compliance policy assigned\" check to raise devices no compliance policy targets, whose compliance therefore comes only from the tenant default. Non-compliant devices are the separate DeviceCompliance alert."
   },
   {
+    "name": "BackupCoverage",
+    "label": "Alert when a tenant has no current CIPP backup of Conditional Access, users and groups",
+    "recommendedRunInterval": "7d",
+    "requiresInput": true,
+    "multipleInput": true,
+    "inputs": [
+      {
+        "inputType": "number",
+        "inputLabel": "Backup counts as stale after X days (default: 2)",
+        "inputName": "BackupCoverageMaxAgeDays"
+      }
+    ],
+    "description": "Raises tenants with no scheduled CIPP backup, a disabled backup task, no backup yet, a stale backup, or Conditional Access / users and groups left out. Entra's own Backup and Recovery keeps only about 5 days and cannot restore hard-deleted objects. See Tenant > Reports > Entra Recovery Coverage."
+  },
+  {
     "name": "IntuneWindowsUpdateFailures",
     "label": "Alert on Windows Update failures reported by Intune",
     "recommendedRunInterval": "1d",
