@@ -1058,5 +1058,135 @@
     "label": "Alert on outdated or retired OpenIntuneBaseline (OIB) policies",
     "recommendedRunInterval": "7d",
     "description": "Weekly check of the tenant's \"Win - OIB -\" Intune policies against the latest OpenIntuneBaseline Windows release on GitHub. Alerts on policies older than the version in that release (Outdated) and on policies the release deprecated or dropped (Retired). OIB policies the tenant has not deployed are not alerted on, and tenants with no OIB policies produce nothing. Report only."
+  },
+  {
+    "name": "EnrollmentDiscovery",
+    "label": "Alert on tenants still relying on CNAME-based Intune enrollment",
+    "recommendedRunInterval": "7d",
+    "requiresInput": true,
+    "multipleInput": true,
+    "inputs": [
+      {
+        "inputType": "switch",
+        "inputLabel": "Include informational findings (legacy CNAME target, missing enterpriseregistration record, CNAME missing while the MDM scope is All)",
+        "inputName": "EnrollmentDiscoveryIncludeInfo"
+      }
+    ],
+    "description": "Weekly check of the enterpriseenrollment / enterpriseregistration CNAMEs on every custom verified domain against the Intune MDM user scope: CNAME published while the scope is None or a narrow group, Windows enrollment in use with no CNAME, CNAMEs pointing somewhere unexpected, and GPO / co-management enrolled hybrid devices that depend on the scope. Report only; see ListEnrollmentDiscovery."
+  },
+  {
+    "name": "IntuneStaleCheckIn",
+    "label": "Alert on Intune devices that have not checked in for X days",
+    "recommendedRunInterval": "1d",
+    "requiresInput": true,
+    "multipleInput": true,
+    "inputs": [
+      {
+        "inputType": "number",
+        "inputLabel": "Days since last Intune check-in (default: 14)",
+        "inputName": "IntuneStaleDays"
+      }
+    ],
+    "description": "Raises managed devices whose last Intune sync is older than the threshold. Retired, wiped and delete-pending devices are skipped. Each device notifies once and resolves when it checks in again. Entra sign-in staleness is the separate StaleEntraDevices alert."
+  },
+  {
+    "name": "IntuneEnrollmentFailures",
+    "label": "Alert on Intune enrollment failures",
+    "recommendedRunInterval": "4h",
+    "requiresInput": true,
+    "multipleInput": true,
+    "inputs": [
+      {
+        "inputType": "number",
+        "inputLabel": "Hours of enrollment failure history to scan each run (default: 24). Failures are de-duplicated, so overlap loses nothing.",
+        "inputName": "EnrollmentFailureLookbackHours"
+      }
+    ],
+    "description": "Reads the Intune enrollment troubleshooting log and raises each failure with Intune's reason and suggested remediation. Repeated attempts by the same device for the same reason on the same day are grouped and notify once."
+  },
+  {
+    "name": "IntuneNewDevices",
+    "label": "Daily digest of newly enrolled Intune devices",
+    "recommendedRunInterval": "1d",
+    "requiresInput": true,
+    "multipleInput": true,
+    "inputs": [
+      {
+        "inputType": "number",
+        "inputLabel": "Hours to look back for new enrollments (default: 24)",
+        "inputName": "NewDeviceLookbackHours"
+      }
+    ],
+    "description": "Lists the devices enrolled in Intune in the look-back window (name, user, OS, model, serial, ownership, enrollment type). Each enrollment is announced once."
+  },
+  {
+    "name": "IntuneDuplicateDevices",
+    "label": "Alert on duplicate Intune device records (same serial number)",
+    "recommendedRunInterval": "7d",
+    "requiresInput": true,
+    "multipleInput": true,
+    "inputs": [
+      {
+        "inputType": "number",
+        "inputLabel": "Minimum records sharing a serial number (default: 2)",
+        "inputName": "DuplicateMinRecords"
+      }
+    ],
+    "description": "Groups managed devices by serial number (placeholder serials such as \"Default string\" and retired devices ignored) and recommends keeping the most recently synced record. Report only: nothing is deleted."
+  },
+  {
+    "name": "IntuneNoCompliancePolicy",
+    "label": "Alert on Intune devices with no compliance policy assigned",
+    "recommendedRunInterval": "1d",
+    "requiresInput": true,
+    "multipleInput": true,
+    "inputs": [
+      {
+        "inputType": "number",
+        "inputLabel": "Skip devices enrolled in the last X days (default: 1)",
+        "inputName": "NoComplianceGraceDays"
+      },
+      {
+        "inputType": "switch",
+        "inputLabel": "Also raise devices Intune could not evaluate (error / conflict)",
+        "inputName": "NoComplianceIncludeErrors"
+      }
+    ],
+    "description": "Uses Intune's built-in \"Has a compliance policy assigned\" check to raise devices no compliance policy targets, whose compliance therefore comes only from the tenant default. Non-compliant devices are the separate DeviceCompliance alert."
+  },
+  {
+    "name": "IntuneWindowsUpdateFailures",
+    "label": "Alert on Windows Update failures reported by Intune",
+    "recommendedRunInterval": "1d",
+    "requiresInput": true,
+    "multipleInput": true,
+    "inputs": [
+      {
+        "inputType": "switch",
+        "inputLabel": "Include expedited quality update profiles (not yet verified live)",
+        "inputName": "WUFailuresIncludeQuality"
+      },
+      {
+        "inputType": "switch",
+        "inputLabel": "Include driver update profiles (not yet verified live)",
+        "inputName": "WUFailuresIncludeDrivers"
+      }
+    ],
+    "description": "Reads the Intune Windows Update alert reports per feature update profile (and optionally expedited quality and driver profiles) and raises each device/alert pair. Needs Windows diagnostic data enabled for Intune. A run where a report could not be read does not report."
+  },
+  {
+    "name": "DriverUpdatesBlocked",
+    "label": "Alert when update rings or Settings Catalog policies block Windows drivers",
+    "recommendedRunInterval": "1d",
+    "requiresInput": true,
+    "multipleInput": true,
+    "inputs": [
+      {
+        "inputType": "switch",
+        "inputLabel": "Also raise unassigned policies that block drivers",
+        "inputName": "DriverBlockIncludeUnassigned"
+      }
+    ],
+    "description": "Raises update rings with Windows drivers set to Block and Settings Catalog policies setting \"Exclude WU Drivers In Quality Update\" to Exclude. Either stops devices receiving drivers and firmware regardless of the driver update profile. Report only."
   }
 ]

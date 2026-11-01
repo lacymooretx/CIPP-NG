@@ -759,6 +759,13 @@ export const nativeMenuItems = [
             path: '/endpoint/MEM/intune-hygiene',
             permissions: ['Endpoint.MEM.*'],
           },
+          // Aspendora fork addition (Vikunja CIPP-24): driver and firmware update review queue.
+          {
+            title: 'Driver Updates',
+            path: '/endpoint/MEM/driver-updates',
+            docsPath: 'endpoint/mem/driver-updates',
+            permissions: ['Endpoint.MEM.*'],
+          },
         ],
       },
       {

@@ -9277,5 +9277,78 @@
     "addedDate": "2026-09-14",
     "powershellEquivalent": "Portal or Graph API",
     "recommendedBy": []
+  },
+  {
+    "name": "standards.DriverUpdateProfile",
+    "cat": "Intune Standards",
+    "tag": [],
+    "helpText": "**Requires Windows Enterprise E3/E5 or Microsoft 365 Business Premium rights and Windows Update for Business deployment service / Autopatch onboarding.** Makes sure the tenant has a Windows driver update profile with the chosen approval method (automatic or manual) and, for automatic approval, the chosen deferral. Remediation creates the profile unassigned; assign it yourself. Tenants managed by Windows Autopatch can be treated as compliant.",
+    "docsDescription": "Checks deviceManagement/windowsDriverUpdateProfiles for a profile with the configured name. Report and alert compare its approval type and deferral days with the template, list Autopatch-managed and other driver profiles, and count update rings or Settings Catalog policies that block Windows Update drivers (which silently defeat any driver profile). Remediation creates the profile when it is missing (no assignments) and corrects the deferral of an automatic profile. Intune does not allow the approval type of an existing profile to change, so a mismatch is only logged. When \"Treat a Windows Autopatch driver profile as compliant\" is on, a tenant whose driver updates are managed by Autopatch is compliant and nothing is created. Aspendora fork addition (Vikunja CIPP-24).",
+    "executiveText": "Keeps Windows driver and firmware updates under a consistent, deliberate approval policy in every tenant, so hardware drivers are either approved automatically after a short soak period or held for review, instead of each tenant drifting to its own setup.",
+    "addedComponent": [
+      {
+        "type": "textField",
+        "name": "standards.DriverUpdateProfile.ProfileName",
+        "label": "Driver update profile name",
+        "required": false,
+        "defaultValue": "CIPP - Windows Driver Updates"
+      },
+      {
+        "type": "autoComplete",
+        "multiple": false,
+        "creatable": false,
+        "name": "standards.DriverUpdateProfile.ApprovalType",
+        "label": "Approval type",
+        "options": [
+          {
+            "label": "Automatic (approve recommended drivers after the deferral)",
+            "value": "automatic"
+          },
+          {
+            "label": "Manual (every driver needs review)",
+            "value": "manual"
+          }
+        ],
+        "defaultValue": {
+          "label": "Automatic (approve recommended drivers after the deferral)",
+          "value": "automatic"
+        }
+      },
+      {
+        "type": "number",
+        "name": "standards.DriverUpdateProfile.DeferralDays",
+        "label": "Deferral days for automatic approval (0-30, default 7)",
+        "defaultValue": 7,
+        "validators": {
+          "min": {
+            "value": 0,
+            "message": "Minimum value is 0"
+          },
+          "max": {
+            "value": 30,
+            "message": "Intune accepts a driver deferral of 0 to 30 days"
+          }
+        }
+      },
+      {
+        "type": "switch",
+        "name": "standards.DriverUpdateProfile.AcceptAutopatch",
+        "label": "Treat a Windows Autopatch driver profile as compliant",
+        "defaultValue": true
+      }
+    ],
+    "label": "Standardize the Windows driver and firmware update profile",
+    "impact": "Medium Impact",
+    "impactColour": "warning",
+    "addedDate": "2026-10-31",
+    "powershellEquivalent": "Graph API - deviceManagement/windowsDriverUpdateProfiles",
+    "recommendedBy": [],
+    "requiredCapabilities": [
+      "INTUNE_A",
+      "MDM_Services",
+      "EMS",
+      "SCCM",
+      "MICROSOFTINTUNEPLAN1"
+    ]
   }
 ]
