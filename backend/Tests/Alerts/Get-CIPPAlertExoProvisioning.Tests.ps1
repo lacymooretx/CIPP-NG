@@ -57,6 +57,12 @@ Describe 'Get-CIPPAlertExoProvisioning' {
         $script:Traced[0].Fix | Should -Be 'fix OrgManagementRoles'
     }
 
+    It 'does not alert a Warn on OrgManagementRoles (a few optional roles missing fleet-wide), only a Fail' {
+        Mock Get-CIPPExoProvisioningHealth { New-Report -Checks @((Chk 'OrgManagementRoles' 'Warn' 'missing 1 role'), (Chk 'ManagementRoles' 'Pass')) }
+        Get-CIPPAlertExoProvisioning -TenantFilter 'contoso.com' | Out-Null
+        @($script:Traced | Where-Object { $_ }).Count | Should -Be 0
+    }
+
     It 'raises one finding per missing domain and per user without a mailbox, without a UserPrincipalName key' {
         $script:Users = @([pscustomobject]@{ id = 'u1'; userPrincipalName = 'a@contoso.com'; licensedSince = '2026-10-01T00:00:00Z' }, [pscustomobject]@{ id = 'u2'; userPrincipalName = 'b@contoso.com'; licensedSince = '2026-10-02T00:00:00Z' })
         Mock Get-CIPPExoProvisioningHealth { New-Report -Checks @((Chk 'AcceptedDomains' 'Warn'), (Chk 'LicensedUserMailboxes' 'Warn')) -MissingDomains @('fabrikam.com') -UsersWithoutMailbox $script:Users }

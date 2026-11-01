@@ -32,7 +32,10 @@ function Get-CIPPAlertExoProvisioning {
     try {
         $Report = Get-CIPPExoProvisioningHealth -TenantFilter $TenantFilter -GraceHours $GraceHours
         # A check that could not run is logged, not alerted, unless it is itself the failure (Exchange not answering).
-        $Raise = @($Report.Checks | Where-Object { $_.Status -eq 'Fail' -or ($_.Status -eq 'Warn' -and $_.Errored -ne $true) })
+        # A Warn on OrgManagementRoles (1-4 roles missing) is not alerted: on 2026-11-01 every tenant lacked the same
+        # newly added role (Information Protection Analyst), a Microsoft-side change rather than a provisioning failure.
+        # 5+ missing is Fail and still alerts; the report page still shows the Warn.
+        $Raise = @($Report.Checks | Where-Object { $_.Status -eq 'Fail' -or ($_.Status -eq 'Warn' -and $_.Errored -ne $true -and $_.Check -ne 'OrgManagementRoles') })
         $Rows = foreach ($Check in $Raise) {
             if ($Check.Check -eq 'AcceptedDomains' -and -not $Check.Errored -and $Check.Status -eq 'Warn') {
                 foreach ($Domain in @($Report.MissingDomains)) {
