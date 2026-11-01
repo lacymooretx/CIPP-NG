@@ -917,6 +917,12 @@ export const nativeMenuItems = [
             path: '/teams-share/teams/voice-apps',
             permissions: ['Teams.Voice.*'],
           },
+          // Aspendora fork addition (Vikunja CIPP-33): where a Teams file really lives and why a user can't open it.
+          {
+            title: 'Teams File Resolver',
+            path: '/teams-share/teams/file-resolver',
+            permissions: ['Sharepoint.Site.*'],
+          },
         ],
       },
       {

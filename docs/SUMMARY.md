@@ -313,6 +313,7 @@
     * [Teams](user-documentation/teams-share/teams/list-team/README.md)
       * [Add Team](user-documentation/teams-share/teams/list-team/add.md)
     * [Business Voice](user-documentation/teams-share/teams/business-voice.md)
+    * [Teams File Resolver](user-documentation/teams-share/teams/file-resolver.md)
   * [Reports](user-documentation/teams-share/reports/README.md)
     * [Sharing Report](user-documentation/teams-share/reports/sharing-report.md)
     * [Permissions Report](user-documentation/teams-share/reports/permissions-report.md)
