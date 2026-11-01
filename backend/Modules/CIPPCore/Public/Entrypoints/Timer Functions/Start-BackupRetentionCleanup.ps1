@@ -43,7 +43,7 @@ function Start-BackupRetentionCleanup {
 
             # Delete blob files
             $BlobFilter = "$CutoffFilter and BackupIsBlob eq true"
-            $BlobBackups = Get-AzDataTableEntity @CIPPBackupTable -Filter $BlobFilter -Property @('PartitionKey', 'RowKey', 'Backup')
+            $BlobBackups = Get-AzDataTableEntity @CIPPBackupTable -Filter $BlobFilter -Property @('PartitionKey', 'RowKey', 'Backup', 'ManifestBlob')
 
             $BlobDeletedCount = 0
             if ($BlobBackups) {
@@ -66,6 +66,14 @@ function Start-BackupRetentionCleanup {
                             $null = New-CIPPAzStorageRequest -Service 'blob' -Resource $BlobPath -Method 'DELETE' -ConnectionString $ConnectionString
                             $BlobDeletedCount++
                             Write-Host "Deleted blob: $BlobPath"
+                            # Aspendora fork addition (Vikunja CIPP-23): remove the integrity manifest with its backup.
+                            if ($Backup.ManifestBlob) {
+                                try {
+                                    $null = New-CIPPAzStorageRequest -Service 'blob' -Resource ([string]$Backup.ManifestBlob) -Method 'DELETE' -ConnectionString $ConnectionString
+                                } catch {
+                                    Write-LogMessage -API 'BackupRetentionCleanup' -message "Failed to delete manifest $($Backup.ManifestBlob): $($_.Exception.Message)" -sev 'Warning'
+                                }
+                            }
                         } catch {
                             Write-LogMessage -API 'BackupRetentionCleanup' -message "Failed to delete blob $($Backup.Backup): $($_.Exception.Message)" -sev 'Warning'
                         }
@@ -103,7 +111,7 @@ function Start-BackupRetentionCleanup {
 
             # Delete blob files
             $BlobFilter = "$CutoffFilter and BackupIsBlob eq true"
-            $BlobBackups = Get-AzDataTableEntity @ScheduledBackupTable -Filter $BlobFilter -Property @('PartitionKey', 'RowKey', 'Backup')
+            $BlobBackups = Get-AzDataTableEntity @ScheduledBackupTable -Filter $BlobFilter -Property @('PartitionKey', 'RowKey', 'Backup', 'ManifestBlob')
 
             $BlobDeletedCount = 0
             if ($BlobBackups) {
@@ -126,6 +134,14 @@ function Start-BackupRetentionCleanup {
                             $null = New-CIPPAzStorageRequest -Service 'blob' -Resource $BlobPath -Method 'DELETE' -ConnectionString $ConnectionString
                             $BlobDeletedCount++
                             Write-Host "Deleted blob: $BlobPath"
+                            # Aspendora fork addition (Vikunja CIPP-23): remove the integrity manifest with its backup.
+                            if ($Backup.ManifestBlob) {
+                                try {
+                                    $null = New-CIPPAzStorageRequest -Service 'blob' -Resource ([string]$Backup.ManifestBlob) -Method 'DELETE' -ConnectionString $ConnectionString
+                                } catch {
+                                    Write-LogMessage -API 'BackupRetentionCleanup' -message "Failed to delete manifest $($Backup.ManifestBlob): $($_.Exception.Message)" -sev 'Warning'
+                                }
+                            }
                         } catch {
                             Write-LogMessage -API 'BackupRetentionCleanup' -message "Failed to delete blob $($Backup.Backup): $($_.Exception.Message)" -sev 'Warning'
                         }

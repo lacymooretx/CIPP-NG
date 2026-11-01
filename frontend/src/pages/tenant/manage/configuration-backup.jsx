@@ -24,6 +24,7 @@ import { ApiGetCall, ApiPostCall } from "../../../api/ApiCall";
 import { CippPropertyListCard } from "../../../components/CippCards/CippPropertyListCard";
 import { CippBackupScheduleDrawer } from "../../../components/CippComponents/CippBackupScheduleDrawer";
 import { CippRestoreBackupDrawer } from "../../../components/CippComponents/CippRestoreBackupDrawer";
+import { CippBackupInsightDrawer } from "../../../components/CippComponents/CippBackupInsightDrawer";
 import { CippApiDialog } from "../../../components/CippComponents/CippApiDialog";
 import { CippTimeAgo } from "../../../components/CippComponents/CippTimeAgo";
 import { CippFormTenantSelector } from "../../../components/CippComponents/CippFormTenantSelector";
@@ -53,6 +54,8 @@ const Page = () => {
   const [selectedBackup, setSelectedBackup] = useState(null);
   const [backupContent, setBackupContent] = useState(null);
   const [isLoadingBackup, setIsLoadingBackup] = useState(false);
+  // Verify / Compare / Restore preview drawer: { mode, backup } or null
+  const [insight, setInsight] = useState(null);
 
   // API call to get backup files
   const backupList = ApiGetCall({
@@ -513,6 +516,31 @@ const Page = () => {
                                     >
                                       Download
                                     </Button>
+                                    {/* Aspendora fork addition (Vikunja CIPP-23) */}
+                                    <Button
+                                      size="small"
+                                      variant="outlined"
+                                      startIcon={<CippIcons.VerifiedUser />}
+                                      onClick={() => setInsight({ mode: "verify", backup })}
+                                    >
+                                      Verify
+                                    </Button>
+                                    <Button
+                                      size="small"
+                                      variant="outlined"
+                                      startIcon={<CippIcons.CompareArrows />}
+                                      onClick={() => setInsight({ mode: "compare", backup })}
+                                    >
+                                      Compare
+                                    </Button>
+                                    <Button
+                                      size="small"
+                                      variant="outlined"
+                                      startIcon={<CippIcons.FactCheck />}
+                                      onClick={() => setInsight({ mode: "preview", backup })}
+                                    >
+                                      Preview restore
+                                    </Button>
                                     <CippRestoreBackupDrawer
                                       buttonText="Restore"
                                       backupName={backup.name}
@@ -536,6 +564,15 @@ const Page = () => {
           </Grid>
         </Grid>
       </Box>
+
+      {/* Verify / Compare / Restore preview drawer - Aspendora fork addition (Vikunja CIPP-23) */}
+      <CippBackupInsightDrawer
+        open={Boolean(insight)}
+        mode={insight?.mode}
+        backup={insight?.backup}
+        backups={backupDisplayItems}
+        onClose={() => setInsight(null)}
+      />
 
       {/* Backup Preview Drawer */}
       <Drawer
