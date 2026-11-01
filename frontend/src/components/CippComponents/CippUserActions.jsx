@@ -576,6 +576,16 @@ export const useCippUserActions = () => {
       external: true,
     },
     {
+      // Aspendora fork addition (Vikunja CIPP-10): read-only, opens the explainer pre-filled and runs it.
+      label: 'Explain sign-in failures',
+      // The object ID, not the UPN: row links are not URL-encoded and a guest UPN contains '#EXT#'.
+      link: '/identity/reports/signin-explainer?userId=[id]',
+      icon: <CippIcons.Help />,
+      color: 'info',
+      target: '_self',
+      multiPost: false,
+    },
+    {
       label: 'Create Template from User',
       type: 'POST',
       icon: <CippIcons.ContentCopy />,
