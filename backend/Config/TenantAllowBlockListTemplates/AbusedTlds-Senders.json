@@ -1,0 +1,11 @@
+{
+  "GUID": "a70c6b39-e66c-43d5-a0e9-8235986cdec5",
+  "templateName": "Abused TLDs - Senders (Aspendora CIPP-30)",
+  "description": "Blocks mail FROM any domain under these abused TLDs (*.TLD sender entries; Microsoft marks it high confidence phishing and quarantines it). WARNING: a sender block also blocks OUTBOUND mail - users cannot send to these TLDs either (NDR 550 5.7.703), and the whole message is rejected for every recipient if one recipient matches. Block entries beat allow entries, so a per-sender allow does NOT create an exception. Run ListTldExposure first. Aspendora fork addition (Vikunja CIPP-30).",
+  "listType": "Sender",
+  "listMethod": "Block",
+  "entries": "*.zip,*.mov,*.top,*.xyz,*.click,*.sbs,*.cfd,*.bond,*.cyou,*.icu,*.buzz,*.rest,*.quest,*.lol,*.country,*.gq,*.cf,*.tk,*.ml,*.ga",
+  "notes": "CIPP-30 abused-TLD block. Also blocks OUTBOUND mail to this TLD.",
+  "NoExpiration": true,
+  "RemoveAfter": false
+}

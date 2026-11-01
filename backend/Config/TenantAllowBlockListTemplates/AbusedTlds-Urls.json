@@ -1,0 +1,11 @@
+{
+  "GUID": "bee99ed5-c25c-4114-9d80-089f011c7b83",
+  "templateName": "Abused TLDs - URLs (Aspendora CIPP-30)",
+  "description": "Blocks messages containing links to any host under these abused TLDs (*.TLD/* URL entries; quarantined as high confidence phishing, and the link is blocked at time of click). Does not stop outbound mail. .zip and .mov are left out on purpose (see the separate file-like template). Aspendora fork addition (Vikunja CIPP-30).",
+  "listType": "Url",
+  "listMethod": "Block",
+  "entries": "*.top/*,*.xyz/*,*.click/*,*.sbs/*,*.cfd/*,*.bond/*,*.cyou/*,*.icu/*,*.buzz/*,*.rest/*,*.quest/*,*.lol/*,*.country/*,*.gq/*,*.cf/*,*.tk/*,*.ml/*,*.ga/*",
+  "notes": "CIPP-30 abused-TLD URL block.",
+  "NoExpiration": true,
+  "RemoveAfter": false
+}
