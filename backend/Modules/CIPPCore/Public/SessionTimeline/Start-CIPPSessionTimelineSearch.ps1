@@ -77,14 +77,15 @@ function Start-CIPPSessionTimelineSearch {
     $SortedTimes = @($SignInTimes | Sort-Object)
 
     if ($StartTime) {
-        $WindowStart = $StartTime.Value.ToUniversalTime()
+        # A [Nullable[datetime]] parameter holds the unwrapped DateTime, so .Value would be $null.
+        $WindowStart = ([datetime]$StartTime).ToUniversalTime()
     } elseif ($SortedTimes.Count -gt 0) {
         $WindowStart = $SortedTimes[0].AddMinutes(-15)
     } else {
         throw 'No sign-ins were found for this session, so the time window is unknown. Enter a start and end time.'
     }
     if ($EndTime) {
-        $WindowEnd = $EndTime.Value.ToUniversalTime()
+        $WindowEnd = ([datetime]$EndTime).ToUniversalTime()
     } elseif ($SortedTimes.Count -gt 0) {
         $WindowEnd = $SortedTimes[-1].AddHours(2)
     } else {
