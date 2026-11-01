@@ -23,6 +23,12 @@ BeforeDiscovery {
 }
 
 BeforeAll {
+    # The '-partner' samples are GDAP changes from tenant 8d6a4ab1-...; pin it as the MSP tenant so other
+    # suites that set $env:TenantID can't change the actor classification (Aspendora fork, CIPP-32).
+    $script:SavedTenantID = $env:TenantID
+    $script:SavedMspIds = $env:CIPP_MSP_TENANT_IDS
+    $env:TenantID = '8d6a4ab1-ca4b-4899-b961-c13b1fe0323d'
+    $env:CIPP_MSP_TENANT_IDS = $null
     $RepoRoot = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $PSCommandPath))
     Add-Type -Path (Join-Path $RepoRoot 'Shared/CIPPSharp/bin/CIPPSharp.dll')
     $script:Templates = Get-Content (Join-Path (Split-Path -Parent $RepoRoot) 'frontend/src/data/AuditLogTemplates.json') -Raw | ConvertFrom-Json
@@ -163,4 +169,9 @@ Describe 'Audit log presets on real audit records' {
     It 'fixture case <Preset> names a preset that exists' -ForEach $FixtureCases {
         $Known | Should -BeTrue
     }
+}
+
+AfterAll {
+    $env:TenantID = $script:SavedTenantID
+    $env:CIPP_MSP_TENANT_IDS = $script:SavedMspIds
 }

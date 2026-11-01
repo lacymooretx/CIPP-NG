@@ -49,7 +49,7 @@ BeforeAll {
         }
         if ($null -ne $Override) { $Request.Body | Add-Member -NotePropertyName PreflightOverride -NotePropertyValue $Override }
         $Response = Invoke-ExecEditCAPolicyFull -Request $Request
-        return @{ Response = $Response; Sent = ($script:LastPatch.Body | ConvertFrom-Json) }
+        return @{ Response = $Response; Sent = $(if ($script:LastPatch.Body) { $script:LastPatch.Body | ConvertFrom-Json }) }
     }
 }
 
