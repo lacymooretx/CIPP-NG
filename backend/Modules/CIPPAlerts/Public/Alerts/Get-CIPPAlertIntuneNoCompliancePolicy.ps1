@@ -40,7 +40,14 @@ function Get-CIPPAlertIntuneNoCompliancePolicy {
     }
     $ById = @{}
     foreach ($D in $Devices) { if ($D.id) { $ById[[string]$D.id] = $D } }
-    $Rows = foreach ($S in @($Settings | Where-Object { [string]$_.state -in $States } | Group-Object -Property deviceId | ForEach-Object { $_.Group[0] })) {
+    # Intune keeps one row per context: a device/system row (no user) plus one per user who signed in. With a
+    # compliance policy assigned to users, the system row stays nonCompliant while each user row is compliant, so a
+    # device is only uncovered when NO row is compliant (2026-11-01: IAN-PC and the Cloud PCs were false positives).
+    $Uncovered = foreach ($Group in @($Settings | Group-Object -Property deviceId)) {
+        if (@($Group.Group | Where-Object { [string]$_.state -eq 'compliant' }).Count -gt 0) { continue }
+        $Group.Group | Where-Object { [string]$_.state -in $States } | Select-Object -First 1
+    }
+    $Rows = foreach ($S in @($Uncovered | Where-Object { $_ })) {
         $Device = $ById[[string]$S.deviceId]
         # Not in the managed device list = gone or retired since the summary was computed.
         if (-not $Device -or -not (Test-CIPPManagedDeviceActive -Device $Device)) { continue }

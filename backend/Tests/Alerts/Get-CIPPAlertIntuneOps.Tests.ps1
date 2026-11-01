@@ -141,6 +141,12 @@ Describe 'Intune operational alerts' {
                         [pscustomobject]@{ deviceId = 'x3'; state = 'compliant' }
                         [pscustomobject]@{ deviceId = 'x4'; state = 'nonCompliant' }
                         [pscustomobject]@{ deviceId = 'gone'; state = 'nonCompliant' }
+                        # User-assigned policy: the system row (no user) is nonCompliant, the signed-in user's row compliant.
+                        [pscustomobject]@{ deviceId = 'x5'; state = 'nonCompliant' }
+                        [pscustomobject]@{ deviceId = 'x5'; state = 'compliant'; userPrincipalName = 'ian@contoso.com' }
+                        # Two rows, neither compliant: still uncovered.
+                        [pscustomobject]@{ deviceId = 'x6'; state = 'nonCompliant' }
+                        [pscustomobject]@{ deviceId = 'x6'; state = 'nonCompliant'; userPrincipalName = 'kiosk@contoso.com' }
                     )
                 } else {
                     @(
@@ -148,6 +154,8 @@ Describe 'Intune operational alerts' {
                         [pscustomobject]@{ id = 'x2'; deviceName = 'ERR'; operatingSystem = 'Windows'; enrolledDateTime = (& $script:Ago 30); managementState = 'managed' }
                         [pscustomobject]@{ id = 'x3'; deviceName = 'OK'; operatingSystem = 'Windows'; enrolledDateTime = (& $script:Ago 30); managementState = 'managed' }
                         [pscustomobject]@{ id = 'x4'; deviceName = 'BRANDNEW'; operatingSystem = 'iOS'; enrolledDateTime = (& $script:Ago 0.1); managementState = 'managed' }
+                        [pscustomobject]@{ id = 'x5'; deviceName = 'USERPOLICY'; operatingSystem = 'Windows'; enrolledDateTime = (& $script:Ago 30); managementState = 'managed' }
+                        [pscustomobject]@{ id = 'x6'; deviceName = 'KIOSK'; operatingSystem = 'Windows'; enrolledDateTime = (& $script:Ago 30); managementState = 'managed' }
                     )
                 }
             }
@@ -155,17 +163,22 @@ Describe 'Intune operational alerts' {
 
         It 'raises devices with no policy, skipping new, vanished and evaluation-error devices by default' {
             Get-CIPPAlertIntuneNoCompliancePolicy -TenantFilter 'contoso.com' | Out-Null
-            $script:Traced.Id | Should -Be @('NoCompliance|x1')
+            $script:Traced.Id | Should -Be @('NoCompliance|x1', 'NoCompliance|x6')
+        }
+
+        It 'does not raise a device whose signed-in user is covered by a user-assigned policy (system row nonCompliant)' {
+            Get-CIPPAlertIntuneNoCompliancePolicy -TenantFilter 'contoso.com' | Out-Null
+            $script:Traced.Id | Should -Not -Contain 'NoCompliance|x5'
         }
 
         It 'adds evaluation errors when asked' {
             Get-CIPPAlertIntuneNoCompliancePolicy -TenantFilter 'contoso.com' -InputValue @{ NoComplianceIncludeErrors = $true } | Out-Null
-            @($script:Traced.Id | Sort-Object) | Should -Be @('NoCompliance|x1', 'NoCompliance|x2')
+            @($script:Traced.Id | Sort-Object) | Should -Be @('NoCompliance|x1', 'NoCompliance|x2', 'NoCompliance|x6')
         }
 
         It 'does not treat the string false as on' {
             Get-CIPPAlertIntuneNoCompliancePolicy -TenantFilter 'contoso.com' -InputValue @{ NoComplianceIncludeErrors = 'false' } | Out-Null
-            $script:Traced.Id | Should -Be @('NoCompliance|x1')
+            $script:Traced.Id | Should -Be @('NoCompliance|x1', 'NoCompliance|x6')
         }
     }
 
