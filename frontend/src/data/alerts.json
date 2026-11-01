@@ -1039,6 +1039,56 @@
     "description": "Weekly check of every holder of a privileged directory role (active and PIM-eligible, group assignments expanded): no passkey, FIDO2 key, Windows Hello for Business, Platform Credential or certificate (Error for Global, Privileged Role and Privileged Authentication Administrator); admin account also licensed or mail-enabled; Global Admin count outside 2-4; passkeys disabled or not self-service; AAGUID restrictions blocking Microsoft Authenticator passkeys. Report only; see ListPhishResistantMfa."
   },
   {
+    "name": "SmsMfaReliance",
+    "label": "Alert on users and admins relying on SMS/voice MFA, and on Authenticator/passkey coverage regressing",
+    "recommendedRunInterval": "7d",
+    "requiresInput": true,
+    "multipleInput": true,
+    "inputs": [
+      {
+        "inputType": "number",
+        "inputLabel": "Alert when Authenticator/passkey coverage drops more than this many percentage points below its best (default: 5)",
+        "inputName": "SmsCoverageDropPercent"
+      }
+    ],
+    "description": "Weekly readiness check before disabling SMS/voice MFA (Entra ID P1 needed for the registration report). Raises admins whose only MFA is SMS/voice or who have none, admins defaulting to SMS/voice, one consolidated row for users relying only on SMS/voice and one for licensed users without MFA, and a drop in Authenticator/passkey coverage. The first run records the coverage baseline. Report only; see ListSmsMfaReadiness."
+  },
+  {
+    "name": "StandingPrivilegedAccess",
+    "label": "Alert on standing Global Admins, privileged guests/apps, inactive admins and GDAP Global Admin",
+    "recommendedRunInterval": "7d",
+    "requiresInput": true,
+    "multipleInput": true,
+    "inputs": [
+      {
+        "inputType": "number",
+        "inputLabel": "Days without a successful sign-in before a privileged account counts as inactive (default: 45)",
+        "inputName": "StandingAccessInactiveDays"
+      },
+      {
+        "inputType": "textField",
+        "inputLabel": "Allow-list: comma-separated appIds or app names of service principals expected to hold roles (* wildcards allowed, e.g. CIPP-SAM, Huntress*). Supports custom variables.",
+        "inputName": "StandingAccessAllowedApps"
+      }
+    ],
+    "description": "Weekly least-privilege check of directory roles: permanent Global Administrators other than registered break-glass accounts (with a suggested smaller role from their Entra audit activity), non-Microsoft service principals and guests holding privileged roles, privileged accounts with no recent sign-in, and GDAP relationships with the customer that include Global Administrator. PIM needs Entra ID P2; without it active roles are treated as standing. Report only; see ListRoleAssignmentReport."
+  },
+  {
+    "name": "NewRoleDefinitions",
+    "label": "Alert on new directory role definitions (custom roles created)",
+    "recommendedRunInterval": "7d",
+    "requiresInput": true,
+    "multipleInput": true,
+    "inputs": [
+      {
+        "inputType": "switch",
+        "inputLabel": "Also alert (as Info) on new built-in roles Microsoft adds?",
+        "inputName": "RoleDefinitionsIncludeBuiltIn"
+      }
+    ],
+    "description": "Records each tenant's directory role definitions and raises one alert per definition that appears later: a new custom role is a Warning (check what it grants and who holds it). The first run seeds silently. Report only."
+  },
+  {
     "name": "OAuthHighRiskGrant",
     "label": "Alert on high-risk OAuth grants and AI connectors with mail or file access",
     "recommendedRunInterval": "1d",
