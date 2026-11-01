@@ -61,14 +61,9 @@ function Test-CIPPBreakGlassPosture {
         }
 
         # Conditional Access: does any active policy apply to this account without excluding it?
-        $Groups = @($A.GroupIds); $Roles = @($A.RoleTemplateIds)
+        # Scope resolution shared with the CA pre-flight gate (Vikunja CIPP-5).
         foreach ($P in $Active) {
-            $U = $P.conditions.users
-            $Included = (@($U.includeUsers) -contains 'All') -or (@($U.includeUsers) -contains $A.Id) -or
-                (@($U.includeGroups | Where-Object { $_ -in $Groups }).Count -gt 0) -or (@($U.includeRoles | Where-Object { $_ -in $Roles }).Count -gt 0)
-            if (-not $Included) { continue }
-            $Excluded = (@($U.excludeUsers) -contains $A.Id) -or (@($U.excludeGroups | Where-Object { $_ -in $Groups }).Count -gt 0) -or (@($U.excludeRoles | Where-Object { $_ -in $Roles }).Count -gt 0)
-            if ($Excluded) { continue }
+            if (-not (Test-CIPPCAPolicyUserScope -Policy $P -Principal $A).InScope) { continue }
             $Controls = @($P.grantControls.builtInControls) + @(if ($P.grantControls.authenticationStrength) { 'authentication strength' }) + @(if ($P.sessionControls.signInFrequency.isEnabled) { 'sign-in frequency' })
             $ReportOnly = $P.state -eq 'enabledForReportingButNotEnforced'
             & $Add "CA|$($A.Id)|$($P.id)" ($ReportOnly ? 'Warning' : 'Error') 'Excluded from all CA' $Upn "Break-glass account $Upn is NOT excluded from Conditional Access policy '$($P.displayName)'$(if ($ReportOnly) { ' (report-only today)' }) ($(@($Controls | Where-Object { $_ }) -join ', ')). A mistake in that policy can lock out the emergency account along with everyone else." 'Exclude the account (or the break-glass group) from this policy. Exclude a group rather than individual accounts, so new policies are easy to get right.'

@@ -27,10 +27,15 @@ BeforeAll {
     }
     function Write-LogMessage { [CmdletBinding()] param($API, $tenant, $headers, $message, $sev, $LogData) }
     function Get-CippException { [CmdletBinding()] param($Exception) $Exception }
+    # Aspendora fork (Vikunja CIPP-5): the pre-flight gate. The tenant policy is disabled unless a test says otherwise.
+    $script:ExistingState = 'disabled'
+    function New-GraphGetRequest { [CmdletBinding()] param($uri, $tenantid) [pscustomobject]@{ id = 'policy-guid'; state = $script:ExistingState } }
+    function Invoke-CIPPCAPreflight { [CmdletBinding()] param($TenantFilter, $PolicyId, $Policy, $ExistingPolicy, $Headers) $script:PreflightCalls++; $script:PreflightResult }
+    . (Join-Path $RepoRoot 'Modules/CIPPCore/Public/CAPreflight/Resolve-CIPPCAPreflightGate.ps1')
 
     . $FunctionPath
 
-    function Invoke-Edit ($PolicyBody) {
+    function Invoke-Edit ($PolicyBody, $Override) {
         $script:LastPatch = $null
         $Request = @{
             Params  = @{ CIPPEndpoint = 'ExecEditCAPolicyFull' }
@@ -42,6 +47,7 @@ BeforeAll {
                 PolicyBody   = ($PolicyBody | ConvertTo-Json -Depth 20 | ConvertFrom-Json)
             }
         }
+        if ($null -ne $Override) { $Request.Body | Add-Member -NotePropertyName PreflightOverride -NotePropertyValue $Override }
         $Response = Invoke-ExecEditCAPolicyFull -Request $Request
         return @{ Response = $Response; Sent = ($script:LastPatch.Body | ConvertFrom-Json) }
     }
@@ -144,6 +150,55 @@ Describe 'Invoke-ExecEditCAPolicyFull' {
             $Names | Should -Not -Contain 'id'
             $Names | Should -Not -Contain 'createdDateTime'
             $Names | Should -Not -Contain 'templateId'
+        }
+    }
+
+    Context 'CA pre-flight gate (Aspendora fork, Vikunja CIPP-5)' {
+        BeforeEach {
+            $script:PreflightCalls = 0
+            $script:ExistingState = 'disabled'
+            $script:PreflightResult = [pscustomobject]@{
+                Passed = $false; Status = 'Fail'; PolicyName = 'CA201'
+                Checks = @([pscustomobject]@{ Key = 'BreakGlassExcluded'; Check = 'Break-glass accounts excluded'; Status = 'Fail'; Message = 'bg@contoso.onmicrosoft.com in scope'; Fix = '' })
+            }
+            $script:Body = @{ displayName = 'CA201'; state = 'enabled'; conditions = @{ users = @{ includeUsers = @('All') } }; grantControls = @{ operator = 'OR'; builtInControls = @('block') } }
+        }
+
+        It 'blocks enabling when the pre-flight fails, without PATCHing' {
+            $Result = Invoke-Edit $script:Body
+            $Result.Response.StatusCode | Should -Be ([System.Net.HttpStatusCode]::Conflict)
+            $Result.Response.Body.Results | Should -Match 'pre-flight'
+            $Result.Response.Body.Preflight.Status | Should -Be 'Fail'
+            $script:LastPatch | Should -BeNullOrEmpty
+        }
+
+        It 'saves when PreflightOverride is true' {
+            $Result = Invoke-Edit $script:Body $true
+            $Result.Response.StatusCode | Should -Be ([System.Net.HttpStatusCode]::OK)
+            $script:LastPatch.Type | Should -Be 'PATCH'
+        }
+
+        It 'treats the string "false" as no override' {
+            $Result = Invoke-Edit $script:Body 'false'
+            $Result.Response.StatusCode | Should -Be ([System.Net.HttpStatusCode]::Conflict)
+        }
+
+        It 'saves when the pre-flight passes' {
+            $script:PreflightResult = [pscustomobject]@{ Passed = $true; Status = 'Pass'; PolicyName = 'CA201'; Checks = @() }
+            (Invoke-Edit $script:Body).Response.StatusCode | Should -Be ([System.Net.HttpStatusCode]::OK)
+        }
+
+        It 'checks an edit that omits state on an already-enabled policy' {
+            $script:ExistingState = 'enabled'
+            $B = $script:Body.Clone(); $B.Remove('state')
+            (Invoke-Edit $B).Response.StatusCode | Should -Be ([System.Net.HttpStatusCode]::Conflict)
+            $script:PreflightCalls | Should -Be 1
+        }
+
+        It 'does not run for report-only or disabled saves' {
+            $B = $script:Body.Clone(); $B.state = 'enabledForReportingButNotEnforced'
+            (Invoke-Edit $B).Response.StatusCode | Should -Be ([System.Net.HttpStatusCode]::OK)
+            $script:PreflightCalls | Should -Be 0
         }
     }
 

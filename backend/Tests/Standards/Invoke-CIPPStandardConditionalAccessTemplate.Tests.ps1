@@ -19,7 +19,7 @@ BeforeAll {
     function Get-CippTable { [CmdletBinding()] param($tablename) }
     function Get-CippAzDataTableEntity { [CmdletBinding()] param($Table, $Filter) }
     function ConvertTo-CIPPODataFilterValue { [CmdletBinding()] param([AllowEmptyString()][string]$Value, $Type) $Value }
-    function New-CIPPCAPolicy { [CmdletBinding()] param($replacePattern, $TenantFilter, $state, $RawJSON, $Overwrite, $APIName, $Headers, $DisableSD, $CreateGroups, $PreloadedCAPolicies, $PreloadedLocations, $PreloadedSecurityDefaults) }
+    function New-CIPPCAPolicy { [CmdletBinding()] param($replacePattern, $TenantFilter, $state, $RawJSON, $Overwrite, $APIName, $Headers, $DisableSD, $CreateGroups, $PreloadedCAPolicies, $PreloadedLocations, $PreloadedSecurityDefaults, $Preflight) }
     function New-CIPPCATemplate { [CmdletBinding()] param($TenantFilter, $JSON, $preloadedLocations) }
     function Compare-CIPPIntuneObject { [CmdletBinding()] param($ReferenceObject, $DifferenceObject, $CompareType) }
     function Write-LogMessage { [CmdletBinding()] param($API, $tenant, $Tenant2, $message, $sev, $headers) }
