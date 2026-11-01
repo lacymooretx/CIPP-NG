@@ -22,7 +22,7 @@ BeforeAll {
 Describe 'Invoke-ExecDriverUpdateAction' {
     BeforeEach {
         Mock Write-LogMessage {}
-        Mock New-GraphPOSTRequest { $script:Posted = @{ Uri = $uri; Body = ($body | ConvertFrom-Json) }; [pscustomobject]@{ successfulDriverIds = @($script:Driver); failedDriverIds = @(); notFoundDriverIds = @() } }
+        Mock New-GraphPOSTRequest { $script:Posted = @{ Uri = $uri; Raw = [string]$body; Body = ($body | ConvertFrom-Json) }; [pscustomobject]@{ successfulDriverIds = @($script:Driver); failedDriverIds = @(); notFoundDriverIds = @() } }
         Mock New-GraphGetRequest { @([pscustomobject]@{ id = $script:Driver; name = 'Intel Bluetooth'; approvalStatus = 'approved'; deployDateTime = '2026-10-31T20:00:00Z' }) }
     }
 
@@ -44,7 +44,8 @@ Describe 'Invoke-ExecDriverUpdateAction' {
         $script:Posted.Uri | Should -Match "windowsDriverUpdateProfiles/$($script:Profile)/executeAction$"
         $script:Posted.Body.actionName | Should -Be 'approve'
         @($script:Posted.Body.driverIds) | Should -Be @($script:Driver)
-        $script:Posted.Body.deploymentDate | Should -Match '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$'
+        # ConvertFrom-Json turns ISO strings into DateTime, so check the JSON actually sent.
+        $script:Posted.Raw | Should -Match '"deploymentDate"\s*:\s*"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z"'
         $R.Body.Results | Should -Match '1 now read back as approved'
     }
 
