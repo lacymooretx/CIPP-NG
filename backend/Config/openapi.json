@@ -56256,6 +56256,63 @@
         "x-cipp-role": "Endpoint.MEM.Read"
       }
     },
+    "/api/ListEntraRecoveryCoverage": {
+      "get": {
+        "summary": "Entra recovery coverage per tenant: Entra Backup and Recovery snapshots, CIPP scheduled backup coverage and gaps",
+        "operationId": "ListEntraRecoveryCoverage",
+        "tags": [
+          "Tenant > Reports"
+        ],
+        "description": "Read only. Per tenant: Entra ID licence (Entra Backup and Recovery needs P1 or P2; Business Premium includes P1),\nnative snapshot status from v1.0 directory/recovery/snapshots (count, latest, window; needs EntraBackup.Read.All),\nwhether a scheduled CIPP backup task covers the tenant, the last CIPP backup and its age, the components it\nincludes, and gaps (no backup, disabled task, older than maxBackupAgeDays, Conditional Access or users/groups\nnot included). Also counts soft-deleted Conditional Access policies and named locations, which are restorable\nfor 30 days but are not listed by Deleted Items. Accepts AllTenants (one Graph batch per tenant).\nAspendora fork addition (Vikunja CIPP-17).",
+        "parameters": [
+          {
+            "name": "maxBackupAgeDays",
+            "in": "query",
+            "description": "Days after which the last CIPP backup counts as stale. Defaults to 2 (backups run daily).",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "skipLive",
+            "in": "query",
+            "description": "true skips the live Graph reads (snapshots, soft-deleted CA objects) and returns licence and CIPP coverage only.",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/tenantFilter"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardResults"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cipp-role": "Tenant.Administration.Read"
+      }
+    },
     "/api/ListEquipment": {
       "get": {
         "summary": "ListEquipment",
@@ -66506,6 +66563,64 @@
           }
         ],
         "x-cipp-role": "Endpoint.MEM.Read"
+      }
+    },
+    "/api/ListPostureChange": {
+      "get": {
+        "summary": "Month-over-month security posture change for a tenant (CIPPTests results and Secure Score).",
+        "operationId": "ListPostureChange",
+        "tags": [
+          "Tenant > Reports"
+        ],
+        "description": "Compares the tenant's current posture (the stored CIPPTests results and the cached Microsoft Secure Score)\nwith the stored posture snapshot from at least minDays (default 25) earlier, falling back to the oldest\nearlier snapshot. Returns Fixed, NewIssues, StillOpen, OpenNow (bucketed DoToday / ThisMonth / LongTerm by\nrisk), NoLongerAssessed, AddedTests, RemovedTests, RenamedTests, SecureScore deltas and Counts. HasPrevious\nis false when no earlier snapshot exists yet.\n\nRead only: this endpoint never stores a snapshot. Snapshots are taken when the Security Posture Change\nreport (ReportType PostureChange) runs and by the PostureSnapshot scripted alert (every 30 days).\nAspendora fork addition (Vikunja CIPP-16).",
+        "parameters": [
+          {
+            "name": "minDays",
+            "in": "query",
+            "description": "Minimum age in days of the preferred baseline snapshot (default 25).",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/tenantFilter"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "description": "Not described statically: this endpoint returns the upstream response as-is, so its fields are determined by the upstream API rather than by CIPP. Call the endpoint to see the actual shape, or add a response schema in backend/Config/openapi-overrides."
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - missing required field or invalid input"
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cipp-role": "Tenant.Reports.Read"
       }
     },
     "/api/ListPotentialApps": {
