@@ -27,7 +27,7 @@ function Get-CIPPAlertPhishResistantAdmins {
             return
         }
         $Rows = @($Report.Findings | Where-Object { $_.Severity -in @('Error', 'Warning') } | ForEach-Object {
-                [pscustomobject]@{ Severity = $_.Severity; Check = $_.Check; Account = $_.Account; Message = $_.Message; Fix = $_.Fix; Key = $_.Key }
+                [pscustomobject]@{ Severity = $_.Severity; Check = $_.Check; Account = $_.Account; Message = $_.Message; Fix = $_.Fix; Key = $_.Key; Id = $_.Key }
             })
         Write-AlertTrace -cmdletName ([string]$MyInvocation.MyCommand) -tenantFilter $TenantFilter -data $Rows
     } catch {
