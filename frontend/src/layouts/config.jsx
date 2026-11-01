@@ -333,6 +333,12 @@ export const nativeMenuItems = [
             path: '/tenant/reports/message-center-digest',
             permissions: ['Tenant.Administration.*'],
           },
+          // Aspendora fork addition (Vikunja CIPP-17): Entra Backup and Recovery + CIPP backup coverage.
+          {
+            title: 'Entra Recovery Coverage',
+            path: '/tenant/reports/entra-recovery-coverage',
+            permissions: ['Tenant.Administration.*'],
+          },
         ],
       },
       {
