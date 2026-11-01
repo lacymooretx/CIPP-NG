@@ -57,8 +57,12 @@ function Get-CIPPOooMessageFlags {
         foreach ($D in $Accepted) {
             if ($Domain -eq $D -or $Domain.EndsWith(".$D")) { $IsInternal = $true; break }
         }
-        $Target = if ($IsInternal) { $InternalEmails } else { $ExternalEmails }
-        if (-not $Target.Contains($Address)) { $Target.Add($Address) }
+        # Not `$Target = if (...) { $List }`: an if statement sends the List down the pipeline, so an empty List unrolls to $null.
+        if ($IsInternal) {
+            if (-not $InternalEmails.Contains($Address)) { $InternalEmails.Add($Address) }
+        } elseif (-not $ExternalEmails.Contains($Address)) {
+            $ExternalEmails.Add($Address)
+        }
     }
 
     $Phones = [System.Collections.Generic.List[string]]::new()
