@@ -414,6 +414,28 @@
     ]
   },
   {
+    "name": "DefenderPendingRemediation",
+    "label": "Alert on Defender automated remediations waiting for approval",
+    "recommendedRunInterval": "4h",
+    "requiresInput": true,
+    "inputType": "number",
+    "inputLabel": "Alert once a remediation has been pending this many hours (default: 24)",
+    "inputName": "PendingRemediationHours",
+    "validators": {
+      "min": {
+        "value": 1,
+        "message": "Must be at least 1 hour"
+      }
+    },
+    "description": "Raises each Defender alert (email/MDO or device/MDE) whose automated investigation has sat in Action Center 'Pending approval' for longer than the threshold, measured from the alert's creation. Each alert notifies once and resolves when the action is approved or rejected. Pending email actions mean MDO automation is not soft-deleting similar messages on its own; that setting is portal-only. Report only; see ListDefenderPendingRemediation."
+  },
+  {
+    "name": "AsrReadiness",
+    "label": "Alert on ASR rules ready to move from Audit to Block",
+    "recommendedRunInterval": "30d",
+    "description": "Monthly ASR readiness check (ListAsrReadiness, 14-day window). Raises rules in Audit with no audit hits over the whole window (Info), rules whose assigned policies conflict (Warning), and one row when Audit rules have no evidence source (advanced hunting device tables missing and no ControlR collector data). No evidence is never treated as no hits. Report only: no policy is changed."
+  },
+  {
     "name": "Vulnerabilities",
     "label": "Alert on software vulnerabilities",
     "requiresInput": true,

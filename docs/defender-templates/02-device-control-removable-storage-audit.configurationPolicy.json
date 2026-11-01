@@ -1,0 +1,146 @@
+{
+  "name": "Aspendora - Device Control: removable storage AUDIT (CIPP-26)",
+  "description": "Ring 0 of the Device Control plan. Device Control on, default enforcement ALLOW, one rule that audits (AuditAllowed + Send event) every read, write and execute on removable media. Blocks nothing. Replace REUSABLE_SETTING_ID with the id of the 'Aspendora - Removable storage: all removable media (CIPP-26)' reusable setting before posting. Aspendora fork, Vikunja CIPP-26.",
+  "platforms": "windows10",
+  "technologies": "mdm,microsoftSense",
+  "roleScopeTagIds": ["0"],
+  "templateReference": {
+    "templateId": "0f2034c6-3cd6-4ee1-bd37-f3c0693e9548_1"
+  },
+  "settings": [
+    {
+      "@odata.type": "#microsoft.graph.deviceManagementConfigurationSetting",
+      "settingInstance": {
+        "@odata.type": "#microsoft.graph.deviceManagementConfigurationChoiceSettingInstance",
+        "settingDefinitionId": "device_vendor_msft_defender_configuration_devicecontrolenabled",
+        "settingInstanceTemplateReference": { "settingInstanceTemplateId": "358ec504-d488-46b9-bbb0-f020763d468a" },
+        "choiceSettingValue": {
+          "value": "device_vendor_msft_defender_configuration_devicecontrolenabled_1",
+          "settingValueTemplateReference": { "settingValueTemplateId": "05bcff50-f939-49fa-9671-f77f51fe0fe6", "useTemplateDefault": false },
+          "children": []
+        }
+      }
+    },
+    {
+      "@odata.type": "#microsoft.graph.deviceManagementConfigurationSetting",
+      "settingInstance": {
+        "@odata.type": "#microsoft.graph.deviceManagementConfigurationChoiceSettingInstance",
+        "settingDefinitionId": "device_vendor_msft_defender_configuration_defaultenforcement",
+        "settingInstanceTemplateReference": { "settingInstanceTemplateId": "37ce17c1-c509-4e46-a5cf-013b8c9605dc" },
+        "choiceSettingValue": {
+          "value": "device_vendor_msft_defender_configuration_defaultenforcement_1",
+          "settingValueTemplateReference": { "settingValueTemplateId": "f3c4636e-5c45-4eab-975c-5674971fc392", "useTemplateDefault": false },
+          "children": []
+        }
+      }
+    },
+    {
+      "@odata.type": "#microsoft.graph.deviceManagementConfigurationSetting",
+      "settingInstance": {
+        "@odata.type": "#microsoft.graph.deviceManagementConfigurationGroupSettingCollectionInstance",
+        "settingDefinitionId": "device_vendor_msft_defender_configuration_devicecontrol_policyrules_{ruleid}",
+        "settingInstanceTemplateReference": { "settingInstanceTemplateId": "a5c5409c-886a-4909-81c7-28156aee9419" },
+        "groupSettingCollectionValue": [
+          {
+            "settingValueTemplateReference": { "settingValueTemplateId": "4353bb0c-d391-4d75-8122-73f35ad92558" },
+            "children": [
+              {
+                "@odata.type": "#microsoft.graph.deviceManagementConfigurationGroupSettingCollectionInstance",
+                "settingDefinitionId": "device_vendor_msft_defender_configuration_devicecontrol_policyrules_{ruleid}_ruledata",
+                "groupSettingCollectionValue": [
+                  {
+                    "children": [
+                      {
+                        "@odata.type": "#microsoft.graph.deviceManagementConfigurationSimpleSettingInstance",
+                        "settingDefinitionId": "device_vendor_msft_defender_configuration_devicecontrol_policyrules_{ruleid}_ruledata_id",
+                        "simpleSettingValue": {
+                          "@odata.type": "#microsoft.graph.deviceManagementConfigurationStringSettingValue",
+                          "value": "{055e6644-41ad-44a8-9ccf-6c1b8def90a6}"
+                        }
+                      },
+                      {
+                        "@odata.type": "#microsoft.graph.deviceManagementConfigurationSimpleSettingInstance",
+                        "settingDefinitionId": "device_vendor_msft_defender_configuration_devicecontrol_policyrules_{ruleid}_ruledata_name",
+                        "simpleSettingValue": {
+                          "@odata.type": "#microsoft.graph.deviceManagementConfigurationStringSettingValue",
+                          "value": "Audit all removable storage access (CIPP-26 ring 0)"
+                        }
+                      },
+                      {
+                        "@odata.type": "#microsoft.graph.deviceManagementConfigurationGroupSettingCollectionInstance",
+                        "settingDefinitionId": "device_vendor_msft_defender_configuration_devicecontrol_policyrules_{ruleid}_ruledata_includedidlist",
+                        "groupSettingCollectionValue": [
+                          {
+                            "children": [
+                              {
+                                "@odata.type": "#microsoft.graph.deviceManagementConfigurationSimpleSettingInstance",
+                                "settingDefinitionId": "device_vendor_msft_defender_configuration_devicecontrol_policyrules_{ruleid}_ruledata_includedidlist_groupid",
+                                "simpleSettingValue": {
+                                  "@odata.type": "#microsoft.graph.deviceManagementConfigurationReferenceSettingValue",
+                                  "value": "REUSABLE_SETTING_ID"
+                                }
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "@odata.type": "#microsoft.graph.deviceManagementConfigurationGroupSettingCollectionInstance",
+                        "settingDefinitionId": "device_vendor_msft_defender_configuration_devicecontrol_policyrules_{ruleid}_ruledata_entry",
+                        "groupSettingCollectionValue": [
+                          {
+                            "children": [
+                              {
+                                "@odata.type": "#microsoft.graph.deviceManagementConfigurationSimpleSettingInstance",
+                                "settingDefinitionId": "device_vendor_msft_defender_configuration_devicecontrol_policyrules_{ruleid}_ruledata_entry_id",
+                                "simpleSettingValue": {
+                                  "@odata.type": "#microsoft.graph.deviceManagementConfigurationStringSettingValue",
+                                  "value": "{b5f76b0c-b4be-4f07-9aaf-2acd6b46badd}"
+                                }
+                              },
+                              {
+                                "@odata.type": "#microsoft.graph.deviceManagementConfigurationChoiceSettingInstance",
+                                "settingDefinitionId": "device_vendor_msft_defender_configuration_devicecontrol_policyrules_{ruleid}_ruledata_entry_type",
+                                "choiceSettingValue": {
+                                  "value": "device_vendor_msft_defender_configuration_devicecontrol_policyrules_{ruleid}_ruledata_entry_type_auditallowed",
+                                  "children": [
+                                    {
+                                      "@odata.type": "#microsoft.graph.deviceManagementConfigurationChoiceSettingCollectionInstance",
+                                      "settingDefinitionId": "device_vendor_msft_defender_configuration_devicecontrol_policyrules_{ruleid}_ruledata_entry_options",
+                                      "choiceSettingCollectionValue": [
+                                        {
+                                          "value": "device_vendor_msft_defender_configuration_devicecontrol_policyrules_{ruleid}_ruledata_entry_options_2",
+                                          "children": []
+                                        }
+                                      ]
+                                    }
+                                  ]
+                                }
+                              },
+                              {
+                                "@odata.type": "#microsoft.graph.deviceManagementConfigurationChoiceSettingCollectionInstance",
+                                "settingDefinitionId": "device_vendor_msft_defender_configuration_devicecontrol_policyrules_{ruleid}_ruledata_entry_accesmask",
+                                "choiceSettingCollectionValue": [
+                                  { "value": "device_vendor_msft_defender_configuration_devicecontrol_policyrules_{ruleid}_ruledata_entry_accesmask_1", "children": [] },
+                                  { "value": "device_vendor_msft_defender_configuration_devicecontrol_policyrules_{ruleid}_ruledata_entry_accesmask_2", "children": [] },
+                                  { "value": "device_vendor_msft_defender_configuration_devicecontrol_policyrules_{ruleid}_ruledata_entry_accesmask_4", "children": [] },
+                                  { "value": "device_vendor_msft_defender_configuration_devicecontrol_policyrules_{ruleid}_ruledata_entry_accesmask_8", "children": [] },
+                                  { "value": "device_vendor_msft_defender_configuration_devicecontrol_policyrules_{ruleid}_ruledata_entry_accesmask_16", "children": [] },
+                                  { "value": "device_vendor_msft_defender_configuration_devicecontrol_policyrules_{ruleid}_ruledata_entry_accesmask_32", "children": [] }
+                                ]
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}
