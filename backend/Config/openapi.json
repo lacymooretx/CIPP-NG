@@ -1008,6 +1008,10 @@
                   "overwrite": {
                     "type": "string"
                   },
+                  "PreflightOverride": {
+                    "type": "boolean",
+                    "description": "Aspendora fork addition (Vikunja CIPP-5): a policy that ends up On must pass the lockout pre-flight, per tenant, unless the operator ticked the override (logged by Resolve-CIPPCAPreflightGate)."
+                  },
                   "RawJSON": {
                     "type": "string"
                   },
@@ -9200,6 +9204,9 @@
                   "newDisplayName": {
                     "type": "string"
                   },
+                  "PreflightOverride": {
+                    "type": "boolean"
+                  },
                   "State": {
                     "type": "string"
                   },
@@ -9233,6 +9240,14 @@
             }
           },
           {
+            "name": "PreflightOverride",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "name": "State",
             "in": "query",
             "required": false,
@@ -9260,6 +9275,9 @@
           },
           "403": {
             "description": "Forbidden - caller lacks the required RBAC role"
+          },
+          "409": {
+            "description": "Conflict - the resource already exists or is in a conflicting state"
           },
           "500": {
             "description": "Internal server error"
@@ -15043,6 +15061,75 @@
         "x-cipp-role": "Endpoint.Application.ReadWrite"
       }
     },
+    "/api/ExecAsrEvidence": {
+      "post": {
+        "summary": "Store ASR event counts from the ControlR collector for ASR readiness",
+        "operationId": "ExecAsrEvidence",
+        "tags": [
+          "Security > Defender"
+        ],
+        "description": "POST { tenantFilter, Reports: [ <Get-AsrEvents output>, ... ] } (or Report: one object). Each report is the\nJSON the ControlR Get-AsrEvents script prints per device: Device, CollectedUtc, WindowHours, RulesOnDevice,\nConfiguredMix, Detections[{ RuleId, Mode, ProcessName, ... }]. CIPP keeps per-rule counts and up to five\nprocess names per rule, one row per device per UTC day in its own AsrEvidence table; command lines, paths\nand user names are discarded. Writes only to CIPP's table: nothing in the tenant is changed.\nListAsrReadiness and the AsrReadiness alert read these rows when advanced hunting is not available.\nAspendora fork addition (Vikunja CIPP-26).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "Report": {
+                    "type": "string"
+                  },
+                  "Reports": {
+                    "type": "string"
+                  },
+                  "tenantFilter": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "tenantFilter"
+                ]
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/tenantFilter"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardResults"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - missing required field or invalid input"
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cipp-role": "Endpoint.MEM.ReadWrite"
+      }
+    },
     "/api/ExecAssignAPDevice": {
       "post": {
         "summary": "ExecAssignAPDevice",
@@ -16107,6 +16194,131 @@
         "x-cipp-role": "CIPP.AppSettings.Read"
       }
     },
+    "/api/ExecBackupDiff": {
+      "post": {
+        "summary": "Compare two backups of the same tenant object by object, with a property-level diff",
+        "operationId": "ExecBackupDiff",
+        "tags": [
+          "CIPP > Core"
+        ],
+        "description": "Diffs BackupA (base, usually the older) against BackupB. Every object is Added (only in B),\nRemoved (only in A), Changed (in both, with a list of property changes: Path, Change\nAdded|Removed|Modified, Before, After) or Unchanged (counted, not listed). Intune and CA\npolicies are matched by name, users and groups by object id. Volatile fields are ignored: id,\ncreatedDateTime, lastModifiedDateTime, version, Timestamp, ETag, @odata.* annotations, and\nassignments unless IncludeAssignments=true. Read-only.\nParameters: BackupA, BackupB, tenantFilter (all required; both backups must belong to it),\nTypes (optional component filter, array or comma-separated), IncludeAssignments,\nType (Scheduled|CIPP, default Scheduled).\nAspendora fork addition (Vikunja CIPP-23).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "BackupA": {
+                    "type": "string"
+                  },
+                  "BackupB": {
+                    "type": "string"
+                  },
+                  "IncludeAssignments": {
+                    "type": "string"
+                  },
+                  "tenantFilter": {
+                    "type": "string"
+                  },
+                  "Type": {
+                    "type": "string"
+                  },
+                  "Types": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "tenantFilter"
+                ]
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "BackupA",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "BackupB",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "IncludeAssignments",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/tenantFilter"
+          },
+          {
+            "name": "Type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Types",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Not described statically: this endpoint returns the upstream response as-is, so its fields are determined by the upstream API rather than by CIPP. Call the endpoint to see the actual shape, or add a response schema in backend/Config/openapi-overrides."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - missing required field or invalid input"
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "422": {
+            "description": "UnprocessableEntity"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cipp-role": "CIPP.Backup.Read"
+      }
+    },
     "/api/ExecBackupReplicationConfig": {
       "post": {
         "summary": "ExecBackupReplicationConfig",
@@ -16181,6 +16393,120 @@
           }
         ],
         "x-cipp-role": "CIPP.AppSettings.ReadWrite"
+      }
+    },
+    "/api/ExecBackupRestorePreview": {
+      "post": {
+        "summary": "Preview what restoring a tenant backup would do, per object, without writing anything",
+        "operationId": "ExecBackupRestorePreview",
+        "tags": [
+          "CIPP > Core"
+        ],
+        "description": "Reads the tenant's current state with the same capture the backup uses (GET requests only)\nand compares each backed-up object with it. Classification: Create (nothing with that\nname/identity exists), Identical (exists and matches, volatile fields and assignments\nignored), Conflict (exists with the same name but different content - Changes shows tenant\nvalue as Before and backup value as After) or Unparsed (the backup holds an error string).\nAction describes what the selected mode would do: the default restore (honouring Overwrite,\nand showing that Intune restores overwrite same-name policies) or, with SafeMode=true, the\nsafe restore-as-new ('<name> (restored yyyy-MM-dd)', CA disabled, no assignments).\nParameters: BackupName, tenantFilter (required; must own the backup), Types (component\nfilter, array or comma-separated; default all components in the backup), SafeMode, Overwrite.\nAspendora fork addition (Vikunja CIPP-23).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "BackupName": {
+                    "type": "string"
+                  },
+                  "Overwrite": {
+                    "type": "string"
+                  },
+                  "SafeMode": {
+                    "type": "string"
+                  },
+                  "tenantFilter": {
+                    "type": "string"
+                  },
+                  "Types": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "tenantFilter"
+                ]
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "BackupName",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Overwrite",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "SafeMode",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/tenantFilter"
+          },
+          {
+            "name": "Types",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Not described statically: this endpoint returns the upstream response as-is, so its fields are determined by the upstream API rather than by CIPP. Call the endpoint to see the actual shape, or add a response schema in backend/Config/openapi-overrides."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - missing required field or invalid input"
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "422": {
+            "description": "UnprocessableEntity"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cipp-role": "CIPP.Backup.Read"
       }
     },
     "/api/ExecBackupRetentionConfig": {
@@ -16399,6 +16725,95 @@
         ],
         "x-cipp-role": "CIPP.AppSettings.ReadWrite",
         "x-cipp-any-tenant": true
+      }
+    },
+    "/api/ExecBackupVerify": {
+      "post": {
+        "summary": "Verify a stored backup against the hashes and counts recorded when it was written",
+        "operationId": "ExecBackupVerify",
+        "tags": [
+          "CIPP > Core"
+        ],
+        "description": "Recomputes the SHA-256 of the backup file and of every item and compares them, and the item\ncounts per type, with the integrity manifest written alongside the backup. Status is Verified,\nCorrupt, Missing, CountMismatch, or 'Unverified (pre-hash)' for backups written before hashing\nexisted. Per-type results list missing, corrupt and unexpected item keys. Read-only.\nParameters: BackupName (required), Type (Scheduled|CIPP, default Scheduled), tenantFilter\n(required for Scheduled; must own the backup).\nAspendora fork addition (Vikunja CIPP-23).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "BackupName": {
+                    "type": "string"
+                  },
+                  "tenantFilter": {
+                    "type": "string"
+                  },
+                  "Type": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "tenantFilter"
+                ]
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "BackupName",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/tenantFilter"
+          },
+          {
+            "name": "Type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Not described statically: this endpoint returns the upstream response as-is, so its fields are determined by the upstream API rather than by CIPP. Call the endpoint to see the actual shape, or add a response schema in backend/Config/openapi-overrides."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - missing required field or invalid input"
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cipp-role": "CIPP.Backup.Read"
       }
     },
     "/api/ExecBaselineAddStandard": {
@@ -17850,7 +18265,33 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "description": "Not described statically: this endpoint returns the upstream response as-is, so its fields are determined by the upstream API rather than by CIPP. Call the endpoint to see the actual shape, or add a response schema in backend/Config/openapi-overrides."
+                  "description": "Derived from the columns the CIPP UI renders. The response may carry more; these are the ones known to exist.",
+                  "properties": {
+                    "AddedBy": {
+                      "x-cipp-field-source": "frontend"
+                    },
+                    "AddedUtc": {
+                      "x-cipp-field-source": "frontend"
+                    },
+                    "DisplayName": {
+                      "x-cipp-field-source": "frontend"
+                    },
+                    "Note": {
+                      "x-cipp-field-source": "frontend"
+                    },
+                    "Reason": {
+                      "x-cipp-field-source": "frontend"
+                    },
+                    "Registered": {
+                      "x-cipp-field-source": "frontend"
+                    },
+                    "Tenant": {
+                      "x-cipp-field-source": "frontend"
+                    },
+                    "UserPrincipalName": {
+                      "x-cipp-field-source": "frontend"
+                    }
+                  }
                 }
               }
             }
@@ -18259,6 +18700,131 @@
           }
         ],
         "x-cipp-role": "Tenant.ConditionalAccess.ReadWrite"
+      }
+    },
+    "/api/ExecCAPreflight": {
+      "post": {
+        "summary": "Pre-flight a Conditional Access policy before it is turned On: break-glass exclusion, Global Admin access, What-If and report-only soak",
+        "operationId": "ExecCAPreflight",
+        "tags": [
+          "Tenant > Conditional"
+        ],
+        "description": "Read-only; changes nothing in the tenant. POST (or GET) with tenantFilter and one of:\n  PolicyId    an existing policy (evaluated as if switched to On)\n  TemplateId  a CA template GUID\n  Policy      the policy JSON (object or string) as it would be written\nOptional: Days (report-only days required, default 7, 1-30), SkipSignIns=true.\nReturns { Results = { Passed; Status; PolicyName; PolicyId; CurrentState; Checks[]; WhatIf[]; ReportOnly;\nWouldBeBlocked; Errors[]; CheckedUtc } }. Each check: { Key; Check; Status (Pass|Warn|Fail|Info); Message; Fix }.\nThe same check gates AddCAPolicy, EditCAPolicy and ExecEditCAPolicyFull when they set a policy to On.\nAspendora fork addition (Vikunja CIPP-5).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "Days": {
+                    "type": "string"
+                  },
+                  "GUID": {
+                    "type": "string"
+                  },
+                  "Policy": {
+                    "type": "string"
+                  },
+                  "PolicyId": {
+                    "type": "string"
+                  },
+                  "RawJSON": {
+                    "type": "string"
+                  },
+                  "SkipSignIns": {
+                    "type": "boolean"
+                  },
+                  "TemplateId": {
+                    "type": "string"
+                  },
+                  "tenantFilter": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "tenantFilter"
+                ]
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "Days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "GUID",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "PolicyId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "SkipSignIns",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "TemplateId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/tenantFilter"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Not described statically: this endpoint returns the upstream response as-is, so its fields are determined by the upstream API rather than by CIPP. Call the endpoint to see the actual shape, or add a response schema in backend/Config/openapi-overrides."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - missing required field or invalid input"
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cipp-role": "Tenant.ConditionalAccess.Read"
       }
     },
     "/api/ExecCAServiceExclusion": {
@@ -22809,6 +23375,113 @@
         "x-cipp-role": "Tenant.Standards.ReadWrite"
       }
     },
+    "/api/ExecDriverUpdateAction": {
+      "post": {
+        "summary": "Approve, decline or suspend Windows drivers in a driver update profile",
+        "operationId": "ExecDriverUpdateAction",
+        "tags": [
+          "Endpoint > MEM"
+        ],
+        "description": "POST deviceManagement/windowsDriverUpdateProfiles/{ProfileId}/executeAction with\n@{ actionName = approve|decline|suspend; driverIds; deploymentDate }. Body/query: tenantFilter (one tenant,\nnot AllTenants), ProfileId, DriverIds (one id or a list), Action (Approve | Decline | Suspend) and, for\nApprove, an optional DeploymentDate (ISO 8601, default now). Intune answers with a bulkDriverActionResult\n(successfulDriverIds / failedDriverIds / notFoundDriverIds); the drivers are then read back from the\ninventory so the response states the approvalStatus Intune actually holds, not just what was asked.\nThis CHANGES tenant configuration: approved drivers start installing on devices in the profile's groups.\nIf Multi Admin Approval protects driver updates, Intune refuses the call. Aspendora fork addition\n(Vikunja CIPP-24).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "Action": {
+                    "type": "string"
+                  },
+                  "DeploymentDate": {
+                    "type": "string"
+                  },
+                  "DriverIds": {
+                    "type": "string"
+                  },
+                  "ProfileId": {
+                    "type": "string"
+                  },
+                  "tenantFilter": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "tenantFilter"
+                ]
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "Action",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "DeploymentDate",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "DriverIds",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "ProfileId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/tenantFilter"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardResults"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - missing required field or invalid input"
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cipp-role": "Endpoint.MEM.ReadWrite"
+      }
+    },
     "/api/ExecDurableFunctions": {
       "post": {
         "summary": "ExecDurableFunctions",
@@ -23059,6 +23732,10 @@
                   "PolicyId": {
                     "type": "string"
                   },
+                  "PreflightOverride": {
+                    "type": "boolean",
+                    "description": "Aspendora fork addition (Vikunja CIPP-5): a save that leaves the policy On (state set to enabled, or omitted on an already-enabled policy - an edit of an enforced policy, the 2026-10-07 class of mistake) must pass the lockout pre-flight unless the operator ticked the override."
+                  },
                   "tenantFilter": {
                     "type": "string"
                   }
@@ -23103,6 +23780,9 @@
           },
           "403": {
             "description": "Forbidden - caller lacks the required RBAC role"
+          },
+          "409": {
+            "description": "Conflict - the resource already exists or is in a conflicting state"
           },
           "500": {
             "description": "Internal server error"
@@ -29956,6 +30636,140 @@
           }
         ],
         "x-cipp-role": "CIPP.Core.Read"
+      }
+    },
+    "/api/ExecMailTriageNote": {
+      "post": {
+        "summary": "Posts a mail triage evidence bundle as an internal note on an existing ConnectWise Manage ticket",
+        "operationId": "ExecMailTriageNote",
+        "tags": [
+          "Email-Exchange > Tools"
+        ],
+        "description": "Body: tenantFilter, TicketId (the ConnectWise ticket number), and Bundle (the ListMailTriage result). Without a\nBundle, the triage is run again from Recipient / Sender / Hours. The note is Markdown, posted to the Internal\nAnalysis tab with processNotifications off (no ConnectWise email). Refuses when the ticket belongs to a\ndifferent company than the tenant's ConnectWise mapping, unless Force=true. Preview=true returns the note text\nwithout posting. Changes nothing in the tenant. Aspendora fork addition (Vikunja CIPP-38).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "Bundle": {
+                    "type": "object",
+                    "properties": {
+                      "GeneratedAt": {
+                        "type": "object",
+                        "properties": {
+                          "Display": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "Hours": {
+                        "type": "string"
+                      },
+                      "Overall": {
+                        "type": "string"
+                      },
+                      "Recipient": {
+                        "type": "string"
+                      },
+                      "Sender": {
+                        "type": "string"
+                      },
+                      "Steps": {
+                        "type": "string"
+                      },
+                      "Summary": {
+                        "type": "string"
+                      },
+                      "Tenant": {
+                        "type": "string"
+                      },
+                      "WindowEnd": {
+                        "type": "object",
+                        "properties": {
+                          "Display": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "WindowStart": {
+                        "type": "object",
+                        "properties": {
+                          "Display": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "Force": {
+                    "type": "string"
+                  },
+                  "Hours": {
+                    "type": "integer"
+                  },
+                  "Preview": {
+                    "type": "string"
+                  },
+                  "Recipient": {
+                    "$ref": "#/components/schemas/LabelValue"
+                  },
+                  "Sender": {
+                    "type": "string"
+                  },
+                  "tenantFilter": {
+                    "type": "string"
+                  },
+                  "TicketId": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "tenantFilter"
+                ]
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/tenantFilter"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardResults"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - missing required field or invalid input"
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cipp-role": "Exchange.Mailbox.ReadWrite",
+        "x-cipp-reads-via": [
+          "ConvertTo-CIPPMailTriageNote"
+        ]
       }
     },
     "/api/ExecMaintenanceScripts": {
@@ -43955,6 +44769,80 @@
         "x-cipp-role": "CIPP.SuperAdmin.ReadWrite"
       }
     },
+    "/api/ExecTldBlockTemplates": {
+      "post": {
+        "summary": "Shows, or saves into the template library, the abused-TLD Tenant Allow/Block List templates",
+        "operationId": "ExecTldBlockTemplates",
+        "tags": [
+          "Email-Exchange > Spamfilter"
+        ],
+        "description": "Action=Preview (default) returns the shipped templates (Config/TenantAllowBlockListTemplates/AbusedTlds-*.json)\nand the TLD list with false-positive risk notes. Action=Save writes them to the CIPP template library\n(templates table, PartitionKey TenantAllowBlockListTemplate) under fixed GUIDs, so saving again updates them\nin place instead of adding copies. Saving does NOT deploy anything: a template only reaches a tenant when it is\nadded to a standards template with the Tenant Allow/Block List Template standard and that standard is set to\nremediate. Template=<GUID> limits Save to one template. Aspendora fork addition (Vikunja CIPP-30).",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "Action": {
+                    "type": "string"
+                  },
+                  "Template": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "Action",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Template",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardResults"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cipp-role": "Exchange.SpamFilter.ReadWrite",
+        "x-cipp-any-tenant": true
+      }
+    },
     "/api/ExecToggleAlert": {
       "post": {
         "summary": "ExecToggleAlert",
@@ -47325,6 +48213,71 @@
         ],
         "x-cipp-role": "Endpoint.Application.Read",
         "x-cipp-any-tenant": true
+      }
+    },
+    "/api/ListAsrReadiness": {
+      "get": {
+        "summary": "ASR audit-to-block readiness per rule for one tenant",
+        "operationId": "ListAsrReadiness",
+        "tags": [
+          "Security > Defender"
+        ],
+        "description": "Lists every Attack Surface Reduction rule with its effective mode across the tenant's assigned ASR policies\n(Block / Audit / Warn / Off / NotConfigured / Conflict), the audit and block hits over the last WindowDays\n(default 14, 1-90) and a recommendation: ReadyForBlock (no audit hits over the whole window), KeepAudit,\nAlreadyBlock, NotConfigured or FixConflict. Hits come from Defender advanced hunting where the tenant has\nthe device tables, otherwise from the ControlR collector rows posted to ExecAsrEvidence. With no evidence\nsource no rule is called ready. SkipHunting=true skips the hunting attempt.\nReport only: nothing is changed. Aspendora fork addition (Vikunja CIPP-26).",
+        "parameters": [
+          {
+            "name": "SkipHunting",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/tenantFilter"
+          },
+          {
+            "name": "WindowDays",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "description": "Not described statically: this endpoint returns the upstream response as-is, so its fields are determined by the upstream API rather than by CIPP. Call the endpoint to see the actual shape, or add a response schema in backend/Config/openapi-overrides."
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - missing required field or invalid input"
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cipp-role": "Endpoint.MEM.Read"
       }
     },
     "/api/ListAssignmentFilters": {
@@ -52748,6 +53701,78 @@
         "x-cipp-any-tenant": true
       }
     },
+    "/api/ListDefenderHardening": {
+      "get": {
+        "summary": "Defender for Endpoint hardening posture: Network Protection, Device Control, web content filtering",
+        "operationId": "ListDefenderHardening",
+        "tags": [
+          "Security > Defender"
+        ],
+        "description": "Per tenant: Network Protection mode across the assigned Settings Catalog / endpoint security policies\n(Block = Pass, Audit = Warn, off / not set / conflicting = Fail), Device Control state (Enforced, Audit,\nEnabledNoRules, Disabled, NotConfigured), and a Manual row for web content filtering, which is\nconfigured only in the Defender portal and has no API. tenantFilter=AllTenants returns one row per tenant\nand control (Tenant, Control, State, Status, Policies, Detail); a tenant that fails gets an Error row.\nReport only: nothing is changed. Aspendora fork addition (Vikunja CIPP-26).",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/tenantFilter"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "description": "Derived from the fields the endpoint selects onto each record. The response may carry more; these are the ones known to exist.",
+                    "properties": {
+                      "Control": {
+                        "x-cipp-field-source": "backend"
+                      },
+                      "Detail": {
+                        "x-cipp-field-source": "backend"
+                      },
+                      "Errors": {
+                        "x-cipp-field-source": "backend"
+                      },
+                      "Policies": {
+                        "x-cipp-field-source": "backend"
+                      },
+                      "State": {
+                        "x-cipp-field-source": "backend"
+                      },
+                      "Status": {
+                        "x-cipp-field-source": "backend"
+                      },
+                      "Tenant": {
+                        "x-cipp-field-source": "backend"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - missing required field or invalid input"
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cipp-role": "Endpoint.MEM.Read"
+      }
+    },
     "/api/ListDefenderIndicators": {
       "get": {
         "summary": "ListDefenderIndicators",
@@ -52806,6 +53831,83 @@
           }
         ],
         "x-cipp-role": "Endpoint.MEM.Read"
+      }
+    },
+    "/api/ListDefenderPendingRemediation": {
+      "get": {
+        "summary": "Defender automated investigation remediations waiting for approval (Action Center pending)",
+        "operationId": "ListDefenderPendingRemediation",
+        "tags": [
+          "Security > Defender"
+        ],
+        "description": "Unresolved Defender alerts from the last LookbackDays (default 90) whose automated investigation is in\npendingApproval, with age since the alert was created, the number of evidence actions awaiting approval\nand the incident link. Source=MDO|MDE|All (default All). MinAgeHours (default 24) sets OverThreshold.\nAlso returns the MDO automation setting as Manual: soft delete for similar files / URLs is configured only\nin the Defender portal and no cmdlet or Graph API exposes it. tenantFilter=AllTenants returns one summary\nrow per tenant (Tenant, PendingCount, OverThresholdCount, Oldest). Report only.\nAspendora fork addition (Vikunja CIPP-31).",
+        "parameters": [
+          {
+            "name": "Source",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/tenantFilter"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "description": "Derived from the fields the endpoint selects onto each record. The response may carry more; these are the ones known to exist.",
+                    "properties": {
+                      "Error": {
+                        "x-cipp-field-source": "backend"
+                      },
+                      "Oldest": {
+                        "x-cipp-field-source": "backend"
+                      },
+                      "OldestTitle": {
+                        "x-cipp-field-source": "backend"
+                      },
+                      "OverThresholdCount": {
+                        "x-cipp-field-source": "backend"
+                      },
+                      "PendingCount": {
+                        "x-cipp-field-source": "backend"
+                      },
+                      "Tenant": {
+                        "x-cipp-field-source": "backend"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - missing required field or invalid input"
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cipp-role": "Security.Alert.Read"
       }
     },
     "/api/ListDefenderState": {
@@ -54726,6 +55828,80 @@
         "x-cipp-role": "Tenant.Administration.Read"
       }
     },
+    "/api/ListDriverUpdateQueue": {
+      "get": {
+        "summary": "Windows driver and firmware updates awaiting review, for one tenant or across all tenants",
+        "operationId": "ListDriverUpdateQueue",
+        "tags": [
+          "Endpoint > MEM"
+        ],
+        "description": "Lists the drivers in each Windows driver update profile (deviceManagement/windowsDriverUpdateProfiles/{id}/\ndriverInventories), by default only those with approvalStatus needsReview. Status=approved|declined|suspended|all\nwidens it. tenantFilter=AllTenants sweeps every tenant the caller may see (time-boxed; unreached tenants are\nlisted in Skipped). Tenants without driver update management (no Windows E3/E5 / Business Premium rights or\nno WUfB deployment service onboarding) are listed in Tenants with Available = false, never as \"nothing to\nreview\". Body: @{ Results = @(driver rows, each with Tenant, ProfileId, DriverId); Tenants = @(per-tenant\nsummary); Failed; Skipped }. Read only; approve / decline / suspend is ExecDriverUpdateAction.\nAspendora fork addition (Vikunja CIPP-24).",
+        "parameters": [
+          {
+            "name": "Status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/tenantFilter"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "description": "Derived from the fields the endpoint selects onto each record. The response may carry more; these are the ones known to exist.",
+                    "properties": {
+                      "Failed": {
+                        "x-cipp-field-source": "backend"
+                      },
+                      "Results": {
+                        "x-cipp-field-source": "backend"
+                      },
+                      "Skipped": {
+                        "x-cipp-field-source": "backend"
+                      },
+                      "Status": {
+                        "x-cipp-field-source": "backend"
+                      },
+                      "Tenants": {
+                        "x-cipp-field-source": "backend"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - missing required field or invalid input"
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cipp-role": "Endpoint.MEM.Read"
+      }
+    },
     "/api/ListEmptyResults": {
       "get": {
         "summary": "- Purposely lists an empty result",
@@ -54763,6 +55939,93 @@
         ],
         "x-cipp-role": "CIPP.Core.Read",
         "x-cipp-any-tenant": true
+      }
+    },
+    "/api/ListEnrollmentDiscovery": {
+      "get": {
+        "summary": "Intune enrollment discovery: CNAME records, MDM user scope and hybrid devices per tenant",
+        "operationId": "ListEnrollmentDiscovery",
+        "tags": [
+          "Endpoint > MEM"
+        ],
+        "description": "For one tenant, or every tenant the caller may see with tenantFilter=AllTenants: the enterpriseenrollment and\nenterpriseregistration CNAMEs of each custom verified domain, the Intune MDM user scope (none / all /\nselected and its groups), Windows and hybrid-joined (GPO / co-management enrolled) device counts, and\nfindings flagging tenants still relying on CNAME-based enrollment (CNAME published with scope None or a\nnarrow group, CNAME missing where Windows enrollment is used, unexpected targets, hybrid devices that depend\non the scope). Single tenant returns the report object; AllTenants returns\n@{ Results = @(one report per tenant); Findings = @(flattened, with Tenant); Failed; Skipped }.\nReport only: nothing is changed. Aspendora fork addition (Vikunja CIPP-22).",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/tenantFilter"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "description": "Derived from the fields the endpoint selects onto each record. The response may carry more; these are the ones known to exist.",
+                    "properties": {
+                      "Domains": {
+                        "x-cipp-field-source": "backend"
+                      },
+                      "Errors": {
+                        "x-cipp-field-source": "backend"
+                      },
+                      "Failed": {
+                        "x-cipp-field-source": "backend"
+                      },
+                      "FindingCount": {
+                        "x-cipp-field-source": "backend"
+                      },
+                      "Findings": {
+                        "x-cipp-field-source": "backend"
+                      },
+                      "HybridDeviceCount": {
+                        "x-cipp-field-source": "backend"
+                      },
+                      "MdmScope": {
+                        "x-cipp-field-source": "backend"
+                      },
+                      "MdmScopeGroups": {
+                        "x-cipp-field-source": "backend"
+                      },
+                      "Results": {
+                        "x-cipp-field-source": "backend"
+                      },
+                      "Skipped": {
+                        "x-cipp-field-source": "backend"
+                      },
+                      "Tenant": {
+                        "x-cipp-field-source": "backend"
+                      },
+                      "WindowsDeviceCount": {
+                        "x-cipp-field-source": "backend"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - missing required field or invalid input"
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cipp-role": "Endpoint.MEM.Read"
       }
     },
     "/api/ListEquipment": {
@@ -62258,6 +63521,79 @@
         "x-cipp-role": "Exchange.SpamFilter.Read"
       }
     },
+    "/api/ListMailTriage": {
+      "get": {
+        "summary": "Guided \"mail not received / delayed\" triage for one recipient, returned as an evidence bundle",
+        "operationId": "ListMailTriage",
+        "tags": [
+          "Email-Exchange > Tools"
+        ],
+        "description": "Inputs: tenantFilter, Recipient (UPN or address), optional Sender, optional Hours (default 48, max 240).\nRuns, in order: Exchange Online service health, message trace, quarantine, mail flow rules that name the\nsender/recipient/domain, inbox rules including hidden ones, sender/delivery restrictions and forwarding,\nmailbox quota and archive, Tenant Allow/Block List and the user's Blocked Senders, and account sign-in state.\nEach step returns Status (OK / Problem / Unknown), a plain-English Summary, Findings and Evidence; the bundle\nhas an Overall status and Summary. Times are US Central (America/Chicago) with the zone stated and UTC\nalongside. Read-only. Post the result to a ConnectWise ticket with ExecMailTriageNote.\nAspendora fork addition (Vikunja CIPP-38).",
+        "parameters": [
+          {
+            "name": "Hours",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Recipient",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Sender",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/tenantFilter"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "description": "Not described statically: this endpoint returns the upstream response as-is, so its fields are determined by the upstream API rather than by CIPP. Call the endpoint to see the actual shape, or add a response schema in backend/Config/openapi-overrides."
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - missing required field or invalid input"
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cipp-role": "Exchange.Mailbox.Read"
+      }
+    },
     "/api/ListMalwareFilters": {
       "get": {
         "summary": "ListMalwareFilters",
@@ -66071,6 +67407,63 @@
         "x-cipp-any-tenant": true
       }
     },
+    "/api/ListRoleAssignmentReport": {
+      "get": {
+        "summary": "Standing-admin and least-privilege report for a tenant's directory roles",
+        "operationId": "ListRoleAssignmentReport",
+        "tags": [
+          "Identity > Administration > Roles"
+        ],
+        "description": "Lists every directory role assignment, active (permanent or PIM time-bound) and PIM-eligible, with group\nassignments expanded, last sign-in and break-glass status. Flags permanent Global Administrators other than\nregistered break-glass accounts (with a least-privilege suggestion from their recent Entra audit activity),\nservice principals and guests holding roles, privileged accounts with no recent sign-in, disabled accounts\nstill holding roles, and GDAP relationships with this customer that carry Global Administrator. PIM needs\nEntra ID P2 and sign-in activity Entra ID P1; without them those parts are reported as unknown, not as\nfindings. Returns Summary, Assignments, Recommendations, Findings, Tasks (the task-to-least-privileged-role\nlookup from Config/LeastPrivilegeRoles.json) and Errors.\nOptional: InactiveDays (default 45). Report only: nothing is changed. Aspendora fork addition (Vikunja CIPP-15).",
+        "parameters": [
+          {
+            "name": "InactiveDays",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/tenantFilter"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "description": "Not described statically: this endpoint returns the upstream response as-is, so its fields are determined by the upstream API rather than by CIPP. Call the endpoint to see the actual shape, or add a response schema in backend/Config/openapi-overrides."
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - missing required field or invalid input"
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cipp-role": "Identity.Role.Read"
+      }
+    },
     "/api/ListRoleAssignments": {
       "get": {
         "summary": "List Entra directory role assignments with their PIM assignment type.",
@@ -68747,6 +70140,70 @@
         "x-cipp-any-tenant": true
       }
     },
+    "/api/ListSharingBurst": {
+      "get": {
+        "summary": "Lists lateral-phishing and mass external sharing findings for a tenant, with ready parameters for the existing sharing-link cleanup actions",
+        "operationId": "ListSharingBurst",
+        "tags": [
+          "Teams-Sharepoint"
+        ],
+        "description": "Runs the same detection as the SharingBurst alert (Get-CIPPSharingBurstReport) on demand and returns every\nfinding, not only new ones: UserBurst (one account sharing with many outsiders within the window), FileSpread\n(one item reaching many outsiders over the lookback) and LinkMailBlast (sharing links created, then a spike in\nnew external mail recipients). Each finding has the preceding risky/unfamiliar sign-in, the send-spread\ncomparison, and Remediation: parameter sets for ExecRemoveSharingLink, ExecBulkRemoveSharingLinks and\nExecSetOneDriveSharing. Nothing is changed - the caller decides what to run.\n\nQuery/body: tenantFilter (required), hours (lookback, 1-168, default 24), recipients (default 25),\nwindowMinutes (default 60), fileRecipients (default 25), sendSpread (default 25), allowList (comma\nseparated UPNs), resolve (true = read link permission ids live from Graph for items not in the\nsharing-links cache; read only). Aspendora fork addition (Vikunja CIPP-13).",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "description": "Derived from the fields the endpoint selects onto each record. The response may carry more; these are the ones known to exist.",
+                    "properties": {
+                      "Cap": {
+                        "x-cipp-field-source": "backend"
+                      },
+                      "Complete": {
+                        "x-cipp-field-source": "backend"
+                      },
+                      "Errors": {
+                        "x-cipp-field-source": "backend"
+                      },
+                      "EventsAnalysed": {
+                        "x-cipp-field-source": "backend"
+                      },
+                      "Results": {
+                        "x-cipp-field-source": "backend"
+                      },
+                      "Window": {
+                        "x-cipp-field-source": "backend"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - missing required field or invalid input"
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cipp-role": "Sharepoint.Site.Read"
+      }
+    },
     "/api/ListSignIns": {
       "get": {
         "summary": "ListSignIns",
@@ -70096,6 +71553,51 @@
           }
         ],
         "x-cipp-role": "Sharepoint.Site.Read"
+      }
+    },
+    "/api/ListSmsMfaReadiness": {
+      "get": {
+        "summary": "SMS/voice MFA readiness: which users would break if SMS or voice MFA were disabled",
+        "operationId": "ListSmsMfaReadiness",
+        "tags": [
+          "Identity > Administration > Users"
+        ],
+        "description": "Single tenant: reads the MFA registration report (Entra ID P1), the tenant's users and the authentication\nmethods policy and returns Summary (ReadyToDisableSms, ReadyToDisableVoice, ReadyToDisableBoth, coverage of\nAuthenticator/passkey/Windows Hello, counts), Users (every enabled member with Category PhoneOnly,\nDefaultPhone, NoMfa or Ready), Findings (admins on SMS/voice or without MFA, users relying only on SMS/voice,\nusers without MFA, readiness), RegisteredByMethod and Errors.\ntenantFilter=AllTenants: returns the stored per-tenant summaries (Results) written by the last single-tenant\nview or SmsMfaReliance alert run, with CheckedUtc; tenants never checked are not listed.\nReport only: nothing in the tenant is changed. Aspendora fork addition (Vikunja CIPP-6).",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/tenantFilter"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardResults"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - missing required field or invalid input"
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cipp-role": "Identity.User.Read"
       }
     },
     "/api/ListSnoozedAlerts": {
@@ -73350,6 +74852,129 @@
           }
         ],
         "x-cipp-role": "Tenant.Reports.Read"
+      }
+    },
+    "/api/ListTldExposure": {
+      "get": {
+        "summary": "Audit-only: what an abused-TLD block would have stopped (inbound) or broken (outbound) in one tenant",
+        "operationId": "ListTldExposure",
+        "tags": [
+          "Email-Exchange > Reports"
+        ],
+        "description": "Reads Get-MessageTraceV2 for the last Days days (default 10, max 90; 10-day windows, 5000-row pages, at most\nMaxPages pages, default 10) and counts mail from senders under the abused TLDs (Config/AbusedTlds.json, or\na Tlds override such as \"xyz,top\") and mail users sent to those TLDs - a *.TLD sender block stops both.\nReturns per-TLD counts and the top sender / recipient domains. Truncated=true means the page cap was hit\nand CoveredFromUtc is how far back it got; use Historical Search for a full 90-day report.\nChanges nothing. Aspendora fork addition (Vikunja CIPP-30).",
+        "parameters": [
+          {
+            "name": "Days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "MaxPages",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/tenantFilter"
+          },
+          {
+            "name": "Tlds",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "description": "Derived from the fields the endpoint selects onto each record. The response may carry more; these are the ones known to exist.",
+                    "properties": {
+                      "ByTld": {
+                        "x-cipp-field-source": "backend"
+                      },
+                      "CatalogVersion": {
+                        "x-cipp-field-source": "backend"
+                      },
+                      "CoveredFrom": {
+                        "x-cipp-field-source": "backend"
+                      },
+                      "Days": {
+                        "x-cipp-field-source": "backend"
+                      },
+                      "InboundMessages": {
+                        "x-cipp-field-source": "backend"
+                      },
+                      "Notes": {
+                        "x-cipp-field-source": "backend"
+                      },
+                      "OutboundMessages": {
+                        "x-cipp-field-source": "backend"
+                      },
+                      "Pages": {
+                        "x-cipp-field-source": "backend"
+                      },
+                      "RowsScanned": {
+                        "x-cipp-field-source": "backend"
+                      },
+                      "Tenant": {
+                        "x-cipp-field-source": "backend"
+                      },
+                      "TldsWithTraffic": {
+                        "x-cipp-field-source": "backend"
+                      },
+                      "TopOutboundDomains": {
+                        "x-cipp-field-source": "backend"
+                      },
+                      "TopSenderDomains": {
+                        "x-cipp-field-source": "backend"
+                      },
+                      "Truncated": {
+                        "x-cipp-field-source": "backend"
+                      },
+                      "WindowEnd": {
+                        "x-cipp-field-source": "backend"
+                      },
+                      "WindowStart": {
+                        "x-cipp-field-source": "backend"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - missing required field or invalid input"
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cipp-role": "Exchange.SpamFilter.Read"
       }
     },
     "/api/ListTransportRules": {
