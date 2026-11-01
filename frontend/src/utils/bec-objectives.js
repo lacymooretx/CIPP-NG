@@ -931,6 +931,7 @@ export const BEC_SIGNAL_GROUP = {
   RiskyUserLow: 'access',
   ConfirmedCompromised: 'access',
   AnonymousLinks: 'exfil',
+  MassSharing: 'exfil',
   MassMail: 'exfil',
   TyposquatSenders: 'exfil',
   DefenderDetections: 'exfil',

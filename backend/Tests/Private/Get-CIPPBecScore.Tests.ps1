@@ -133,6 +133,8 @@ Describe 'Get-CIPPBecScore' {
             @{ Key = 'AttackerMailActivity'; Value = @([pscustomobject]@{ IPVerdict = 'LikelyAttacker'; MailboxOwner = 'victim@contoso.com' }, [pscustomobject]@{ IPVerdict = 'Unknown'; MailboxOwner = 'victim@contoso.com' }); Expected = 3; Signal = 'AttackerMailAccess'; Backed = $true }
             @{ Key = 'AttackerFileActivity'; Value = @([pscustomobject]@{ IPVerdict = 'Compromised' }); Expected = 2; Signal = 'AttackerFileAccess'; Backed = $true }
             @{ Key = 'FormsActivity'; Value = @([pscustomobject]@{ Flagged = $true; IPVerdict = 'LikelyAttacker' }, [pscustomobject]@{ Flagged = $true; IPVerdict = 'Suspicious' }); Expected = 3; Signal = 'AttackerForms'; Backed = $true }
+            # Aspendora fork (Vikunja CIPP-13): lateral phishing by mass external sharing
+            @{ Key = 'SharingBursts'; Value = @([pscustomobject]@{ Type = 'UserBurst'; ExternalRecipients = 30 }); Expected = 4; Signal = 'MassSharing' }
         )
         foreach ($Case in $Cases) {
             $Payload = @{ $Case.Key = $Case.Value }

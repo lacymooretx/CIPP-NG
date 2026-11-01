@@ -27,6 +27,7 @@
       "ForeignSuccessfulSignIns": 3,
       "ForeignActivity": 3,
       "AnonymousLinks": 3,
+      "MassSharing": 4,
       "MassMail": 3,
       "RecentMfaMethods": 2,
       "RecentIntuneDevices": 2,
@@ -52,6 +53,11 @@
       "DelegatedMailboxAttackerAccess": 3,
       "OtherAccountsReached": 3
     }
+  },
+  "sharingBurst": {
+    "recipients": 25,
+    "windowMinutes": 60,
+    "fileRecipients": 25
   },
   "inboxRules": {
     "suspiciousFolderPattern": "RSS",
