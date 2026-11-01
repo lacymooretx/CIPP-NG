@@ -106,7 +106,7 @@ Describe 'ConvertTo-CIPPSafeRestorePayload' {
     }
 
     It 'renames a Settings Catalog policy inside the payload and strips assignments' {
-        $Item = Items (New-TestScheduledBackupJson -Intune @((New-TestCatalogRow -Name 'Cat'))) | Where-Object Type -EQ 'intuneconfig'
+        $Item = Items (New-TestScheduledBackupJson -Intune @((New-TestCatalogRow -Name 'Cat'))) | ForEach-Object { $_ } | Where-Object Type -EQ 'intuneconfig'
         $Out = ConvertTo-CIPPSafeRestorePayload -Item $Item -NewName 'Cat (restored 2026-10-31)'
         $Out.Type | Should -Be 'Catalog'
         $Out.DisplayName | Should -Be 'Cat (restored 2026-10-31)'

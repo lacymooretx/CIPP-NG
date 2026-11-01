@@ -71,14 +71,14 @@ Describe 'Get-CIPPBackupItemList' {
 
     It 'marks capture error strings as unparsed instead of failing' {
         $Json = New-TestScheduledBackupJson -Ca @('Failed to create a template of the Conditional Access Policy with ID: x. Error: boom')
-        $Ca = Get-CIPPBackupItemList -Backup (ConvertFrom-TestBackupJson $Json) | Where-Object Type -EQ 'ca'
+        $Ca = Get-CIPPBackupItemList -Backup (ConvertFrom-TestBackupJson $Json) | ForEach-Object { $_ } | Where-Object Type -EQ 'ca'
         $Ca.Unparsed | Should -BeTrue
         $Ca.Key | Should -BeLike 'unparsed|*'
     }
 
     It 'makes duplicate keys unique' {
         $Json = New-TestScheduledBackupJson -Ca @((New-TestCAPolicyJson -Name 'Dup'), (New-TestCAPolicyJson -Name 'DUP'))
-        (Get-CIPPBackupItemList -Backup (ConvertFrom-TestBackupJson $Json) | Where-Object Type -EQ 'ca').Key | Should -Be @('dup', 'dup #2')
+        (Get-CIPPBackupItemList -Backup (ConvertFrom-TestBackupJson $Json) | ForEach-Object { $_ } | Where-Object Type -EQ 'ca').Key | Should -Be @('dup', 'dup #2')
     }
 
     It 'groups CIPP core backups by table' {

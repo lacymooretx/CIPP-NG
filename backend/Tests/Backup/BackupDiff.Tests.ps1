@@ -23,7 +23,9 @@ Describe 'Compare-CIPPBackupValue' {
     }
 
     It 'treats a reordered array as equal' {
-        @(Compare-CIPPBackupValue -Before (Norm @{ g = @('a', 'b', 'c') }) -After (Norm @{ g = @('c', 'a', 'b') })).Count | Should -Be 0
+        # These helpers return their array as one pipeline object (return , ...); assign before counting.
+        $Changes = Compare-CIPPBackupValue -Before (Norm @{ g = @('a', 'b', 'c') }) -After (Norm @{ g = @('c', 'a', 'b') })
+        $Changes.Count | Should -Be 0
     }
 
     It 'diffs equal-length arrays index by index' {
@@ -68,7 +70,7 @@ Describe 'Compare-CIPPBackupItemSet' {
     It 'reports a changed Intune setting inside the parsed template' {
         $Old = New-TestScheduledBackupJson -Intune @((New-TestIntuneRow -Name 'Win' -Settings @{ passwordMinimumLength = 8 }))
         $New = New-TestScheduledBackupJson -Intune @((New-TestIntuneRow -Name 'Win' -Settings @{ passwordMinimumLength = 14 }))
-        $Edit = Compare-CIPPBackupItemSet -BaseItems (Items $Old) -CompareItems (Items $New) | Where-Object Type -EQ 'intuneconfig'
+        $Edit = Compare-CIPPBackupItemSet -BaseItems (Items $Old) -CompareItems (Items $New) | ForEach-Object { $_ } | Where-Object Type -EQ 'intuneconfig'
         $Edit.Status | Should -Be 'Changed'
         $Edit.Changes.Path | Should -Be 'Template.passwordMinimumLength'
     }
@@ -81,8 +83,8 @@ Describe 'Compare-CIPPBackupItemSet' {
         $B.TemplateJson = $T | ConvertTo-Json -Depth 20 -Compress
         $Old = Items (New-TestScheduledBackupJson -Intune @($A))
         $New = Items (New-TestScheduledBackupJson -Intune @($B))
-        (Compare-CIPPBackupItemSet -BaseItems $Old -CompareItems $New | Where-Object Type -EQ 'intuneconfig').Status | Should -Be 'Unchanged'
-        $WithAssignments = Compare-CIPPBackupItemSet -BaseItems $Old -CompareItems $New -IncludeAssignments | Where-Object Type -EQ 'intuneconfig'
+        (Compare-CIPPBackupItemSet -BaseItems $Old -CompareItems $New | ForEach-Object { $_ } | Where-Object Type -EQ 'intuneconfig').Status | Should -Be 'Unchanged'
+        $WithAssignments = Compare-CIPPBackupItemSet -BaseItems $Old -CompareItems $New -IncludeAssignments | ForEach-Object { $_ } | Where-Object Type -EQ 'intuneconfig'
         $WithAssignments.Status | Should -Be 'Changed'
         $WithAssignments.Changes.Path | Should -BeLike 'Template.assignments*'
     }
@@ -93,7 +95,7 @@ Describe 'Compare-CIPPBackupItemSet' {
             [pscustomobject]@{ id = 'u1'; userPrincipalName = 'ann@contoso.com'; displayName = 'Ann'; jobTitle = 'CEO' },
             [pscustomobject]@{ id = 'u2'; userPrincipalName = 'bob@contoso.com'; displayName = 'Bob'; jobTitle = 'Clerk' }
         )
-        $Ann = Compare-CIPPBackupItemSet -BaseItems (Items $Old) -CompareItems (Items $New) | Where-Object Key -EQ 'u1'
+        $Ann = Compare-CIPPBackupItemSet -BaseItems (Items $Old) -CompareItems (Items $New) | ForEach-Object { $_ } | Where-Object Key -EQ 'u1'
         $Ann.Status | Should -Be 'Changed'
         $Ann.Changes.Path | Should -Be 'jobTitle'
     }
