@@ -499,6 +499,11 @@ function Test-CIPPAuditLogRules {
         # Partner users: the shared lookup (memoised per worker, cached for a day) the BEC run reads too.
         $PartnerUserLookup = Get-CIPPPartnerUserLookup
 
+        # Aspendora fork addition (Vikunja CIPP-32): who counts as the MSP when a rule excludes the MSP's own
+        # admins (CIPPActorClass / CIPPActorIsMSP, see Get-CIPPAuditActorClass).
+        $MspTenantIds = @(@($env:TenantID) + @(([string]$env:CIPP_MSP_TENANT_IDS) -split '[,;\s]+') | Where-Object { $_ })
+        $CippAppId = [string]$env:ApplicationID
+
         try {
             $LogCount = $Rows.count
             $RunGuid = (New-Guid).Guid
@@ -683,6 +688,16 @@ function Test-CIPPAuditLogRules {
                     if ($Data.Actor) {
                         # One string so a rule can test who acted (e.g. MS-PIM); -notlike against the Actor array itself is always true.
                         $Flattened['CIPPActor'] = @(foreach ($ActorEntry in $Data.Actor) { [string]$ActorEntry.ID }) -join ', '
+                    }
+                    # Aspendora fork addition (Vikunja CIPP-32). Strings, so a rule matches them with a plain
+                    # 'Equals to' / 'Not in' condition. A failure here must never drop the record.
+                    try {
+                        $ActorClass = Get-CIPPAuditActorClass -Record $Source -MappedUserId $Data.CIPPUserId -MspTenantIds $MspTenantIds -CippAppId $CippAppId -PartnerUserLookup $PartnerUserLookup
+                        $Flattened['CIPPActorClass'] = [string]$ActorClass.Class
+                        $Flattened['CIPPActorIsMSP'] = [string]$ActorClass.IsMsp
+                        $Flattened['CIPPActorDetail'] = [string]$ActorClass.Detail
+                    } catch {
+                        Write-Information "Actor classification failed for $($AuditRecord.id): $($_.Exception.Message)"
                     }
                     if ($Flattened.Count -gt 0) {
                         $Data | Add-Member -NotePropertyMembers $Flattened -Force -ErrorAction SilentlyContinue

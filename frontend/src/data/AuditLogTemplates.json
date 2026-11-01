@@ -989,5 +989,158 @@
         }
       ]
     }
+  },
+  {
+    "value": "EmailSecurityPolicyChanged",
+    "name": "An email security policy (anti-phish, anti-spam, anti-malware, Safe Attachments, Safe Links) was changed by someone outside the MSP",
+    "template": {
+      "preset": {
+        "value": "EmailSecurityPolicyChanged",
+        "label": "An email security policy (anti-phish, anti-spam, anti-malware, Safe Attachments, Safe Links) was changed by someone outside the MSP"
+      },
+      "logbook": { "value": "Audit.Exchange", "label": "Exchange" },
+      "conditions": [
+        {
+          "Property": { "value": "List:Operation", "label": "Operation" },
+          "Operator": { "value": "in", "label": "In" },
+          "Input": [
+            { "value": "New-AntiPhishPolicy", "label": "New-AntiPhishPolicy" },
+            { "value": "Set-AntiPhishPolicy", "label": "Set-AntiPhishPolicy" },
+            { "value": "Remove-AntiPhishPolicy", "label": "Remove-AntiPhishPolicy" },
+            { "value": "New-HostedContentFilterPolicy", "label": "New-HostedContentFilterPolicy" },
+            { "value": "Set-HostedContentFilterPolicy", "label": "Set-HostedContentFilterPolicy" },
+            { "value": "Remove-HostedContentFilterPolicy", "label": "Remove-HostedContentFilterPolicy" },
+            { "value": "New-HostedOutboundSpamFilterPolicy", "label": "New-HostedOutboundSpamFilterPolicy" },
+            { "value": "Set-HostedOutboundSpamFilterPolicy", "label": "Set-HostedOutboundSpamFilterPolicy" },
+            { "value": "Remove-HostedOutboundSpamFilterPolicy", "label": "Remove-HostedOutboundSpamFilterPolicy" },
+            { "value": "New-MalwareFilterPolicy", "label": "New-MalwareFilterPolicy" },
+            { "value": "Set-MalwareFilterPolicy", "label": "Set-MalwareFilterPolicy" },
+            { "value": "Remove-MalwareFilterPolicy", "label": "Remove-MalwareFilterPolicy" },
+            { "value": "New-SafeAttachmentPolicy", "label": "New-SafeAttachmentPolicy" },
+            { "value": "Set-SafeAttachmentPolicy", "label": "Set-SafeAttachmentPolicy" },
+            { "value": "Remove-SafeAttachmentPolicy", "label": "Remove-SafeAttachmentPolicy" },
+            { "value": "New-SafeLinksPolicy", "label": "New-SafeLinksPolicy" },
+            { "value": "Set-SafeLinksPolicy", "label": "Set-SafeLinksPolicy" },
+            { "value": "Remove-SafeLinksPolicy", "label": "Remove-SafeLinksPolicy" },
+            { "value": "Set-HostedConnectionFilterPolicy", "label": "Set-HostedConnectionFilterPolicy" },
+            { "value": "Set-AtpPolicyForO365", "label": "Set-AtpPolicyForO365" },
+            { "value": "New-AntiPhishRule", "label": "New-AntiPhishRule" },
+            { "value": "Set-AntiPhishRule", "label": "Set-AntiPhishRule" },
+            { "value": "Remove-AntiPhishRule", "label": "Remove-AntiPhishRule" },
+            { "value": "Enable-AntiPhishRule", "label": "Enable-AntiPhishRule" },
+            { "value": "Disable-AntiPhishRule", "label": "Disable-AntiPhishRule" },
+            { "value": "New-HostedContentFilterRule", "label": "New-HostedContentFilterRule" },
+            { "value": "Set-HostedContentFilterRule", "label": "Set-HostedContentFilterRule" },
+            { "value": "Remove-HostedContentFilterRule", "label": "Remove-HostedContentFilterRule" },
+            { "value": "Enable-HostedContentFilterRule", "label": "Enable-HostedContentFilterRule" },
+            { "value": "Disable-HostedContentFilterRule", "label": "Disable-HostedContentFilterRule" },
+            { "value": "New-HostedOutboundSpamFilterRule", "label": "New-HostedOutboundSpamFilterRule" },
+            { "value": "Set-HostedOutboundSpamFilterRule", "label": "Set-HostedOutboundSpamFilterRule" },
+            { "value": "Remove-HostedOutboundSpamFilterRule", "label": "Remove-HostedOutboundSpamFilterRule" },
+            { "value": "Enable-HostedOutboundSpamFilterRule", "label": "Enable-HostedOutboundSpamFilterRule" },
+            { "value": "Disable-HostedOutboundSpamFilterRule", "label": "Disable-HostedOutboundSpamFilterRule" },
+            { "value": "New-MalwareFilterRule", "label": "New-MalwareFilterRule" },
+            { "value": "Set-MalwareFilterRule", "label": "Set-MalwareFilterRule" },
+            { "value": "Remove-MalwareFilterRule", "label": "Remove-MalwareFilterRule" },
+            { "value": "Enable-MalwareFilterRule", "label": "Enable-MalwareFilterRule" },
+            { "value": "Disable-MalwareFilterRule", "label": "Disable-MalwareFilterRule" },
+            { "value": "New-SafeAttachmentRule", "label": "New-SafeAttachmentRule" },
+            { "value": "Set-SafeAttachmentRule", "label": "Set-SafeAttachmentRule" },
+            { "value": "Remove-SafeAttachmentRule", "label": "Remove-SafeAttachmentRule" },
+            { "value": "Enable-SafeAttachmentRule", "label": "Enable-SafeAttachmentRule" },
+            { "value": "Disable-SafeAttachmentRule", "label": "Disable-SafeAttachmentRule" },
+            { "value": "New-SafeLinksRule", "label": "New-SafeLinksRule" },
+            { "value": "Set-SafeLinksRule", "label": "Set-SafeLinksRule" },
+            { "value": "Remove-SafeLinksRule", "label": "Remove-SafeLinksRule" },
+            { "value": "Enable-SafeLinksRule", "label": "Enable-SafeLinksRule" },
+            { "value": "Disable-SafeLinksRule", "label": "Disable-SafeLinksRule" },
+            { "value": "Set-ATPProtectionPolicyRule", "label": "Set-ATPProtectionPolicyRule" },
+            { "value": "Enable-ATPProtectionPolicyRule", "label": "Enable-ATPProtectionPolicyRule" },
+            { "value": "Disable-ATPProtectionPolicyRule", "label": "Disable-ATPProtectionPolicyRule" },
+            { "value": "Set-EOPProtectionPolicyRule", "label": "Set-EOPProtectionPolicyRule" },
+            { "value": "Enable-EOPProtectionPolicyRule", "label": "Enable-EOPProtectionPolicyRule" },
+            { "value": "Disable-EOPProtectionPolicyRule", "label": "Disable-EOPProtectionPolicyRule" }
+          ]
+        },
+        {
+          "Property": { "value": "String", "label": "CIPPActorIsMSP" },
+          "Operator": { "value": "eq", "label": "Equals to" },
+          "Input": { "value": "False" }
+        },
+        {
+          "Property": { "value": "String", "label": "CIPPActorClass" },
+          "Operator": { "value": "ne", "label": "Not Equals to" },
+          "Input": { "value": "Microsoft" }
+        }
+      ]
+    }
+  },
+  {
+    "value": "TenantAllowBlockListChanged",
+    "name": "The Tenant Allow/Block List was changed by someone outside the MSP",
+    "template": {
+      "preset": {
+        "value": "TenantAllowBlockListChanged",
+        "label": "The Tenant Allow/Block List was changed by someone outside the MSP"
+      },
+      "logbook": { "value": "Audit.Exchange", "label": "Exchange" },
+      "conditions": [
+        {
+          "Property": { "value": "List:Operation", "label": "Operation" },
+          "Operator": { "value": "in", "label": "In" },
+          "Input": [
+            { "value": "New-TenantAllowBlockListItems", "label": "New-TenantAllowBlockListItems" },
+            { "value": "Set-TenantAllowBlockListItems", "label": "Set-TenantAllowBlockListItems" },
+            { "value": "Remove-TenantAllowBlockListItems", "label": "Remove-TenantAllowBlockListItems" },
+            { "value": "New-TenantAllowBlockListSpoofItems", "label": "New-TenantAllowBlockListSpoofItems" },
+            { "value": "Set-TenantAllowBlockListSpoofItems", "label": "Set-TenantAllowBlockListSpoofItems" },
+            { "value": "Remove-TenantAllowBlockListSpoofItems", "label": "Remove-TenantAllowBlockListSpoofItems" }
+          ]
+        },
+        {
+          "Property": { "value": "String", "label": "CIPPActorIsMSP" },
+          "Operator": { "value": "eq", "label": "Equals to" },
+          "Input": { "value": "False" }
+        },
+        {
+          "Property": { "value": "String", "label": "CIPPActorClass" },
+          "Operator": { "value": "ne", "label": "Not Equals to" },
+          "Input": { "value": "Microsoft" }
+        }
+      ]
+    }
+  },
+  {
+    "value": "TransportRuleChanged",
+    "name": "A transport rule was changed, removed, disabled or enabled by someone outside the MSP",
+    "template": {
+      "preset": {
+        "value": "TransportRuleChanged",
+        "label": "A transport rule was changed, removed, disabled or enabled by someone outside the MSP"
+      },
+      "logbook": { "value": "Audit.Exchange", "label": "Exchange" },
+      "conditions": [
+        {
+          "Property": { "value": "List:Operation", "label": "Operation" },
+          "Operator": { "value": "in", "label": "In" },
+          "Input": [
+            { "value": "Set-TransportRule", "label": "Set-TransportRule" },
+            { "value": "Remove-TransportRule", "label": "Remove-TransportRule" },
+            { "value": "Disable-TransportRule", "label": "Disable-TransportRule" },
+            { "value": "Enable-TransportRule", "label": "Enable-TransportRule" }
+          ]
+        },
+        {
+          "Property": { "value": "String", "label": "CIPPActorIsMSP" },
+          "Operator": { "value": "eq", "label": "Equals to" },
+          "Input": { "value": "False" }
+        },
+        {
+          "Property": { "value": "String", "label": "CIPPActorClass" },
+          "Operator": { "value": "ne", "label": "Not Equals to" },
+          "Input": { "value": "Microsoft" }
+        }
+      ]
+    }
   }
 ]

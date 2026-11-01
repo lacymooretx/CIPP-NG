@@ -1133,6 +1133,8 @@ function Push-BECRun {
                     SafelistChanges          = $SafelistChanges
                     SafelistError            = $State.SafelistError
                     SharingChanges           = $SharingChanges
+                    # Aspendora fork addition (Vikunja CIPP-13): mass external sharing in this user's sharing changes (the lateral-phishing IOC).
+                    SharingBursts            = @(try { Get-CIPPSharingBurstFindings -Events @($SharingChanges) -RecipientThreshold ([int]($Heuristics.sharingBurst.recipients ?? 25)) -WindowMinutes ([int]($Heuristics.sharingBurst.windowMinutes ?? 60)) -FileRecipientThreshold ([int]($Heuristics.sharingBurst.fileRecipients ?? 25)) } catch { Write-Information "Sharing burst analysis failed: $($_.Exception.Message)"; @() })
                     IntuneDevices            = & $Rows 'IntuneDevices'
                     IntuneDevicesError       = $State.IntuneDevicesError
                     LocationAnalysis         = $LocationAnalysis

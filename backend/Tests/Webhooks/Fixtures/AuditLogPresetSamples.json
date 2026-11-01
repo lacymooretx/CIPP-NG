@@ -1,5 +1,5 @@
 {
-  "description": "Real unified audit log records (Management Activity API, wrapped in the Graph auditLog record shape), captured from a test tenant and scrubbed: tenant-specific GUIDs replaced consistently, tenant/partner domains renamed to contoso/fabrikampartner, public IPs moved to 203.0.113.0/24. Used by AuditLogPresets.Samples.Tests.ps1.",
+  "description": "Real unified audit log records (Management Activity API, wrapped in the Graph auditLog record shape), captured from a test tenant and scrubbed: tenant-specific GUIDs replaced consistently, tenant/partner domains renamed to contoso/fabrikampartner, public IPs moved to 203.0.113.0/24. Used by AuditLogPresets.Samples.Tests.ps1. Samples named derived-* (Vikunja CIPP-32) are not separate captures: they copy the exo-add-rolegroupmember record's shape (which matches a GDAP partner record seen in production on 2026-10-29) and change only the operation, actor and parameters, to cover cmdlets no test tenant has logged yet.",
   "samples": {
     "exo-new-inboxrule-plain": {
       "id": "4cf86bdb-f1b4-4708-a5bc-5a3b88e2b618",
@@ -5809,6 +5809,446 @@
         ],
         "TargetContextId": "e75dcc09-5152-44ca-8550-f8f22fa4cfa3"
       }
+    },
+    "derived-exo-set-hostedcontentfilterpolicy-tenantadmin": {
+      "id": "5a000000-0000-0000-0000-000000000001",
+      "createdDateTime": "10/17/2026 17:25:31Z",
+      "auditLogRecordType": "Exchange",
+      "operation": "Set-HostedContentFilterPolicy",
+      "organizationId": "e75dcc09-5152-44ca-8550-f8f22fa4cfa3",
+      "userType": 2,
+      "userId": "admin@contoso.onmicrosoft.com",
+      "service": "Exchange",
+      "objectId": "Default",
+      "userPrincipalName": "admin@contoso.onmicrosoft.com",
+      "clientIp": "203.0.113.10:13892",
+      "administrativeUnits": [],
+      "auditData": {
+        "AppAccessContext": {
+          "AADSessionId": "9a8ad3b5-c288-42d8-916b-56b3a7f4147b",
+          "IssuedAtTime": "2026-10-17T17:17:50",
+          "UniqueTokenId": "u9IAkUXitkuOMpMGN82hAA"
+        },
+        "CreationTime": "2026-10-17T17:25:31",
+        "Id": "5a000000-0000-0000-0000-000000000001",
+        "Operation": "Set-HostedContentFilterPolicy",
+        "OrganizationId": "e75dcc09-5152-44ca-8550-f8f22fa4cfa3",
+        "RecordType": 1,
+        "ResultStatus": "True",
+        "UserKey": "10032000ABCDEF12",
+        "UserType": 2,
+        "Version": 1,
+        "Workload": "Exchange",
+        "ClientIP": "203.0.113.10:13892",
+        "ObjectId": "Default",
+        "UserId": "admin@contoso.onmicrosoft.com",
+        "AppId": "",
+        "AppPoolName": "MSExchangeAdminApiNetCore",
+        "ClientAppId": "",
+        "CorrelationID": "",
+        "ExternalAccess": false,
+        "OrganizationName": "contoso.onmicrosoft.com",
+        "OriginatingServer": "AM0PR10MB3218 (15.21.0522.007)",
+        "Parameters": [
+          {
+            "Name": "Identity",
+            "Value": "Default"
+          },
+          {
+            "Name": "AllowedSenderDomains",
+            "Value": "fabrikam-invoices.example"
+          }
+        ],
+        "RequestId": "f524c87b-7c41-4985-a96e-9aa272b076a2",
+        "SessionId": "9a8ad3b5-c288-42d8-916b-56b3a7f4147b",
+        "TokenTenantId": "e75dcc09-5152-44ca-8550-f8f22fa4cfa3"
+      }
+    },
+    "derived-exo-set-antiphishpolicy-partner": {
+      "id": "5a000000-0000-0000-0000-000000000002",
+      "createdDateTime": "10/17/2026 17:25:31Z",
+      "auditLogRecordType": "Exchange",
+      "operation": "Set-AntiPhishPolicy",
+      "organizationId": "e75dcc09-5152-44ca-8550-f8f22fa4cfa3",
+      "userType": 2,
+      "userId": "contoso.onmicrosoft.com\\tenant: 8d6a4ab1-ca4b-4899-b961-c13b1fe0323d, object: ca2a58ac-0202-49db-b889-193fd5ed0bad",
+      "service": "Exchange",
+      "objectId": "Office365 AntiPhish Default",
+      "userPrincipalName": "contoso.onmicrosoft.com\\tenant: 8d6a4ab1-ca4b-4899-b961-c13b1fe0323d, object: ca2a58ac-0202-49db-b889-193fd5ed0bad",
+      "clientIp": "203.0.113.10:13892",
+      "administrativeUnits": [],
+      "auditData": {
+        "AppAccessContext": {
+          "AADSessionId": "9a8ad3b5-c288-42d8-916b-56b3a7f4147b",
+          "IssuedAtTime": "2026-10-17T17:17:50",
+          "UniqueTokenId": "u9IAkUXitkuOMpMGN82hAA"
+        },
+        "CreationTime": "2026-10-17T17:25:31",
+        "Id": "5a000000-0000-0000-0000-000000000002",
+        "Operation": "Set-AntiPhishPolicy",
+        "OrganizationId": "e75dcc09-5152-44ca-8550-f8f22fa4cfa3",
+        "RecordType": 1,
+        "ResultStatus": "True",
+        "UserKey": "contoso.onmicrosoft.com\\tenant: 8d6a4ab1-ca4b-4899-b961-c13b1fe0323d, object: ca2a58ac-0202-49db-b889-193fd5ed0bad",
+        "UserType": 2,
+        "Version": 1,
+        "Workload": "Exchange",
+        "ClientIP": "203.0.113.10:13892",
+        "ObjectId": "Office365 AntiPhish Default",
+        "UserId": "contoso.onmicrosoft.com\\tenant: 8d6a4ab1-ca4b-4899-b961-c13b1fe0323d, object: ca2a58ac-0202-49db-b889-193fd5ed0bad",
+        "AppId": "",
+        "AppPoolName": "MSExchangeAdminApiNetCore",
+        "ClientAppId": "",
+        "CorrelationID": "",
+        "ExternalAccess": false,
+        "OrganizationName": "contoso.onmicrosoft.com",
+        "OriginatingServer": "AM0PR10MB3218 (15.21.0522.007)",
+        "Parameters": [
+          {
+            "Name": "Identity",
+            "Value": "Office365 AntiPhish Default"
+          },
+          {
+            "Name": "EnableMailboxIntelligenceProtection",
+            "Value": "True"
+          }
+        ],
+        "RequestId": "f524c87b-7c41-4985-a96e-9aa272b076a2",
+        "SessionId": "9a8ad3b5-c288-42d8-916b-56b3a7f4147b",
+        "TokenTenantId": "e75dcc09-5152-44ca-8550-f8f22fa4cfa3"
+      }
+    },
+    "derived-exo-set-safelinkspolicy-msservice": {
+      "id": "5a000000-0000-0000-0000-000000000003",
+      "createdDateTime": "10/17/2026 17:25:31Z",
+      "auditLogRecordType": "Exchange",
+      "operation": "Set-SafeLinksPolicy",
+      "organizationId": "e75dcc09-5152-44ca-8550-f8f22fa4cfa3",
+      "userType": 2,
+      "userId": "NT SERVICE\\MSExchangeAdminApiNetCore (Microsoft.Exchange.AdminApi.NetCore)",
+      "service": "Exchange",
+      "objectId": "Built-In Protection Policy",
+      "userPrincipalName": "NT SERVICE\\MSExchangeAdminApiNetCore (Microsoft.Exchange.AdminApi.NetCore)",
+      "clientIp": "203.0.113.10:13892",
+      "administrativeUnits": [],
+      "auditData": {
+        "AppAccessContext": {
+          "AADSessionId": "9a8ad3b5-c288-42d8-916b-56b3a7f4147b",
+          "IssuedAtTime": "2026-10-17T17:17:50",
+          "UniqueTokenId": "u9IAkUXitkuOMpMGN82hAA"
+        },
+        "CreationTime": "2026-10-17T17:25:31",
+        "Id": "5a000000-0000-0000-0000-000000000003",
+        "Operation": "Set-SafeLinksPolicy",
+        "OrganizationId": "e75dcc09-5152-44ca-8550-f8f22fa4cfa3",
+        "RecordType": 1,
+        "ResultStatus": "True",
+        "UserKey": "NT SERVICE\\MSExchangeAdminApiNetCore (Microsoft.Exchange.AdminApi.NetCore)",
+        "UserType": 2,
+        "Version": 1,
+        "Workload": "Exchange",
+        "ClientIP": "203.0.113.10:13892",
+        "ObjectId": "Built-In Protection Policy",
+        "UserId": "NT SERVICE\\MSExchangeAdminApiNetCore (Microsoft.Exchange.AdminApi.NetCore)",
+        "AppId": "",
+        "AppPoolName": "MSExchangeAdminApiNetCore",
+        "ClientAppId": "",
+        "CorrelationID": "",
+        "ExternalAccess": false,
+        "OrganizationName": "contoso.onmicrosoft.com",
+        "OriginatingServer": "AM0PR10MB3218 (15.21.0522.007)",
+        "Parameters": [
+          {
+            "Name": "Identity",
+            "Value": "Built-In Protection Policy"
+          },
+          {
+            "Name": "TrackClicks",
+            "Value": "True"
+          }
+        ],
+        "RequestId": "f524c87b-7c41-4985-a96e-9aa272b076a2",
+        "SessionId": "9a8ad3b5-c288-42d8-916b-56b3a7f4147b",
+        "TokenTenantId": "e75dcc09-5152-44ca-8550-f8f22fa4cfa3"
+      }
+    },
+    "derived-exo-new-tenantallowblocklistitems-tenantadmin": {
+      "id": "5a000000-0000-0000-0000-000000000004",
+      "createdDateTime": "10/17/2026 17:25:31Z",
+      "auditLogRecordType": "Exchange",
+      "operation": "New-TenantAllowBlockListItems",
+      "organizationId": "e75dcc09-5152-44ca-8550-f8f22fa4cfa3",
+      "userType": 2,
+      "userId": "admin@contoso.onmicrosoft.com",
+      "service": "Exchange",
+      "objectId": "billing@fabrikam-invoices.example",
+      "userPrincipalName": "admin@contoso.onmicrosoft.com",
+      "clientIp": "203.0.113.10:13892",
+      "administrativeUnits": [],
+      "auditData": {
+        "AppAccessContext": {
+          "AADSessionId": "9a8ad3b5-c288-42d8-916b-56b3a7f4147b",
+          "IssuedAtTime": "2026-10-17T17:17:50",
+          "UniqueTokenId": "u9IAkUXitkuOMpMGN82hAA"
+        },
+        "CreationTime": "2026-10-17T17:25:31",
+        "Id": "5a000000-0000-0000-0000-000000000004",
+        "Operation": "New-TenantAllowBlockListItems",
+        "OrganizationId": "e75dcc09-5152-44ca-8550-f8f22fa4cfa3",
+        "RecordType": 1,
+        "ResultStatus": "True",
+        "UserKey": "10032000ABCDEF12",
+        "UserType": 2,
+        "Version": 1,
+        "Workload": "Exchange",
+        "ClientIP": "203.0.113.10:13892",
+        "ObjectId": "billing@fabrikam-invoices.example",
+        "UserId": "admin@contoso.onmicrosoft.com",
+        "AppId": "",
+        "AppPoolName": "MSExchangeAdminApiNetCore",
+        "ClientAppId": "",
+        "CorrelationID": "",
+        "ExternalAccess": false,
+        "OrganizationName": "contoso.onmicrosoft.com",
+        "OriginatingServer": "AM0PR10MB3218 (15.21.0522.007)",
+        "Parameters": [
+          {
+            "Name": "ListType",
+            "Value": "Sender"
+          },
+          {
+            "Name": "Allow",
+            "Value": "True"
+          },
+          {
+            "Name": "Entries",
+            "Value": "billing@fabrikam-invoices.example"
+          },
+          {
+            "Name": "NoExpiration",
+            "Value": "True"
+          }
+        ],
+        "RequestId": "f524c87b-7c41-4985-a96e-9aa272b076a2",
+        "SessionId": "9a8ad3b5-c288-42d8-916b-56b3a7f4147b",
+        "TokenTenantId": "e75dcc09-5152-44ca-8550-f8f22fa4cfa3"
+      }
+    },
+    "derived-exo-new-tenantallowblocklistitems-partner": {
+      "id": "5a000000-0000-0000-0000-000000000005",
+      "createdDateTime": "10/17/2026 17:25:31Z",
+      "auditLogRecordType": "Exchange",
+      "operation": "New-TenantAllowBlockListItems",
+      "organizationId": "e75dcc09-5152-44ca-8550-f8f22fa4cfa3",
+      "userType": 2,
+      "userId": "contoso.onmicrosoft.com\\tenant: 8d6a4ab1-ca4b-4899-b961-c13b1fe0323d, object: ca2a58ac-0202-49db-b889-193fd5ed0bad",
+      "service": "Exchange",
+      "objectId": "spam@fabrikam-spam.example",
+      "userPrincipalName": "contoso.onmicrosoft.com\\tenant: 8d6a4ab1-ca4b-4899-b961-c13b1fe0323d, object: ca2a58ac-0202-49db-b889-193fd5ed0bad",
+      "clientIp": "203.0.113.10:13892",
+      "administrativeUnits": [],
+      "auditData": {
+        "AppAccessContext": {
+          "AADSessionId": "9a8ad3b5-c288-42d8-916b-56b3a7f4147b",
+          "IssuedAtTime": "2026-10-17T17:17:50",
+          "UniqueTokenId": "u9IAkUXitkuOMpMGN82hAA"
+        },
+        "CreationTime": "2026-10-17T17:25:31",
+        "Id": "5a000000-0000-0000-0000-000000000005",
+        "Operation": "New-TenantAllowBlockListItems",
+        "OrganizationId": "e75dcc09-5152-44ca-8550-f8f22fa4cfa3",
+        "RecordType": 1,
+        "ResultStatus": "True",
+        "UserKey": "contoso.onmicrosoft.com\\tenant: 8d6a4ab1-ca4b-4899-b961-c13b1fe0323d, object: ca2a58ac-0202-49db-b889-193fd5ed0bad",
+        "UserType": 2,
+        "Version": 1,
+        "Workload": "Exchange",
+        "ClientIP": "203.0.113.10:13892",
+        "ObjectId": "spam@fabrikam-spam.example",
+        "UserId": "contoso.onmicrosoft.com\\tenant: 8d6a4ab1-ca4b-4899-b961-c13b1fe0323d, object: ca2a58ac-0202-49db-b889-193fd5ed0bad",
+        "AppId": "",
+        "AppPoolName": "MSExchangeAdminApiNetCore",
+        "ClientAppId": "",
+        "CorrelationID": "",
+        "ExternalAccess": false,
+        "OrganizationName": "contoso.onmicrosoft.com",
+        "OriginatingServer": "AM0PR10MB3218 (15.21.0522.007)",
+        "Parameters": [
+          {
+            "Name": "ListType",
+            "Value": "Sender"
+          },
+          {
+            "Name": "Block",
+            "Value": "True"
+          },
+          {
+            "Name": "Entries",
+            "Value": "spam@fabrikam-spam.example"
+          }
+        ],
+        "RequestId": "f524c87b-7c41-4985-a96e-9aa272b076a2",
+        "SessionId": "9a8ad3b5-c288-42d8-916b-56b3a7f4147b",
+        "TokenTenantId": "e75dcc09-5152-44ca-8550-f8f22fa4cfa3"
+      }
+    },
+    "derived-exo-disable-transportrule-tenantadmin": {
+      "id": "5a000000-0000-0000-0000-000000000006",
+      "createdDateTime": "10/17/2026 17:25:31Z",
+      "auditLogRecordType": "Exchange",
+      "operation": "Disable-TransportRule",
+      "organizationId": "e75dcc09-5152-44ca-8550-f8f22fa4cfa3",
+      "userType": 2,
+      "userId": "admin@contoso.onmicrosoft.com",
+      "service": "Exchange",
+      "objectId": "Block external auto-forwarding",
+      "userPrincipalName": "admin@contoso.onmicrosoft.com",
+      "clientIp": "203.0.113.10:13892",
+      "administrativeUnits": [],
+      "auditData": {
+        "AppAccessContext": {
+          "AADSessionId": "9a8ad3b5-c288-42d8-916b-56b3a7f4147b",
+          "IssuedAtTime": "2026-10-17T17:17:50",
+          "UniqueTokenId": "u9IAkUXitkuOMpMGN82hAA"
+        },
+        "CreationTime": "2026-10-17T17:25:31",
+        "Id": "5a000000-0000-0000-0000-000000000006",
+        "Operation": "Disable-TransportRule",
+        "OrganizationId": "e75dcc09-5152-44ca-8550-f8f22fa4cfa3",
+        "RecordType": 1,
+        "ResultStatus": "True",
+        "UserKey": "10032000ABCDEF12",
+        "UserType": 2,
+        "Version": 1,
+        "Workload": "Exchange",
+        "ClientIP": "203.0.113.10:13892",
+        "ObjectId": "Block external auto-forwarding",
+        "UserId": "admin@contoso.onmicrosoft.com",
+        "AppId": "",
+        "AppPoolName": "MSExchangeAdminApiNetCore",
+        "ClientAppId": "",
+        "CorrelationID": "",
+        "ExternalAccess": false,
+        "OrganizationName": "contoso.onmicrosoft.com",
+        "OriginatingServer": "AM0PR10MB3218 (15.21.0522.007)",
+        "Parameters": [
+          {
+            "Name": "Identity",
+            "Value": "Block external auto-forwarding"
+          }
+        ],
+        "RequestId": "f524c87b-7c41-4985-a96e-9aa272b076a2",
+        "SessionId": "9a8ad3b5-c288-42d8-916b-56b3a7f4147b",
+        "TokenTenantId": "e75dcc09-5152-44ca-8550-f8f22fa4cfa3"
+      }
+    },
+    "derived-exo-new-transportrule-tenantadmin": {
+      "id": "5a000000-0000-0000-0000-000000000007",
+      "createdDateTime": "10/17/2026 17:25:31Z",
+      "auditLogRecordType": "Exchange",
+      "operation": "New-TransportRule",
+      "organizationId": "e75dcc09-5152-44ca-8550-f8f22fa4cfa3",
+      "userType": 2,
+      "userId": "admin@contoso.onmicrosoft.com",
+      "service": "Exchange",
+      "objectId": "Copy to archive",
+      "userPrincipalName": "admin@contoso.onmicrosoft.com",
+      "clientIp": "203.0.113.10:13892",
+      "administrativeUnits": [],
+      "auditData": {
+        "AppAccessContext": {
+          "AADSessionId": "9a8ad3b5-c288-42d8-916b-56b3a7f4147b",
+          "IssuedAtTime": "2026-10-17T17:17:50",
+          "UniqueTokenId": "u9IAkUXitkuOMpMGN82hAA"
+        },
+        "CreationTime": "2026-10-17T17:25:31",
+        "Id": "5a000000-0000-0000-0000-000000000007",
+        "Operation": "New-TransportRule",
+        "OrganizationId": "e75dcc09-5152-44ca-8550-f8f22fa4cfa3",
+        "RecordType": 1,
+        "ResultStatus": "True",
+        "UserKey": "10032000ABCDEF12",
+        "UserType": 2,
+        "Version": 1,
+        "Workload": "Exchange",
+        "ClientIP": "203.0.113.10:13892",
+        "ObjectId": "Copy to archive",
+        "UserId": "admin@contoso.onmicrosoft.com",
+        "AppId": "",
+        "AppPoolName": "MSExchangeAdminApiNetCore",
+        "ClientAppId": "",
+        "CorrelationID": "",
+        "ExternalAccess": false,
+        "OrganizationName": "contoso.onmicrosoft.com",
+        "OriginatingServer": "AM0PR10MB3218 (15.21.0522.007)",
+        "Parameters": [
+          {
+            "Name": "Name",
+            "Value": "Copy to archive"
+          },
+          {
+            "Name": "BlindCopyTo",
+            "Value": "archive@fabrikam.example"
+          }
+        ],
+        "RequestId": "f524c87b-7c41-4985-a96e-9aa272b076a2",
+        "SessionId": "9a8ad3b5-c288-42d8-916b-56b3a7f4147b",
+        "TokenTenantId": "e75dcc09-5152-44ca-8550-f8f22fa4cfa3"
+      }
+    },
+    "derived-exo-set-transportrule-partner": {
+      "id": "5a000000-0000-0000-0000-000000000008",
+      "createdDateTime": "10/17/2026 17:25:31Z",
+      "auditLogRecordType": "Exchange",
+      "operation": "Set-TransportRule",
+      "organizationId": "e75dcc09-5152-44ca-8550-f8f22fa4cfa3",
+      "userType": 2,
+      "userId": "contoso.onmicrosoft.com\\tenant: 8d6a4ab1-ca4b-4899-b961-c13b1fe0323d, object: ca2a58ac-0202-49db-b889-193fd5ed0bad",
+      "service": "Exchange",
+      "objectId": "Block external auto-forwarding",
+      "userPrincipalName": "contoso.onmicrosoft.com\\tenant: 8d6a4ab1-ca4b-4899-b961-c13b1fe0323d, object: ca2a58ac-0202-49db-b889-193fd5ed0bad",
+      "clientIp": "203.0.113.10:13892",
+      "administrativeUnits": [],
+      "auditData": {
+        "AppAccessContext": {
+          "AADSessionId": "9a8ad3b5-c288-42d8-916b-56b3a7f4147b",
+          "IssuedAtTime": "2026-10-17T17:17:50",
+          "UniqueTokenId": "u9IAkUXitkuOMpMGN82hAA"
+        },
+        "CreationTime": "2026-10-17T17:25:31",
+        "Id": "5a000000-0000-0000-0000-000000000008",
+        "Operation": "Set-TransportRule",
+        "OrganizationId": "e75dcc09-5152-44ca-8550-f8f22fa4cfa3",
+        "RecordType": 1,
+        "ResultStatus": "True",
+        "UserKey": "contoso.onmicrosoft.com\\tenant: 8d6a4ab1-ca4b-4899-b961-c13b1fe0323d, object: ca2a58ac-0202-49db-b889-193fd5ed0bad",
+        "UserType": 2,
+        "Version": 1,
+        "Workload": "Exchange",
+        "ClientIP": "203.0.113.10:13892",
+        "ObjectId": "Block external auto-forwarding",
+        "UserId": "contoso.onmicrosoft.com\\tenant: 8d6a4ab1-ca4b-4899-b961-c13b1fe0323d, object: ca2a58ac-0202-49db-b889-193fd5ed0bad",
+        "AppId": "",
+        "AppPoolName": "MSExchangeAdminApiNetCore",
+        "ClientAppId": "",
+        "CorrelationID": "",
+        "ExternalAccess": false,
+        "OrganizationName": "contoso.onmicrosoft.com",
+        "OriginatingServer": "AM0PR10MB3218 (15.21.0522.007)",
+        "Parameters": [
+          {
+            "Name": "Identity",
+            "Value": "Block external auto-forwarding"
+          },
+          {
+            "Name": "Mode",
+            "Value": "Enforce"
+          }
+        ],
+        "RequestId": "f524c87b-7c41-4985-a96e-9aa272b076a2",
+        "SessionId": "9a8ad3b5-c288-42d8-916b-56b3a7f4147b",
+        "TokenTenantId": "e75dcc09-5152-44ca-8550-f8f22fa4cfa3"
+      }
     }
   },
   "cases": [
@@ -6267,6 +6707,37 @@
       "noTrigger": [
         "aad-pim-permanent-assignment",
         "aad-add-member-to-role"
+      ]
+    },
+    {
+      "preset": "EmailSecurityPolicyChanged",
+      "trigger": [
+        "derived-exo-set-hostedcontentfilterpolicy-tenantadmin"
+      ],
+      "noTrigger": [
+        "derived-exo-set-antiphishpolicy-partner",
+        "derived-exo-set-safelinkspolicy-msservice",
+        "exo-add-rolegroupmember"
+      ]
+    },
+    {
+      "preset": "TenantAllowBlockListChanged",
+      "trigger": [
+        "derived-exo-new-tenantallowblocklistitems-tenantadmin"
+      ],
+      "noTrigger": [
+        "derived-exo-new-tenantallowblocklistitems-partner",
+        "derived-exo-set-hostedcontentfilterpolicy-tenantadmin"
+      ]
+    },
+    {
+      "preset": "TransportRuleChanged",
+      "trigger": [
+        "derived-exo-disable-transportrule-tenantadmin"
+      ],
+      "noTrigger": [
+        "derived-exo-new-transportrule-tenantadmin",
+        "derived-exo-set-transportrule-partner"
       ]
     }
   ]

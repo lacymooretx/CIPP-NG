@@ -219,6 +219,9 @@ function New-CIPPAlertTemplate {
         $ButtonUrl = "$CIPPURL/identity/administration/bec/case?userId=$($data.ObjectId)&tenantFilter=$Tenant"
         $ButtonText = 'User Management'
         $AfterButtonText = '<p>If this is incorrect, use the user management screen to block the user and revoke the sessions</p>'
+        # Aspendora fork addition (Vikunja CIPP-32): $null unless the operation is an email security, TABL or
+        # transport rule cmdlet (see Get-CIPPEmailSecurityChangeContext).
+        $EmailSecurityContext = try { Get-CIPPEmailSecurityChangeContext -Data $Data -Tenant $Tenant } catch { $null }
         switch ($Data.Operation) {
             'New-InboxRule' {
                 # Test if the rule is a forwarding or redirect rule
@@ -387,6 +390,20 @@ function New-CIPPAlertTemplate {
                 $ButtonUrl = "$CIPPURL/identity/administration/bec/case?userId=$($data.Userkey)&tenantFilter=$Tenant"
                 $ButtonText = 'User Management'
                 $AfterButtonText = '<p>If this is incorrect, use the user management screen to block the user and revoke the sessions</p>'
+            }
+            # Aspendora fork addition (Vikunja CIPP-32): email security policy, Tenant Allow/Block List and transport
+            # rule changes get actor, IP, parameters, cached before-values and the standards that manage them.
+            { $null -ne $EmailSecurityContext } {
+                $Title = $EmailSecurityContext.Title
+                $IntroText = $EmailSecurityContext.IntroText
+                if ($ActionResults) { $IntroText = $IntroText + "<p>Based on the rule, the following actions have been taken: $($ActionResults -join '<br/>' )</p>" }
+                if ($LocationInfo) {
+                    $LocationTable = ($LocationInfo | ConvertTo-Html -Fragment -As List | Out-String).Replace('<table>', ' <table class="table-modern">')
+                    $IntroText = $IntroText + "<p>The (potential) location information for this IP is as follows:</p>$LocationTable"
+                }
+                $ButtonUrl = "$CIPPURL/tenant/standards/alignment"
+                $ButtonText = 'Standards'
+                $AfterButtonText = '<p>To undo an unwanted change, re-apply the standard listed above (if any) or edit the policy in CIPP or the Defender portal. CIPP does not revert it automatically.</p>'
             }
             default {
                 $Title = 'A custom alert has occured'

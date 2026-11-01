@@ -1006,6 +1006,51 @@
     ]
   },
   {
+    "name": "SharingBurst",
+    "label": "Alert on lateral OneDrive/SharePoint phishing and mass external sharing from one account",
+    "recommendedRunInterval": "1h",
+    "requiresInput": true,
+    "multipleInput": true,
+    "inputs": [
+      {
+        "inputType": "textField",
+        "inputLabel": "Hours of sharing activity to analyse each run (default: 24, max 168). Findings are de-duplicated, so overlap loses nothing and catches SharePoint audit events that arrive late.",
+        "inputName": "SharingBurstLookbackHours"
+      },
+      {
+        "inputType": "textField",
+        "inputLabel": "Burst: distinct external recipients one account shares with inside the window before alerting (default: 25).",
+        "inputName": "SharingBurstRecipients"
+      },
+      {
+        "inputType": "textField",
+        "inputLabel": "Burst window in minutes (default: 60).",
+        "inputName": "SharingBurstWindowMinutes"
+      },
+      {
+        "inputType": "textField",
+        "inputLabel": "File spread: distinct external recipients one file reaches over the whole lookback, however spaced out (default: 25).",
+        "inputName": "SharingBurstFileRecipients"
+      },
+      {
+        "inputType": "textField",
+        "inputLabel": "Send spread: new external mail recipients in 24 h (against the account's previous 7 days) that mark a mail blast after link creation (default: 25).",
+        "inputName": "SharingBurstSendSpread"
+      },
+      {
+        "inputType": "textField",
+        "inputLabel": "Allow-list: UPNs that share externally in bulk on purpose (e.g. marketing), comma separated.",
+        "inputName": "SharingBurstAllowList"
+      },
+      {
+        "inputType": "textField",
+        "inputLabel": "Maximum new findings to raise per run (default: 10). High severity first; the rest are recorded and logged.",
+        "inputName": "SharingBurstMaxPerCycle"
+      }
+    ],
+    "description": "Watches the unified audit log for one account sharing a file with many external recipients within an hour, one file reaching many outsiders over a day, and sharing links followed by a spike in new external mail recipients. Each finding includes any risky or unfamiliar sign-in in the 24 h before and ready parameters for ExecRemoveSharingLink, ExecBulkRemoveSharingLinks and ExecSetOneDriveSharing. Detection only; see ListSharingBurst."
+  },
+  {
     "name": "BreakGlassActivity",
     "label": "Alert on any sign-in by, or change to, a registered break-glass account",
     "recommendedRunInterval": "30m",

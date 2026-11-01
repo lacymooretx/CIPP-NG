@@ -58,6 +58,8 @@ function Get-CIPPBecScore {
         ForeignSuccessfulSignIns       = [int]($LocationAnalysis.ForeignSuccessfulSignInCount ?? 0)
         ForeignActivity                = [int]($LocationAnalysis.ForeignRuleChangeCount ?? 0) + [int]($LocationAnalysis.ForeignSafelistChangeCount ?? 0) + [int]($LocationAnalysis.ForeignSharingChangeCount ?? 0) + [int]($LocationAnalysis.ForeignSentMessageCount ?? 0)
         AnonymousLinks                 = @($Results.SharingChanges | Where-Object { [string]$_.Operation -like 'AnonymousLink*' }).Count
+        # Aspendora fork addition (Vikunja CIPP-13): lateral phishing by mass external sharing (Get-CIPPSharingBurstFindings)
+        MassSharing                    = @($Results.SharingBursts | Where-Object { $_ }).Count
         MassMail                       = if ($Results.SentMessageAnalysis.Flagged -eq $true) { 1 } else { 0 }
         RecentMfaMethods               = @($Results.MFADevices | Where-Object { & $InWindow $_.createdDateTime }).Count
         RecentIntuneDevices            = @($Results.IntuneDevices | Where-Object { & $InWindow $_.enrolledDateTime }).Count
@@ -100,6 +102,7 @@ function Get-CIPPBecScore {
         ForeignSuccessfulSignIns       = 'Successful sign-ins from outside the usage location'
         ForeignActivity                = 'Rule, safelist, sharing or mail activity from outside the usage location'
         AnonymousLinks                 = 'Anonymous sharing links were created or changed'
+        MassSharing                    = 'A burst of sharing, or one file, reached many external recipients (lateral OneDrive/SharePoint phishing)'
         MassMail                       = 'Mass-mail pattern in sent messages'
         RecentMfaMethods               = 'MFA methods registered in the window'
         RecentIntuneDevices            = 'Intune devices enrolled in the window'
