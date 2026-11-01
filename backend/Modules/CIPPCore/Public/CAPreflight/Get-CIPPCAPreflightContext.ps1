@@ -79,8 +79,16 @@ function Get-CIPPCAPreflightContext {
     $GaUsers = [ordered]@{}
     $GlobalAdminsKnown = $true
     try {
-        foreach ($A in @(& $Get "$Graph/v1.0/roleManagement/directory/roleAssignments?`$filter=roleDefinitionId eq '$GA'&`$expand=principal")) {
-            if ($A.directoryScopeId -and $A.directoryScopeId -ne '/') { continue }
+        # No $expand=principal: one assignment whose principal was deleted makes Graph reject the whole query
+        # ("Resource ... does not exist"), seen in 3endt.com. Resolve principals with getByIds, which skips missing ids.
+        $GaAssignments = @(& $Get "$Graph/v1.0/roleManagement/directory/roleAssignments?`$filter=roleDefinitionId eq '$GA'&`$select=id,principalId,directoryScopeId" | Where-Object { -not $_.directoryScopeId -or $_.directoryScopeId -eq '/' })
+        $GaPrincipalIds = @($GaAssignments.principalId | Where-Object { $_ } | Sort-Object -Unique)
+        $GaPrincipals = @()
+        if ($GaPrincipalIds.Count -gt 0) {
+            $Body = ConvertTo-Json -InputObject @{ ids = $GaPrincipalIds } -Compress
+            $GaPrincipals = @((New-GraphPOSTRequest -tenantid $TenantFilter -uri "$Graph/v1.0/directoryObjects/getByIds?`$select=id,userPrincipalName,displayName" -body $Body -ErrorAction Stop).value)
+        }
+        foreach ($A in @($GaPrincipals | ForEach-Object { [pscustomobject]@{ principal = $_ } })) {
             switch ($A.principal.'@odata.type') {
                 '#microsoft.graph.user' { $GaUsers[[string]$A.principal.id] = $A.principal.userPrincipalName }
                 '#microsoft.graph.group' {

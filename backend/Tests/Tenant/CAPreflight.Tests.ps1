@@ -288,7 +288,8 @@ Describe 'Get-CIPPCAPreflightContext' {
             switch -Regex ($uri) {
                 'userRegistrationDetails' { throw 'Tenant does not have a premium license' }
                 '/authentication/methods' { @([pscustomobject]@{ '@odata.type' = '#microsoft.graph.fido2AuthenticationMethod' }) }
-                'roleAssignments' { @([pscustomobject]@{ directoryScopeId = '/'; principal = [pscustomobject]@{ '@odata.type' = '#microsoft.graph.user'; id = 'admin1'; userPrincipalName = 'admin1@contoso.com' } }) }
+                # A second assignment points at a deleted principal (as in 3endt.com); getByIds skips it.
+                'roleAssignments' { @([pscustomobject]@{ directoryScopeId = '/'; principalId = 'admin1' }, [pscustomobject]@{ directoryScopeId = '/'; principalId = 'deleted1' }) }
                 'transitiveMemberOf' { @([pscustomobject]@{ '@odata.type' = '#microsoft.graph.group'; id = 'bg-group' }) }
                 'directoryAudits' {
                     @([pscustomobject]@{ activityDisplayName = 'Update conditional access policy'; activityDateTime = '2026-10-29T10:00:00Z'
@@ -296,6 +297,12 @@ Describe 'Get-CIPPCAPreflightContext' {
                 }
                 default { throw "unexpected $uri" }
             }
+        }
+        function New-GraphPOSTRequest {
+            [CmdletBinding()] param($uri, $tenantid, $body)
+            $script:Uris.Add($uri)
+            if ($uri -notmatch 'getByIds') { throw "unexpected POST $uri" }
+            [pscustomobject]@{ value = @([pscustomobject]@{ '@odata.type' = '#microsoft.graph.user'; id = 'admin1'; userPrincipalName = 'admin1@contoso.com' }) }
         }
     }
     BeforeEach { $script:Uris = [System.Collections.Generic.List[string]]::new() }
