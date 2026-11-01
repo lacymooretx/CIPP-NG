@@ -391,6 +391,12 @@ export const nativeMenuItems = [
             path: '/security/incidents/list-check-alerts',
             permissions: ['Security.Alert.*'],
           },
+          // Aspendora fork addition (Vikunja CIPP-12): trace one sign-in session across the audit log.
+          {
+            title: 'Session Timeline',
+            path: '/security/incidents/session-timeline',
+            permissions: ['Security.Incident.*'],
+          },
         ],
       },
       {
