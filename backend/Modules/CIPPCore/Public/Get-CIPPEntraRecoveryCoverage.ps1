@@ -49,7 +49,8 @@ function Get-CIPPEntraRecoveryCoverage {
         } catch { return $null }
     }
     function Test-Enabled($Value) { return ($Value -eq $true -or "$Value" -eq 'true') }
-    function New-NameSet { return [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase) }
+    # The leading comma matters: returning an empty HashSet unrolls it to $null.
+    function New-NameSet { , [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase) }
 
     # --- Tenants in scope ---------------------------------------------------------------------------------------
     # Wrapped in @() outside the if: an if-expression unrolls a one-element array.
