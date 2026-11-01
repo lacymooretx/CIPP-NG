@@ -38,7 +38,7 @@ BeforeAll {
     }
 
     function script:Set-Fixture {
-        param($Guests, [bool]$P1 = $true, $Inviters = @{}, $Groups = @{}, [switch]$BulkFails, $Spo = @{ EnableAzureADB2BIntegration = $true; SharingCapability = 'ExternalUserSharingOnly' }, $AllowInvites = 'adminsAndGuestInviters')
+        param($Guests, [bool]$P1 = $true, $Inviters = @{}, $Groups = @{}, [switch]$BulkFails, $Spo = @{ EnableAzureADB2BIntegration = $true; SharingCapability = 1 }, $AllowInvites = 'adminsAndGuestInviters')
         $script:F = @{ Guests = @($Guests); P1 = $P1; Inviters = $Inviters; Groups = $Groups; BulkFails = [bool]$BulkFails; Spo = $Spo; AllowInvites = $AllowInvites }
     }
 }
@@ -161,6 +161,7 @@ Describe 'Get-CIPPGuestInventory' {
         $R.TenantContext.SharePointB2BIntegration | Should -BeTrue
         $R.TenantContext.AllowInvitesFrom | Should -Be 'adminsAndGuestInviters'
         $R.TenantContext.GuestUserRole | Should -Be 'Limited (default)'
+        $R.TenantContext.SharePointSharingCapability | Should -Be 'New and existing guests'
         Should -Invoke New-GraphBulkRequest -Times 0
     }
 }
@@ -174,7 +175,7 @@ Describe 'Get-CIPPGuestReviewReportData' {
             if ($uri -like '*/organization') { return [pscustomobject]@{ displayName = 'Contoso'; verifiedDomains = @(@{ name = 'contoso.com'; isDefault = $true }) } }
         }
         Mock New-GraphBulkRequest { foreach ($R in $Requests) { [pscustomobject]@{ id = $R.id; status = 200; body = [pscustomobject]@{ value = @() } } } }
-        Mock Get-CIPPSPOTenant { [pscustomobject]@{ EnableAzureADB2BIntegration = $false; SharingCapability = 'ExternalUserAndGuestSharing' } }
+        Mock Get-CIPPSPOTenant { [pscustomobject]@{ EnableAzureADB2BIntegration = $false; SharingCapability = 2 } }
     }
 
     It 'orders the cleanup proposal REMOVE, DISABLE, REVIEW with whole rows, and lists kept guests separately' {
@@ -194,6 +195,7 @@ Describe 'Get-CIPPGuestReviewReportData' {
         $Settings = ($M.Sections | Where-Object { $_.Title -eq 'Guest Access Settings' })
         $Settings.Status | Should -Be 'warn'
         $Settings.Rows[0][1] | Should -BeLike 'Off:*'
+        $Settings.Rows[1][1] | Should -Be 'Anyone (anonymous links allowed)'
         @($M.Findings.Title) | Should -Contain 'Anyone can invite guests'
         @($M.Findings.Title) | Should -Contain 'Guests to remove'
     }

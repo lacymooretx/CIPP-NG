@@ -165,7 +165,14 @@ function Get-CIPPGuestInventory {
         try {
             $Spo = Get-CIPPSPOTenant -TenantFilter $TenantFilter | Select-Object -First 1
             $Context.SharePointB2BIntegration = $Spo.EnableAzureADB2BIntegration
-            $Context.SharePointSharingCapability = [string]$Spo.SharingCapability
+            # CSOM returns the SharingCapabilities enum as a number.
+            $Context.SharePointSharingCapability = switch ([string]$Spo.SharingCapability) {
+                { $_ -in '0', 'Disabled' } { 'Disabled (internal only)' }
+                { $_ -in '1', 'ExternalUserSharingOnly' } { 'New and existing guests' }
+                { $_ -in '2', 'ExternalUserAndGuestSharing' } { 'Anyone (anonymous links allowed)' }
+                { $_ -in '3', 'ExistingExternalUserSharingOnly' } { 'Existing guests only' }
+                default { [string]$Spo.SharingCapability }
+            }
         } catch {
             $Errors.Add("SharePoint tenant settings: $((Get-CippException -Exception $_).NormalizedError)")
         }

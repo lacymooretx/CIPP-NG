@@ -83,7 +83,7 @@ function Get-CIPPGuestReviewReportData {
     $Settings.Add(@('Who can invite guests', $(if ($C.AllowInvitesFrom) { [string]$C.AllowInvitesFrom } else { 'Unknown' })))
     $Settings.Add(@('Guest directory permissions', $(if ($C.GuestUserRole) { [string]$C.GuestUserRole } else { 'Unknown' })))
     $Settings.Add(@('Guest sign-in activity', $(if ($SignIn) { 'Available' } else { 'Not available: requires Entra ID P1' })))
-    $InviteStatus = if ($C.AllowInvitesFrom -eq 'everyone') { 'warn' } else { 'pass' }
+    $InviteStatus = if ($C.AllowInvitesFrom -eq 'everyone' -or $C.SharePointSharingCapability -like 'Anyone*') { 'warn' } else { 'pass' }
     Add-Section 'Guest Access Settings' $InviteStatus 'Tenant settings that decide how guests are created and what they can see.' @('Setting', 'Value') $Settings $null
 
     $Summary = New-RowList
