@@ -40242,6 +40242,79 @@
         "x-cipp-any-tenant": true
       }
     },
+    "/api/ExecSessionTimelineSearch": {
+      "post": {
+        "summary": "Start a Unified Audit Log search to trace everything one Entra sign-in session did",
+        "operationId": "ExecSessionTimelineSearch",
+        "tags": [
+          "Security > Incidents"
+        ],
+        "description": "Takes the sessionId from a suspicious Entra sign-in, reads the session's sign-ins to find the user and when the\nsession was used, and starts a Graph audit log search (security/auditLog/queries) for that user and window over\nExchange, SharePoint, OneDrive, Teams and Entra logon records. Returns the query id; poll ListSessionTimeline with\nit to get the timeline once Microsoft finishes the search (usually 5-20 minutes). Creates a search only; changes\nno tenant configuration. Aspendora fork addition (Vikunja CIPP-12).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "endTime": {
+                    "type": "string",
+                    "description": "Optional window end: ISO 8601 or Unix seconds. Defaults to 2 hours after the session's last sign-in."
+                  },
+                  "sessionId": {
+                    "type": "string",
+                    "description": "The sessionId (GUID) from an Entra sign-in log entry."
+                  },
+                  "startTime": {
+                    "type": "string",
+                    "description": "Optional window start: ISO 8601 or Unix seconds. Defaults to 15 minutes before the session's first sign-in."
+                  },
+                  "tenantFilter": {
+                    "type": "string",
+                    "description": "The tenant the session belongs to. AllTenants is not supported."
+                  },
+                  "userPrincipalName": {
+                    "allOf": [
+                      {
+                        "$ref": "#/components/schemas/LabelValue"
+                      }
+                    ],
+                    "description": "Optional user principal name to scope the search to. Defaults to the user on the session's sign-ins."
+                  }
+                },
+                "required": [
+                  "tenantFilter"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardResults"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cipp-role": "Security.Incident.ReadWrite"
+      }
+    },
     "/api/ExecSetAPDeviceGroupTag": {
       "post": {
         "summary": "ExecSetAPDeviceGroupTag",
@@ -66104,6 +66177,54 @@
         "x-cipp-role": "CIPP.Alert.Read"
       }
     },
+    "/api/ListPersonalDevices": {
+      "get": {
+        "summary": "Personally owned Intune devices with each tenant's BYOD enrollment controls",
+        "operationId": "ListPersonalDevices",
+        "tags": [
+          "Endpoint > Reports"
+        ],
+        "description": "Read only. Lists managed devices whose owner type is personal (device, OS, user, enrolled date, last sync,\nenrollment and join type, compliance, and whether a Windows device was Entra registered by adding a work account),\nplus a per-tenant summary with personalDeviceEnrollmentBlocked per platform from the default platform restriction\nand the \"Disable MDM enrollment when adding work or school account\" setting (isMdmEnrollmentDuringRegistrationDisabled).\nA single tenant is read live; AllTenants is read from the CIPP reporting cache. Aspendora fork addition (Vikunja CIPP-21).",
+        "parameters": [
+          {
+            "name": "newDays",
+            "in": "query",
+            "description": "Devices enrolled within this many days are flagged as new. Defaults to 30.",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/tenantFilter"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardResults"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cipp-role": "Endpoint.Device.Read"
+      }
+    },
     "/api/ListPerUserMFA": {
       "get": {
         "summary": "ListPerUserMFA",
@@ -70026,6 +70147,81 @@
         "x-cipp-role": "Tenant.Administration.Read"
       }
     },
+    "/api/ListSessionTimeline": {
+      "get": {
+        "summary": "Timeline of everything one Entra sign-in session did, or a user's recent sessions to pick from",
+        "operationId": "ListSessionTimeline",
+        "tags": [
+          "Security > Incidents"
+        ],
+        "description": "Read only. With queryId and sessionId: polls the audit log search started by ExecSessionTimelineSearch. While\nMicrosoft is still running it, returns Ready = false and the status. Once finished, returns the session's sign-ins\nand every Exchange, SharePoint, OneDrive, Teams and Entra logon audit record whose AADSessionId, SessionId, device\nSessionId or UniqueTokenId matches the session, as one timeline in US Central with UTC alongside (workload,\noperation, object as message id / folder path or file path - never mail subjects - client IP, user agent, how it\nmatched), plus counts per workload and operation, per IP, and highlights (mails read and sent, files accessed and\ndownloaded, shares created, inbox rules changed, ...).\nWith userPrincipalName instead: lists the user's interactive sign-in sessions in the last days (default 7) with\nfirst/last sign-in, IPs, countries and apps, so the suspicious one can be picked.\nGraph activity logs are not included (they need Log Analytics). Aspendora fork addition (Vikunja CIPP-12).",
+        "parameters": [
+          {
+            "name": "days",
+            "in": "query",
+            "description": "Days back for the recent-session list, 1 to 30. Defaults to 7.",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "queryId",
+            "in": "query",
+            "description": "The audit log query id returned by ExecSessionTimelineSearch.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sessionId",
+            "in": "query",
+            "description": "The sign-in sessionId (GUID) being traced. Required with queryId.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/tenantFilter"
+          },
+          {
+            "name": "userPrincipalName",
+            "in": "query",
+            "description": "List this user's recent sessions instead of a timeline (UPN or object id).",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardResults"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cipp-role": "Security.Incident.Read"
+      }
+    },
     "/api/ListShadowAI": {
       "get": {
         "summary": "ListShadowAI",
@@ -73389,6 +73585,81 @@
           }
         ],
         "x-cipp-role": "Teams.Activity.Read"
+      }
+    },
+    "/api/ListTeamsFileResolution": {
+      "get": {
+        "summary": "Resolves a Teams chat or channel file to its real storage location and permissions, and suggests the smallest fix",
+        "operationId": "ListTeamsFileResolution",
+        "tags": [
+          "Teams-Sharepoint"
+        ],
+        "description": "Read only, single tenant. Give url (a Teams file link, a SharePoint / OneDrive sharing link or a direct file URL),\nor userPrincipalName plus fileName to search that user's OneDrive \"Microsoft Teams Chat Files\" folder and their\nteams' libraries (bounded: 25 teams, 25 candidates). Returns where the file really lives (the uploader's OneDrive\nfor chat files, the team site for standard channels, a separate site for private and shared channels), the\nsite and drive URLs, owner and item path, every permission on the item (sharing-link scope, never the link URL),\nand, with affectedUser, whether that user is covered and how, team versus channel membership, the teams a shared\nchannel is shared with, external (other-tenant) shared-channel members with the B2B direct connect inbound\nsetting for their tenant, and a plain-English most likely cause with the smallest fix and a link to the CIPP\npage that applies it. Changes nothing. Aspendora fork addition (Vikunja CIPP-33).",
+        "parameters": [
+          {
+            "name": "affectedUser",
+            "in": "query",
+            "description": "Optional. The user who cannot open the file (UPN or object ID); their access is checked and drives the suggested fix.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "fileName",
+            "in": "query",
+            "description": "Search mode, with userPrincipalName: all or part of the file name.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/tenantFilter"
+          },
+          {
+            "name": "url",
+            "in": "query",
+            "description": "The file link: a Teams file link (teams.microsoft.com/l/file/...), a sharing link, or the file's browser URL.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "userPrincipalName",
+            "in": "query",
+            "description": "Search mode, with fileName: the user whose chat files and teams are searched. For a chat file, give the sender.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardResults"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cipp-role": "Sharepoint.Site.Read"
       }
     },
     "/api/ListTeamsLisLocation": {
