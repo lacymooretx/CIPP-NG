@@ -287,6 +287,7 @@
       * [Deploy Assignment Filter Template](user-documentation/endpoint/mem/assignment-filter-templates/deploy.md)
     * [Scripts](user-documentation/endpoint/mem/list-scripts.md)
     * [MAA Requests](user-documentation/endpoint/mem/approval-requests.md)
+    * [Driver Updates](user-documentation/endpoint/mem/driver-updates.md)
   * [Reports](user-documentation/endpoint/reports/README.md)
     * [Analytics Device Score](user-documentation/endpoint/reports/analyticsdevicescore.md)
     * [Work from Anywhere](user-documentation/endpoint/reports/work-from-anywhere.md)
