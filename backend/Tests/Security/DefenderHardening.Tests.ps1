@@ -138,7 +138,7 @@ Describe 'Get-CIPPIntunePolicyAssignmentState' {
 Describe 'Resolve-CIPPAsrRuleModes' {
     BeforeAll {
         function PR { param($Name, $Assigned, [object[]]$Rules) [pscustomobject]@{ PolicyId = $Name; PolicyName = $Name; Assigned = $Assigned; AssignmentLabel = 'All Devices'; Rules = $Rules } }
-        function R { param($SettingName, $Mode) [pscustomobject]@{ SettingName = $SettingName; RuleId = ''; Name = $SettingName; Mode = $Mode; ExclusionCount = 0 } }
+        function NewAsrRuleRow { param($SettingName, $Mode) [pscustomobject]@{ SettingName = $SettingName; RuleId = ''; Name = $SettingName; Mode = $Mode; ExclusionCount = 0 } }
     }
     It 'returns a row for every catalog rule, NotConfigured when nothing sets it' {
         $Rows = @(Resolve-CIPPAsrRuleModes -PolicyRules @())
@@ -146,21 +146,21 @@ Describe 'Resolve-CIPPAsrRuleModes' {
         @($Rows.EffectiveMode | Sort-Object -Unique) | Should -Be @('NotConfigured')
     }
     It 'ignores unassigned policies but lists them' {
-        $Rows = Resolve-CIPPAsrRuleModes -PolicyRules @((PR 'Old' $false @(R 'blockrebootingmachineinsafemode' 'Block')))
+        $Rows = Resolve-CIPPAsrRuleModes -PolicyRules @((PR 'Old' $false @(NewAsrRuleRow 'blockrebootingmachineinsafemode' 'Block')))
         $Row = $Rows | Where-Object SettingName -EQ 'blockrebootingmachineinsafemode'
         $Row.EffectiveMode | Should -Be 'NotConfigured'
         $Row.UnassignedPolicies | Should -Match 'Old: Block'
     }
     It 'agrees when assigned policies agree and flags Conflict when they differ' {
         $Rows = Resolve-CIPPAsrRuleModes -PolicyRules @(
-            (PR 'A' $true @((R 'blockrebootingmachineinsafemode' 'Audit'), (R 'blockwebshellcreationforservers' 'Block')))
-            (PR 'B' $true @((R 'blockrebootingmachineinsafemode' 'Audit'), (R 'blockwebshellcreationforservers' 'Audit')))
+            (PR 'A' $true @((NewAsrRuleRow 'blockrebootingmachineinsafemode' 'Audit'), (NewAsrRuleRow 'blockwebshellcreationforservers' 'Block')))
+            (PR 'B' $true @((NewAsrRuleRow 'blockrebootingmachineinsafemode' 'Audit'), (NewAsrRuleRow 'blockwebshellcreationforservers' 'Audit')))
         )
         ($Rows | Where-Object SettingName -EQ 'blockrebootingmachineinsafemode').EffectiveMode | Should -Be 'Audit'
         ($Rows | Where-Object SettingName -EQ 'blockwebshellcreationforservers').EffectiveMode | Should -Be 'Conflict'
     }
     It 'keeps rules the catalog does not know' {
-        $Rows = @(Resolve-CIPPAsrRuleModes -PolicyRules @((PR 'A' $true @(R 'brandnewrule' 'Audit'))))
+        $Rows = @(Resolve-CIPPAsrRuleModes -PolicyRules @((PR 'A' $true @(NewAsrRuleRow 'brandnewrule' 'Audit'))))
         $Rows.Count | Should -Be 20
         ($Rows | Where-Object SettingName -EQ 'brandnewrule').EffectiveMode | Should -Be 'Audit'
     }
