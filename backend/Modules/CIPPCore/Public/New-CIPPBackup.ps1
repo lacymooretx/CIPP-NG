@@ -184,6 +184,26 @@ function New-CIPPBackup {
             $entity['TenantFilter'] = $TenantFilter
         }
 
+        # Aspendora fork addition (Vikunja CIPP-23): integrity manifest. SHA-256 of the file, SHA-256 per
+        # item and item counts per type, written next to the backup blob and summarised on the row so
+        # ExecBackupVerify can prove the backup is complete. Best effort: a failure here never fails the backup.
+        try {
+            $Manifest = New-CIPPBackupManifest -BackupJson $BackupData
+            $ManifestJson = ConvertTo-Json -InputObject $Manifest -Depth 20 -Compress
+            $ManifestBlobName = "$RowKey.manifest.json"
+            $ManifestResource = "$ContainerName/$ManifestBlobName"
+            $null = New-CIPPAzStorageRequest -Service 'blob' -Resource $ManifestResource -Method 'PUT' -ContentType 'application/json; charset=utf-8' -Body $ManifestJson -ConnectionString $ConnectionString
+            $entity['HashVersion'] = [int]$Manifest.HashVersion
+            $entity['BackupSha256'] = [string]$Manifest.BackupSha256
+            $entity['ManifestBlob'] = $ManifestResource
+            $entity['ManifestSha256'] = Get-CIPPBackupSha256 -Text $ManifestJson
+            $entity['ItemCounts'] = [string](ConvertTo-Json -InputObject $Manifest.ItemCounts -Compress)
+            Push-CIPPBackupReplication -BackupType $ReplType -BlobName $ManifestBlobName -Content $ManifestJson -Headers $Headers
+        } catch {
+            $ErrorMessage = Get-CippException -Exception $_
+            Write-LogMessage -headers $Headers -API $APINAME -message "Backup $RowKey was saved but its integrity manifest could not be written: $($ErrorMessage.NormalizedError)" -Sev 'Warning' -LogData $ErrorMessage
+        }
+
         $Table = Get-CippTable -tablename $TableName
         try {
             if ($PSCmdlet.ShouldProcess("$backupType Backup", 'Create')) {
