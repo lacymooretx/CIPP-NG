@@ -1164,8 +1164,13 @@
     "inputs": [
       {
         "inputType": "textField",
-        "inputLabel": "Allow-list: comma-separated appIds or app names (* wildcards allowed, e.g. Backup Application *). Supports custom variables like %oauthallowlist%.",
+        "inputLabel": "Fleet-wide allow-list (every tenant): comma-separated appIds or app names (* wildcards allowed, e.g. Backup Application *). Supports custom variables like %oauthallowlist%.",
         "inputName": "OAuthRiskAllowList"
+      },
+      {
+        "inputType": "textField",
+        "inputLabel": "Tenant-specific allow-list: entries written tenant|appId-or-name, separated by commas (e.g. aspendora.com|e0476654-c1d5-430b-ab80-70cbd947616a). Applies only to that tenant, so an app vetted for one client still alerts everywhere else.",
+        "inputName": "OAuthRiskTenantAllowList"
       }
     ],
     "description": "Daily live scan of every app's OAuth grants (ListOAuthGrantRisk). Raises apps scored Critical (app-only mailbox, file or directory access with no user signed in) or High (tenant-wide risky delegated consent, unverified publisher), and any AI connector with mail, files or sites scopes, unless allow-listed. Each app notifies once per scope set and resolves when the grant is removed. Includes blast radius and a suggested action (disable the service principal first: it keeps the config)."

@@ -8,6 +8,7 @@ BeforeAll {
     function Get-CippException { param($Exception) @{ NormalizedError = "$($Exception.Exception.Message)" } }
     function Write-LogMessage { param($API, $tenant, $message, $sev) $script:Logs.Add($message) }
     function Write-AlertTrace { param($cmdletName, $tenantFilter, $data) $script:Traced++; $script:Data = @($data); $data }
+    function Get-Tenants { param($TenantFilter) [pscustomobject]@{ defaultDomainName = $TenantFilter; customerId = '11111111-2222-3333-4444-555555555555' } }
 
     function script:New-App {
         param($Name, $Risk, $High = @(), $Data = @(), $Ai = $null, [bool]$Microsoft = $false, $Score = 100)
@@ -50,6 +51,21 @@ Describe 'Get-CIPPAlertOAuthHighRiskGrant' {
         $R.App | Should -Be @('Otter Notes')
         $R = @(Get-CIPPAlertOAuthHighRiskGrant -TenantFilter 'contoso.com' -InputValue @{ OAuthRiskAllowList = 'otter notes' })
         $R.App | Should -Be @('Backup Application 1234', 'Evil Mail Reader')
+    }
+
+    It 'applies tenant-specific entries only to that tenant (domain or tenant id)' {
+        $In = @{ OAuthRiskAllowList = 'Backup Application *'; OAuthRiskTenantAllowList = 'contoso.com|id-EvilMailReader, fabrikam.com|Otter Notes' }
+        @(Get-CIPPAlertOAuthHighRiskGrant -TenantFilter 'contoso.com' -InputValue $In).App | Should -Be @('Otter Notes')
+        @(Get-CIPPAlertOAuthHighRiskGrant -TenantFilter 'fabrikam.com' -InputValue $In).App | Should -Be @('Evil Mail Reader')
+        @(Get-CIPPAlertOAuthHighRiskGrant -TenantFilter 'other.com' -InputValue $In).App | Should -Be @('Evil Mail Reader', 'Otter Notes')
+        $ById = @{ OAuthRiskTenantAllowList = "11111111-2222-3333-4444-555555555555|Evil *`nCONTOSO.COM|otter notes" }
+        @(Get-CIPPAlertOAuthHighRiskGrant -TenantFilter 'contoso.com' -InputValue $ById).App | Should -Be @('Backup Application 1234')
+    }
+
+    It 'scopes a tenant|entry found in the fleet-wide list, and ignores malformed entries' {
+        $In = @{ OAuthRiskAllowList = 'Backup Application *, fabrikam.com|id-EvilMailReader, |Otter Notes, contoso.com|' }
+        @(Get-CIPPAlertOAuthHighRiskGrant -TenantFilter 'contoso.com' -InputValue $In).App | Should -Be @('Evil Mail Reader', 'Otter Notes')
+        @(Get-CIPPAlertOAuthHighRiskGrant -TenantFilter 'fabrikam.com' -InputValue $In).App | Should -Be @('Otter Notes')
     }
 
     It 'keys each row on appId plus scope set, so a new scope notifies again' {
