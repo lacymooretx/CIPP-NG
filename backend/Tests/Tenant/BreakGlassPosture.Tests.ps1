@@ -3,6 +3,7 @@
 BeforeAll {
     $RepoRoot = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $PSCommandPath))
     . (Join-Path $RepoRoot 'Modules/CIPPCore/Public/BreakGlass/Test-CIPPBreakGlassPosture.ps1')
+    . (Join-Path $RepoRoot 'Modules/CIPPCore/Public/CAPreflight/Test-CIPPCAPolicyUserScope.ps1')
     $script:Now = [datetime]::new(2026, 10, 31, 12, 0, 0, [DateTimeKind]::Utc)
     $script:GA = '62e90394-69f5-4237-9190-012177145e10'
     function Good {

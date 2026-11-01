@@ -14,10 +14,16 @@ function Invoke-AddCAPolicy {
     $Tenants = $Request.body.tenantFilter.value
     if ('AllTenants' -in $Tenants) { $Tenants = (Get-Tenants).defaultDomainName }
 
+    # Aspendora fork addition (Vikunja CIPP-5): a policy that ends up On must pass the lockout pre-flight,
+    # per tenant, unless the operator ticked the override (logged by Resolve-CIPPCAPreflightGate).
+    $PreflightOverride = $Request.Body.PreflightOverride -eq $true
+
     $Failed = 0
     $results = foreach ($Tenant in $tenants) {
         try {
             $NewCAPolicy = @{
+                Preflight         = 'Enforce'
+                PreflightOverride = $PreflightOverride
                 replacePattern = $Request.Body.replacename
                 Overwrite      = $Request.Body.overwrite
                 TenantFilter   = $Tenant

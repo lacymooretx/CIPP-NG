@@ -46,6 +46,36 @@ function Invoke-ExecEditCAPolicyFull {
         Format-CIPPCAPolicy -Policy $PolicyObject
         $RawJSON = ConvertTo-Json -InputObject $PolicyObject -Depth 20 -Compress
 
+        # Aspendora fork addition (Vikunja CIPP-5): a save that leaves the policy On (state set to enabled, or
+        # omitted on an already-enabled policy - an edit of an enforced policy, the 2026-10-07 class of mistake)
+        # must pass the lockout pre-flight unless the operator ticked the override.
+        $PreflightOverride = $Request.Body.PreflightOverride -eq $true
+        $ExistingPolicy = $null
+        $TargetState = $PolicyObject.state
+        if (-not $TargetState) {
+            $ExistingPolicy = New-GraphGetRequest -uri "https://graph.microsoft.com/beta/identity/conditionalAccess/policies/$PolicyId" -tenantid $TenantFilter -ErrorAction Stop
+            $TargetState = $ExistingPolicy.state
+        }
+        if ($TargetState -eq 'enabled') {
+            $Gate = $null
+            try {
+                $Preflight = Invoke-CIPPCAPreflight -TenantFilter $TenantFilter -PolicyId $PolicyId -Policy $PolicyObject -ExistingPolicy $ExistingPolicy -Headers $Headers
+                $Gate = Resolve-CIPPCAPreflightGate -Result $Preflight -Mode 'Enforce' -Override $PreflightOverride -Headers $Headers -APIName $APIName -TenantFilter $TenantFilter
+            } catch {
+                $PreflightError = (Get-CippException -Exception $_).NormalizedError
+                if (-not $PreflightOverride) {
+                    $Blocked = "Blocked: the CA pre-flight check could not run for policy $PolicyId ($PreflightError). Re-submit with the pre-flight override ticked to proceed; the override is logged."
+                    Write-LogMessage -API $APIName -tenant $TenantFilter -headers $Headers -message $Blocked -sev Warning
+                    return [HttpResponseContext]@{ StatusCode = [HttpStatusCode]::Conflict; Body = @{ Results = $Blocked } }
+                }
+                Write-LogMessage -API $APIName -tenant $TenantFilter -headers $Headers -message "CA pre-flight could not run for policy $PolicyId ($PreflightError); saving because the override was ticked." -sev Warning
+            }
+            if ($Gate -and -not $Gate.Allowed) {
+                Write-LogMessage -API $APIName -tenant $TenantFilter -headers $Headers -message $Gate.Message -sev Warning
+                return [HttpResponseContext]@{ StatusCode = [HttpStatusCode]::Conflict; Body = @{ Results = $Gate.Message; Preflight = $Gate.Preflight } }
+            }
+        }
+
         $null = New-GraphPOSTRequest `
             -uri "https://graph.microsoft.com/beta/identity/conditionalAccess/policies/$PolicyId" `
             -tenantid $TenantFilter `

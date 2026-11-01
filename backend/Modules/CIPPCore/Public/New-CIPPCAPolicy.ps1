@@ -17,7 +17,14 @@ function New-CIPPCAPolicy {
         $PreloadedServicePrincipals = $null,
         $PreloadedUsers = $null,
         $PreloadedGroups = $null,
-        $PreloadedVacationGroups = $null
+        $PreloadedVacationGroups = $null,
+        # Aspendora fork addition (Vikunja CIPP-5): lockout pre-flight when the policy will end up On.
+        # Off (default, every caller that does not opt in): no check, behaviour unchanged.
+        # Warn (standards/drift): check and log a warning, never block.
+        # Enforce (interactive HTTP writes): block unless PreflightOverride is true.
+        [ValidateSet('Off', 'Warn', 'Enforce')][string]$Preflight = 'Off',
+        [bool]$PreflightOverride = $false,
+        [int]$PreflightDays = 7
     )
 
     # Helper function to replace group display names with GUIDs
@@ -649,6 +656,39 @@ function New-CIPPCAPolicy {
     }
     $RawJSON = ConvertTo-Json -InputObject $JSONobj -Depth 10 -Compress
     Write-Information $RawJSON
+
+    # Aspendora fork addition (Vikunja CIPP-5): pre-flight before a policy ends up On. Runs on the resolved
+    # body (ids, not names). Outside the try below, so a block is not re-logged as a Graph failure.
+    if ($Preflight -ne 'Off') {
+        $PreflightExisting = @($AllExistingPolicies | Where-Object -Property displayName -EQ $displayName) | Select-Object -First 1
+        $EffectiveState = if ($State -eq 'donotchange' -and $PreflightExisting) { $PreflightExisting.state } else { $JSONobj.state }
+        $RunPreflight = $EffectiveState -eq 'enabled' -and (-not $PreflightExisting -or $Overwrite -eq $true)
+        if ($RunPreflight -and $Preflight -eq 'Warn' -and $PreflightExisting.state -eq 'enabled') {
+            # Scheduled re-deploy of an already-enforced policy: only check when an exclusion that exists today would be
+            # dropped (the 2026-10-07 class of mistake), so standards do not re-run the collector every cycle for nothing.
+            $Dropped = foreach ($Prop in 'excludeUsers', 'excludeGroups', 'excludeRoles') {
+                @($PreflightExisting.conditions.users.$Prop | Where-Object { $_ -and $_ -notin @($JSONobj.conditions.users.$Prop) })
+            }
+            $RunPreflight = @($Dropped | Where-Object { $_ }).Count -gt 0
+        }
+        if ($RunPreflight) {
+            $Gate = $null
+            try {
+                $PreflightMode = if ($Preflight -eq 'Enforce') { 'Enforce' } else { 'Warn' }
+                $PreflightResult = Invoke-CIPPCAPreflight -TenantFilter $TenantFilter -Policy $JSONobj -ExistingPolicy $PreflightExisting -ExistingKnown -Headers $Headers -RequiredDays $PreflightDays -SkipSignIns:($Preflight -eq 'Warn')
+                $Gate = Resolve-CIPPCAPreflightGate -Result $PreflightResult -Mode $PreflightMode -Override $PreflightOverride -Headers $Headers -APIName $APIName -TenantFilter $TenantFilter
+            } catch {
+                $PreflightError = (Get-CippException -Exception $_).NormalizedError
+                if ($Preflight -eq 'Enforce' -and -not $PreflightOverride) {
+                    throw [System.InvalidOperationException]::new("Blocked: the CA pre-flight check could not run for '$displayName' ($PreflightError). Re-submit with the pre-flight override ticked (PreflightOverride=true) to proceed; the override is logged.")
+                }
+                $Continuing = if ($PreflightOverride) { 'continuing because the pre-flight override was ticked' } else { 'continuing (warning only)' }
+                Write-LogMessage -Headers $Headers -API $APIName -tenant $TenantFilter -message "CA pre-flight could not run for '$displayName' ($PreflightError); $Continuing." -Sev 'Warning'
+            }
+            if ($Gate -and -not $Gate.Allowed) { throw [System.InvalidOperationException]::new($Gate.Message) }
+        }
+    }
+
     try {
         Write-Information 'Checking for existing policies'
         # Use cached policies from the beginning

@@ -288,6 +288,8 @@ function Invoke-CIPPCATemplateBatch {
                 PreloadedUsers             = $PreloadedUsers
                 PreloadedGroups            = $PreloadedGroups
                 PreloadedVacationGroups    = $PreloadedVacationGroups
+                # Aspendora fork addition (Vikunja CIPP-5): pre-flight is warning-only on the scheduled path, never a block.
+                Preflight                  = 'Warn'
             }
             $null = New-CIPPCAPolicy @NewCAPolicy
             $RemediatedAny = $true

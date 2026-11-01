@@ -102,6 +102,8 @@ function Invoke-CIPPStandardConditionalAccessTemplate {
                 PreloadedCAPolicies       = $AllCAPolicies
                 PreloadedLocations        = $PreloadedLocations
                 PreloadedSecurityDefaults = $PreloadedSecurityDefaults
+                # Aspendora fork addition (Vikunja CIPP-5): pre-flight is warning-only on the scheduled path, never a block.
+                Preflight                 = 'Warn'
             }
 
             $null = New-CIPPCAPolicy @NewCAPolicy

@@ -7,6 +7,7 @@ import { CippCADeployDrawer } from "../../../../components/CippComponents/CippCA
 import { CippApiLogsDrawer } from "../../../../components/CippComponents/CippApiLogsDrawer";
 import { CippCAPolicyCoverageDrawer } from "../../../../components/CippComponents/CippCAPolicyCoverageDrawer";
 import { CippCAPolicyImpactDrawer } from "../../../../components/CippComponents/CippCAPolicyImpactDrawer";
+import { CippCAPreflightDrawer } from "../../../../components/CippComponents/CippCAPreflightDrawer";
 import { PermissionButton } from "../../../../utils/permissions";
 import { useSettings } from "../../../../hooks/use-settings.js";
 
@@ -107,6 +108,27 @@ const Page = () => {
       ],
     },
     {
+      // Aspendora fork addition (Vikunja CIPP-5): pre-flight lockout check with a gated Enable button.
+      label: "Run pre-flight",
+      icon: <CippIcons.FactCheck />,
+      color: "info",
+      hideBulk: true,
+      multiPost: false,
+      customComponent: (row, { drawerVisible, setDrawerVisible }) => {
+        const policy = Array.isArray(row) ? row[0] : row;
+        return (
+          <CippCAPreflightDrawer
+            policyId={policy?.id}
+            policyName={policy?.displayName}
+            policyState={policy?.state}
+            tenantFilter={policy?.Tenant || tenant}
+            visible={!!drawerVisible}
+            onClose={() => setDrawerVisible(false)}
+          />
+        );
+      },
+    },
+    {
       label: "Enable Policy",
       type: "POST",
       url: "/api/EditCAPolicy",
@@ -114,7 +136,16 @@ const Page = () => {
         GUID: "id",
         State: "!Enabled",
       },
-      confirmText: `Are you sure you want to enable "[displayName]"?`,
+      // Aspendora fork (Vikunja CIPP-5): the backend runs the pre-flight and refuses (409) a failing
+      // policy unless the override is ticked. Use "Run pre-flight" to see the checks first.
+      confirmText: `Enable "[displayName]"? CIPP runs the lockout pre-flight first (break-glass excluded, a Global Admin can still sign in, What-If, 7 days in report-only) and refuses if it fails. Use "Run pre-flight" to see the checks.`,
+      fields: [
+        {
+          type: "switch",
+          name: "PreflightOverride",
+          label: "Override a failed pre-flight (logged with your name)",
+        },
+      ],
       condition: (row) => row.state !== "enabled",
       icon: <CippIcons.Check />,
       color: "info",
