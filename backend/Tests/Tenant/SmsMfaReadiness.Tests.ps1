@@ -187,3 +187,280 @@ Describe 'Get-CIPPAlertSmsMfaReliance' {
         (Get-LifecycleState 'Get-CIPPAlertSmsMfaReliance')['PhoneOnlyUsers'] | Should -Be 'Open'
     }
 }
+
+# Aspendora fork (Vikunja CIPP-46): Microsoft-provided SMS/voice retirement - date bucketing, policy parsing, alert.
+# Policy shapes copied from live beta authenticationMethodsPolicy reads (3endt.com, aspendora.com, 2026-11-01);
+# guest identity shapes from a live v1.0 users read (3endt.com, 2026-11-01). No real names.
+Describe 'Test-CIPPSmsMfaReadiness retirement dates' {
+    BeforeAll {
+        # 2026-11-01 12:00 UTC = 06:00 CST (DST ended 02:00 CDT that morning).
+        $script:Now = [datetime]::SpecifyKind([datetime]'2026-11-01T12:00:00', 'Utc')
+        function Ext {
+            param($Id, $Type = 'Guest', $Issuer = 'ExternalAzureAD', $State = 'Accepted', $Creation = 'Invitation')
+            [pscustomobject]@{ id = $Id; accountEnabled = $true; userType = $Type; assignedLicenses = @(); userPrincipalName = "$($Id)_fabrikam.com#EXT#@contoso.onmicrosoft.com"
+                creationType = $Creation; externalUserState = $State
+                identities = @([pscustomobject]@{ signInType = 'federated'; issuer = $Issuer }, [pscustomobject]@{ signInType = 'userPrincipalName'; issuer = 'contoso.onmicrosoft.com' })
+            }
+        }
+        function IntGuest {
+            param($Id)
+            [pscustomobject]@{ id = $Id; accountEnabled = $true; userType = 'Guest'; assignedLicenses = @(); userPrincipalName = "$Id@contoso.com"
+                creationType = $null; externalUserState = $null; identities = @([pscustomobject]@{ signInType = 'userPrincipalName'; issuer = 'contoso.onmicrosoft.com' })
+            }
+        }
+        function Eval {
+            param($Regs, $Users, $Ga = @(), $GaEligible, $Policy = (Policy), $NowUtc = $script:Now)
+            $P = @{ Registrations = $Regs; Users = $Users; Policy = $Policy; NowUtc = $NowUtc }
+            if ($null -ne $Ga) { $P.GlobalAdminIds = $Ga }
+            if ($null -ne $GaEligible) { $P.GlobalAdminEligibleIds = $GaEligible }
+            Test-CIPPSmsMfaReadiness @P
+        }
+    }
+
+    It 'dates a member February, an active Global Admin July, and leaves CIPP-6 counts alone' {
+        $R = Eval -Regs @((Reg 'mem' @('mobilePhone')), (Reg 'ga' @('mobilePhone') -Admin)) -Users @((User 'mem'), (User 'ga')) -Ga @('GA')
+        ($R.Users | Where-Object Id -EQ 'mem').RetirementDate | Should -Be '2027-02-01'
+        ($R.Users | Where-Object Id -EQ 'mem').RetirementBasis | Should -Be 'Member'
+        ($R.Users | Where-Object Id -EQ 'ga').RetirementDate | Should -Be '2027-07-01' # id match is case-insensitive
+        ($R.Users | Where-Object Id -EQ 'ga').IsGlobalAdmin | Should -BeTrue
+        $R.Summary.RetirementFebruary2027 | Should -Be 1
+        $R.Summary.RetirementJuly2027 | Should -Be 1
+        $R.Summary.PhoneOnly | Should -Be 2
+        $R.Summary.UsersEnabled | Should -Be 2
+        $R.Summary.ReadyByFeb2027 | Should -BeFalse
+    }
+
+    It 'treats a non-Global admin role holder as February' {
+        $R = Eval -Regs @((Reg 'helpdesk' @('mobilePhone') -Admin)) -Users @((User 'helpdesk')) -Ga @('someoneelse')
+        $R.Users[0].RetirementDate | Should -Be '2027-02-01'
+        $R.Users[0].IsGlobalAdmin | Should -BeFalse
+    }
+
+    It 'treats a PIM-eligible-only Global Admin as July and says so' {
+        $R = Eval -Regs @((Reg 'elig' @('mobilePhone') -Admin)) -Users @((User 'elig')) -Ga @() -GaEligible @('elig')
+        $R.Users[0].RetirementBasis | Should -Be 'GlobalAdministratorEligible'
+        $R.Users[0].RetirementDate | Should -Be '2027-07-01'
+        ($R.Findings | Where-Object Key -EQ 'SmsRetirementJuly').Message | Should -Match 'PIM-eligible'
+    }
+
+    It 'dates an external guest July and an internal guest February, without adding guests to Users or PhoneOnly' {
+        $Regs = @((Reg 'ext' @('mobilePhone') -UserType 'guest'), (Reg 'intg' @('mobilePhone') -UserType 'guest'), (Reg 'mem' @('fido2')))
+        $R = Eval -Regs $Regs -Users @((Ext 'ext'), (IntGuest 'intg'), (User 'mem'))
+        @($R.Users).Count | Should -Be 1
+        $R.Summary.PhoneOnly | Should -Be 0
+        $R.Summary.GuestsPhoneOnly | Should -Be 2
+        ($R.Guests | Where-Object Id -EQ 'ext').RetirementBasis | Should -Be 'ExternalUser'
+        ($R.Guests | Where-Object Id -EQ 'ext').RetirementDate | Should -Be '2027-07-01'
+        ($R.Guests | Where-Object Id -EQ 'intg').RetirementBasis | Should -Be 'InternalGuest'
+        ($R.Guests | Where-Object Id -EQ 'intg').RetirementDate | Should -Be '2027-02-01'
+        $R.Summary.ReadyByFeb2027 | Should -BeFalse # the internal guest
+        $R.Summary.RetirementJuly2027 | Should -Be 1
+    }
+
+    It 'recognises a MicrosoftAccount guest with no invitation state, and an external member, as external' {
+        $Msa = Ext 'msa' -Issuer 'MicrosoftAccount' -State $null -Creation $null
+        $ExtMember = Ext 'xm' -Type 'Member'
+        $R = Eval -Regs @((Reg 'msa' @('mobilePhone') -UserType 'guest'), (Reg 'xm' @('mobilePhone'))) -Users @($Msa, $ExtMember)
+        $R.Guests[0].RetirementBasis | Should -Be 'ExternalUser'
+        ($R.Users | Where-Object Id -EQ 'xm').RetirementBasis | Should -Be 'ExternalUser'
+        ($R.Users | Where-Object Id -EQ 'xm').RetirementDate | Should -Be '2027-07-01'
+    }
+
+    It 'gives no retirement date to users without a phone method' {
+        $R = Eval -Regs @((Reg 'a' @('fido2'))) -Users @((User 'a'))
+        $R.Users[0].RetirementDate | Should -BeNullOrEmpty
+        $R.Users[0].DaysRemaining | Should -BeNullOrEmpty
+        $R.Summary.NearestDeadline | Should -BeNullOrEmpty
+        $R.Summary.ReadyByFeb2027 | Should -BeTrue
+        @($R.Guests).Count | Should -Be 0
+    }
+
+    It 'falls back to February for everyone when Global Admins could not be read, with an Info row' {
+        $R = Eval -Regs @((Reg 'ga' @('mobilePhone') -Admin)) -Users @((User 'ga')) -Ga $null
+        $R.Users[0].RetirementDate | Should -Be '2027-02-01'
+        $R.Summary.GlobalAdminsKnown | Should -BeFalse
+        $R.Findings.Key | Should -Contain 'SmsRetirementGlobalAdminsUnknown'
+    }
+
+    It 'counts days from the US Central date, not the UTC date' {
+        # 2027-01-31 05:30 UTC is 2027-01-30 23:30 CST: two days to Feb 1 in Central (one by the UTC date).
+        $R = Eval -Regs @((Reg 'a' @('mobilePhone'))) -Users @((User 'a')) -NowUtc ([datetime]::SpecifyKind([datetime]'2027-01-31T05:30:00', 'Utc'))
+        $R.Users[0].DaysRemaining | Should -Be 2
+        $R.Summary.TodayCentral | Should -Be '2027-01-30'
+        # 06:30 UTC is 00:30 CST on the 31st: one day.
+        $R2 = Eval -Regs @((Reg 'a' @('mobilePhone'))) -Users @((User 'a')) -NowUtc ([datetime]::SpecifyKind([datetime]'2027-01-31T06:30:00', 'Utc'))
+        $R2.Users[0].DaysRemaining | Should -Be 1
+    }
+
+    It 'counts from a CDT date (UTC-5) correctly too' {
+        # 2026-10-31 04:30 UTC is 2026-10-30 23:30 CDT: 94 days to Feb 1.
+        $R = Eval -Regs @((Reg 'a' @('mobilePhone'))) -Users @((User 'a')) -NowUtc ([datetime]::SpecifyKind([datetime]'2026-10-31T04:30:00', 'Utc'))
+        $R.Summary.TodayCentral | Should -Be '2026-10-30'
+        $R.Users[0].DaysRemaining | Should -Be 94
+    }
+
+    It 'counts 92 days from 2026-11-01 and goes negative once passed' {
+        $R = Eval -Regs @((Reg 'a' @('mobilePhone'))) -Users @((User 'a'))
+        $R.Users[0].DaysRemaining | Should -Be 92
+        $R.Summary.NearestDeadline | Should -Be '2027-02-01'
+        $R.Summary.NearestDeadlineDaysRemaining | Should -Be 92
+        $Past = Eval -Regs @((Reg 'a' @('mobilePhone'))) -Users @((User 'a')) -NowUtc ([datetime]::SpecifyKind([datetime]'2027-02-03T18:00:00', 'Utc'))
+        $Past.Users[0].DaysRemaining | Should -Be -2
+        ($Past.Findings | Where-Object Key -EQ 'SmsRetirementFebruary').Message | Should -Match 'have been blocked at sign-in since 2027-02-01'
+    }
+
+    It 'raises an Error for the February group and a Warning for the July group, with stable Keys' {
+        $R = Eval -Regs @((Reg 'm1' @('mobilePhone')), (Reg 'm2' @('officePhone')), (Reg 'ga' @('mobilePhone') -Admin)) -Users @((User 'm1'), (User 'm2'), (User 'ga')) -Ga @('ga')
+        $Feb = $R.Findings | Where-Object Key -EQ 'SmsRetirementFebruary'
+        $Feb.Severity | Should -Be 'Error'
+        $Feb.Message | Should -Match '^2 account\(s\) .*blocked at sign-in from 2027-02-01 \(92 day'
+        ($R.Findings | Where-Object Key -EQ 'SmsRetirementJuly').Severity | Should -Be 'Warning'
+        $R.Summary.NearestDeadline | Should -Be '2027-02-01'
+        $R.Summary.NearestDeadlineUsers | Should -Be 2
+    }
+
+    It 'makes July the nearest deadline when only the July group is left' {
+        $R = Eval -Regs @((Reg 'ga' @('mobilePhone') -Admin), (Reg 'm' @('fido2'))) -Users @((User 'ga'), (User 'm')) -Ga @('ga')
+        $R.Summary.NearestDeadline | Should -Be '2027-07-01'
+        $R.Summary.ReadyByFeb2027 | Should -BeTrue
+        $R.Summary.ReadyByJul2027 | Should -BeFalse
+    }
+}
+
+Describe 'Test-CIPPSmsMfaReadiness policy parsing' {
+    BeforeAll {
+        # Trimmed from the live 3endt.com policy (2026-11-01), round-tripped through JSON so the shapes are what
+        # New-GraphGetRequest hands back.
+        function LivePolicy {
+            param($OptOut = 'absent', $CampaignState = 'enabled', $CampaignMethod = 'microsoftAuthenticator', $FidoState = 'enabled', $FidoTarget = 'all_users', $Tel = 'null')
+            $SmsTel = if ($Tel -eq 'null') { $null } else { @{ providerName = $Tel } }
+            $Json = @{
+                registrationEnforcement            = @{ authenticationMethodsRegistrationCampaign = @{ snoozeDurationInDays = 1; state = $CampaignState; excludeTargets = @()
+                        includeTargets = @(@{ id = 'all_users'; targetType = 'group'; targetedAuthenticationMethod = $CampaignMethod }) }
+                }
+                authenticationMethodConfigurations = @(
+                    @{ '@odata.type' = '#microsoft.graph.fido2AuthenticationMethodConfiguration'; id = 'Fido2'; state = $FidoState; includeTargets = @(@{ targetType = 'group'; id = $FidoTarget }) }
+                    @{ '@odata.type' = '#microsoft.graph.smsAuthenticationMethodConfiguration'; id = 'Sms'; state = 'enabled'; telecomProviderSettings = $SmsTel }
+                    @{ '@odata.type' = '#microsoft.graph.voiceAuthenticationMethodConfiguration'; id = 'Voice'; state = 'enabled'; telecomProviderSettings = $null }
+                )
+            }
+            # String on the left: with $OptOut = $true on the left, 'null' would convert to $true and match.
+            if ('null' -eq $OptOut) { $Json.optOutSettings = $null }
+            elseif ('absent' -ne $OptOut) { $Json.optOutSettings = @{ passkeyDynamicMigration = $OptOut } }
+            $Json | ConvertTo-Json -Depth 10 | ConvertFrom-Json
+        }
+        function EvalPolicy { param($P) Test-CIPPSmsMfaReadiness -Registrations @((Reg 'a' @('mobilePhone'))) -Users @((User 'a')) -Policy $P -GlobalAdminIds @() -NowUtc ([datetime]::SpecifyKind([datetime]'2026-11-01T12:00:00', 'Utc')) }
+    }
+
+    It 'reads opt-out true, false, null (never set, as seen live) and absent' {
+        (EvalPolicy (LivePolicy -OptOut $true)).Summary.PasskeyDynamicMigrationOptOut | Should -Be 'true'
+        (EvalPolicy (LivePolicy -OptOut $false)).Summary.PasskeyDynamicMigrationOptOut | Should -Be 'false'
+        (EvalPolicy (LivePolicy -OptOut 'null')).Summary.PasskeyDynamicMigrationOptOut | Should -Be 'false'
+        (EvalPolicy (LivePolicy -OptOut 'absent')).Summary.PasskeyDynamicMigrationOptOut | Should -Be 'unknown'
+        (EvalPolicy $null).Summary.PasskeyDynamicMigrationOptOut | Should -Be 'unknown'
+    }
+
+    It 'adds an Info row only when opted out' {
+        (EvalPolicy (LivePolicy -OptOut $true)).Findings.Key | Should -Contain 'SmsRetirementOptOut'
+        (EvalPolicy (LivePolicy -OptOut 'null')).Findings.Key | Should -Not -Contain 'SmsRetirementOptOut'
+    }
+
+    It 'flags a campaign targeting Authenticator (live 3endt.com shape) but not one targeting FIDO2 (live aspendora.com shape)' {
+        $A = EvalPolicy (LivePolicy -CampaignState 'enabled' -CampaignMethod 'microsoftAuthenticator')
+        $A.Summary.RegistrationCampaignTargetsPasskey | Should -BeFalse
+        $A.Summary.RegistrationCampaignMethods | Should -Be 'microsoftAuthenticator'
+        ($A.Findings | Where-Object Key -EQ 'SmsRetirementCampaign').Message | Should -Match 'targets microsoftAuthenticator, not passkeys'
+        $B = EvalPolicy (LivePolicy -CampaignState 'enabled' -CampaignMethod 'FIDO2')
+        $B.Summary.RegistrationCampaignOk | Should -BeTrue
+        $B.Summary.RegistrationCampaignAllUsers | Should -BeTrue
+        $B.Findings.Key | Should -Not -Contain 'SmsRetirementCampaign'
+    }
+
+    It 'accepts Microsoft managed (default) targeting passkeys and flags a disabled campaign' {
+        (EvalPolicy (LivePolicy -CampaignState 'default' -CampaignMethod 'passkey')).Summary.RegistrationCampaignOk | Should -BeTrue
+        $D = EvalPolicy (LivePolicy -CampaignState 'disabled' -CampaignMethod 'FIDO2')
+        $D.Summary.RegistrationCampaignOk | Should -BeFalse
+        ($D.Findings | Where-Object Key -EQ 'SmsRetirementCampaign').Message | Should -Match 'is disabled'
+    }
+
+    It 'reports FIDO2 disabled, and FIDO2 scoped to groups' {
+        $Off = EvalPolicy (LivePolicy -FidoState 'disabled')
+        $Off.Summary.PasskeyState | Should -Be 'disabled'
+        $Off.Summary.PasskeyScope | Should -Be 'None'
+        $Off.Findings.Key | Should -Contain 'SmsRetirementPasskeyDisabled'
+        $Grp = EvalPolicy (LivePolicy -FidoTarget '11111111-2222-3333-4444-555555555555')
+        $Grp.Summary.PasskeyScope | Should -Be 'Groups'
+        $Grp.Summary.PasskeyGroups | Should -Be 1
+        $Grp.Findings.Key | Should -Contain 'SmsRetirementPasskeyScoped'
+        (EvalPolicy (LivePolicy)).Summary.PasskeyScope | Should -Be 'AllUsers'
+    }
+
+    It 'reads the telephony provider from telecomProviderSettings' {
+        (EvalPolicy (LivePolicy)).Summary.TelephonyProvider | Should -Be 'MicrosoftProvided'
+        $T = EvalPolicy (LivePolicy -Tel 'Contoso Telecom')
+        $T.Summary.TelephonyProvider | Should -Be 'Configured'
+        ($T.Findings | Where-Object Key -EQ 'SmsRetirementFebruary').Severity | Should -Be 'Warning'
+        (EvalPolicy (Policy)).Summary.TelephonyProvider | Should -Be 'NotDetectable' # property absent
+        (EvalPolicy $null).Summary.TelephonyProvider | Should -Be 'unknown'
+    }
+}
+
+Describe 'Get-CIPPAlertSmsMfaReliance retirement' {
+    BeforeAll {
+        function Get-CIPPSmsMfaReadiness { param($TenantFilter) $script:Report }
+        function Set-RetReport {
+            param($Nearest = '2027-02-01', $Days = 80, $Count = 4, [object[]]$Findings = @(), [object[]]$Users = @())
+            $script:Report = [pscustomobject]@{ Errors = @(); Findings = $Findings; Users = $Users
+                Summary = [pscustomobject]@{ CoveragePercent = $null; UsersEnabled = 10; PhoneOnly = $Count; NearestDeadline = $Nearest; NearestDeadlineDaysRemaining = $Days; NearestDeadlineUsers = $Count
+                    PasskeyDynamicMigrationOptOut = 'false'; RegistrationCampaignState = 'enabled'; RegistrationCampaignMethods = 'microsoftAuthenticator'; PasskeyState = 'enabled'
+                }
+            }
+        }
+        function RunR { param($InputValue) @(Get-CIPPAlertSmsMfaReliance -TenantFilter 'contoso.com' -InputValue $InputValue | Where-Object { $_ }) }
+        $script:AdminRow = [pscustomobject]@{ Key = 'AdminPhoneOnly|ga'; Severity = 'Error'; Check = 'Admin on SMS/voice'; Account = 'ga@contoso.com'; Message = 'm'; Fix = 'f' }
+        $script:FebFinding = [pscustomobject]@{ Key = 'SmsRetirementFebruary'; Severity = 'Error'; Check = 'x'; Account = ''; Message = '4 account(s)'; Fix = 'f' }
+        $script:GaUser = [pscustomobject]@{ Id = 'ga'; Category = 'PhoneOnly'; IsAdmin = $true; RetirementDate = '2027-07-01'; DaysRemaining = 242 }
+    }
+    BeforeEach { Reset-AlertStore }
+
+    It 'raises the deadline row inside the default 90-day window, once, while the days count down' {
+        Set-RetReport -Days 80
+        $First = RunR
+        $First.Id | Should -Be @('SmsRetirementDeadline|2027-02-01')
+        $First[0].Severity | Should -Be 'Error'
+        $First[0].DaysRemaining | Should -Be 80
+        Set-RetReport -Days 73 -Count 3
+        RunR | Should -BeNullOrEmpty # same Id: a new count or day does not re-notify
+    }
+
+    It 'stays quiet outside the window and honours SmsRetirementWarnDays' {
+        Set-RetReport -Days 120
+        RunR | Should -BeNullOrEmpty
+        (RunR -InputValue @{ SmsRetirementWarnDays = 150 }).Id | Should -Be @('SmsRetirementDeadline|2027-02-01')
+    }
+
+    It 'resolves the February row and notifies the July date as a new row' {
+        Set-RetReport -Days 30; $null = RunR
+        Set-RetReport -Nearest '2027-07-01' -Days 60 -Count 1
+        $R = RunR
+        $R.Id | Should -Be @('SmsRetirementDeadline|2027-07-01')
+        $R[0].Severity | Should -Be 'Warning'
+        (Get-LifecycleState 'Get-CIPPAlertSmsMfaReliance')['SmsRetirementDeadline|2027-02-01'] | Should -Be 'Resolved'
+    }
+
+    It 'does not raise SmsRetirement findings directly, only the deadline row' {
+        Set-RetReport -Days 200 -Findings @($script:FebFinding)
+        RunR | Should -BeNullOrEmpty
+    }
+
+    It 'keeps existing Ids and adds the user retirement date to admin rows without re-notifying' {
+        Set-RetReport -Nearest $null -Days $null -Findings @($script:AdminRow) -Users @($script:GaUser)
+        $R = RunR
+        $R.Id | Should -Be @('AdminPhoneOnly|ga')
+        $R[0].RetirementDate | Should -Be '2027-07-01'
+        $R[0].DaysRemaining | Should -Be 242
+        $Later = $script:GaUser.PSObject.Copy(); $Later.DaysRemaining = 235
+        Set-RetReport -Nearest $null -Days $null -Findings @($script:AdminRow) -Users @($Later)
+        RunR | Should -BeNullOrEmpty
+    }
+}

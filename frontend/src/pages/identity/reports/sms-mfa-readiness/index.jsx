@@ -11,6 +11,21 @@ import { ApiGetCall } from "../../../../api/ApiCall";
 
 const yesNo = (value) => (value === true ? "Yes" : value === false ? "No" : "Unknown");
 
+// Microsoft-provided SMS/voice retirement (CIPP-46). Days are counted by the backend from today's US Central date.
+const daysText = (days) =>
+  days == null ? "-" : days > 0 ? `${days} days` : days === 0 ? "Today" : `Passed ${-days} days ago`;
+const campaignText = (summary) => {
+  if (!summary || !summary.RegistrationCampaignState || summary.RegistrationCampaignState === "unknown") {
+    return "Unknown";
+  }
+  // Graph calls the portal's "Microsoft managed" state "default".
+  const state =
+    summary.RegistrationCampaignState === "default" ? "Microsoft managed" : summary.RegistrationCampaignState;
+  return summary.RegistrationCampaignMethods ? `${state}: ${summary.RegistrationCampaignMethods}` : state;
+};
+const optOutText = (value) =>
+  value === "true" ? "Opted out (until 1 Feb 2027)" : value === "false" ? "Not opted out" : "Unknown";
+
 const Page = () => {
   const tenant = useSettings().currentTenant;
   const allTenants = tenant === "AllTenants";
@@ -49,6 +64,16 @@ const Page = () => {
                 "AdminsPhoneOnly",
                 "NoMfa",
                 "AdminsNoMfa",
+                "ReadyByFeb2027",
+                "RetirementFebruary2027",
+                "RetirementJuly2027",
+                "NearestDeadline",
+                "NearestDeadlineDaysRemaining",
+                "PasskeyDynamicMigrationOptOut",
+                "RegistrationCampaignState",
+                "RegistrationCampaignMethods",
+                "PasskeyState",
+                "TelephonyProvider",
                 "CheckedUtc",
               ]}
             />
@@ -63,6 +88,8 @@ const Page = () => {
   const users = Array.isArray(report.data?.Users) ? report.data.Users : [];
   const affected = users.filter((u) => u.Category !== "Ready");
   const errors = Array.isArray(report.data?.Errors) ? report.data.Errors : [];
+  const guests = Array.isArray(report.data?.Guests) ? report.data.Guests : [];
+  const nearestDays = summary?.NearestDeadlineDaysRemaining;
 
   return (
     <Container maxWidth={false} sx={{ flexGrow: 1, py: 2 }}>
@@ -104,6 +131,50 @@ const Page = () => {
           />
         </Grid>
         <Grid size={12}>
+          <CippInfoBar
+            isFetching={report.isFetching}
+            data={[
+              {
+                icon: <CippIcons.CalendarMonth />,
+                data: summary
+                  ? summary.NearestDeadline
+                    ? `${summary.NearestDeadline} (${summary.NearestDeadlineUsers} users)`
+                    : "None"
+                  : "-",
+                name: `SMS/voice retirement deadline (Feb: ${summary?.RetirementFebruary2027 ?? "-"}, Jul: ${
+                  summary?.RetirementJuly2027 ?? "-"
+                })`,
+                color: summary && !summary.NearestDeadline ? "success" : "error",
+              },
+              {
+                icon: <CippIcons.HourglassEmpty />,
+                data: summary ? (summary.NearestDeadline ? daysText(nearestDays) : "Ready") : "-",
+                name: `Days remaining (ready by 1 Feb 2027: ${yesNo(summary?.ReadyByFeb2027)})`,
+                color:
+                  !summary || !summary.NearestDeadline
+                    ? "success"
+                    : nearestDays != null && nearestDays <= 90
+                      ? "error"
+                      : "warning",
+              },
+              {
+                icon: <CippIcons.Schedule />,
+                data: optOutText(summary?.PasskeyDynamicMigrationOptOut),
+                name: "Passkey auto-enablement opt-out (does not stop enforcement)",
+                color: summary?.PasskeyDynamicMigrationOptOut === "true" ? "warning" : "info",
+              },
+              {
+                icon: <CippIcons.Fingerprint />,
+                data: campaignText(summary),
+                name: `Registration campaign (passkeys ${summary?.PasskeyState ?? "unknown"}${
+                  summary?.PasskeyScope === "Groups" ? ` for ${summary.PasskeyGroups} group(s)` : ""
+                })`,
+                color: summary?.RegistrationCampaignOk ? "success" : "warning",
+              },
+            ]}
+          />
+        </Grid>
+        <Grid size={12}>
           <CippDataTable
             title={`SMS/voice MFA readiness - ${tenant}`}
             data={findings}
@@ -135,9 +206,30 @@ const Page = () => {
               "Methods",
               "DefaultMethod",
               "Licensed",
+              "RetirementDate",
+              "DaysRemaining",
+              "RetirementBasis",
             ]}
           />
         </Grid>
+        {guests.length > 0 && (
+          <Grid size={12}>
+            <CippDataTable
+              title="Guests whose only MFA is SMS/voice (external users: 1 Jul 2027; internal guests: 1 Feb 2027)"
+              data={guests}
+              isFetching={report.isFetching}
+              queryKey={`SmsMfaReadiness-${tenant}-guests`}
+              simpleColumns={[
+                "UserPrincipalName",
+                "DisplayName",
+                "Methods",
+                "RetirementBasis",
+                "RetirementDate",
+                "DaysRemaining",
+              ]}
+            />
+          </Grid>
+        )}
       </Grid>
     </Container>
   );
