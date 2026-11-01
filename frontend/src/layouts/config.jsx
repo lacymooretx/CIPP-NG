@@ -1114,6 +1114,12 @@ export const nativeMenuItems = [
             path: '/email/reports/malware-filters',
             permissions: ['Exchange.SpamFilter.*'],
           },
+          // Aspendora fork addition (Vikunja CIPP-30): audit-only abused-TLD exposure + block templates.
+          {
+            title: 'Abused TLD Exposure',
+            path: '/email/reports/tld-exposure',
+            permissions: ['Exchange.SpamFilter.*'],
+          },
           {
             title: 'Safe Attachments Filters',
             path: '/email/reports/safeattachments-filters',
@@ -1204,6 +1210,13 @@ export const nativeMenuItems = [
             title: 'Message Trace',
             path: '/email/tools/message-trace',
             docsPath: 'tools/email-tools/message-trace',
+            permissions: ['Exchange.Mailbox.*'],
+          },
+          // Aspendora fork addition (Vikunja CIPP-38): guided mail-not-received triage.
+          {
+            title: 'Mail Delivery Triage',
+            path: '/email/tools/mail-triage',
+            docsPath: 'tools/email-tools/mail-triage',
             permissions: ['Exchange.Mailbox.*'],
           },
           {
