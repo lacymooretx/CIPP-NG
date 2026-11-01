@@ -45,6 +45,8 @@ function Get-CIPPReportData {
         'StaleDevices' { return Get-CIPPStaleDeviceReportData -TenantFilter $TenantFilter }
         'AzurePosture' { return Get-CIPPAzurePostureReportData -TenantFilter $TenantFilter }
         'GuestReview' { return Get-CIPPGuestReviewReportData -TenantFilter $TenantFilter }
+        # Aspendora fork addition (Vikunja CIPP-16): month-over-month posture diff; running it stores a snapshot.
+        'PostureChange' { return Get-CIPPPostureChangeReportData -TenantFilter $TenantFilter }
         default { throw "Unknown report type '$ReportType'." }
     }
 }

@@ -400,6 +400,8 @@
     * [Generated Reports](user-documentation/tools/report-builder/generated.md)
     * [Templates](user-documentation/tools/report-builder/templates.md)
     * [Report Builder](user-documentation/tools/report-builder/builder.md)
+  * [Reports](user-documentation/tools/security-report/README.md)
+    * [Security Posture Change](user-documentation/tools/security-report/posture-change.md)
   * [Custom Tests](user-documentation/tools/custom-tests/README.md)
     * [Add/Edit Custom Test](user-documentation/tools/custom-tests/add.md)
     * [View Versions](user-documentation/tools/custom-tests/versions.md)

@@ -540,6 +540,12 @@
     "recommendedRunInterval": "30d"
   },
   {
+    "name": "PostureSnapshot",
+    "label": "Store a monthly security posture snapshot (for the Security Posture Change report)",
+    "recommendedRunInterval": "30d",
+    "description": "Never sends an alert. Stores the tenant's current CIPP test results and Secure Score as a posture snapshot so the Security Posture Change report (Tools > Reports) can show month-over-month changes even when the report is only run on demand. Reads CIPP's own tables only."
+  },
+  {
     "name": "AppCertificateExpiry",
     "label": "Alert on expiring application certificates",
     "recommendedRunInterval": "1d"
