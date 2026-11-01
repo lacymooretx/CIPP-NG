@@ -42772,6 +42772,234 @@
         "x-cipp-any-tenant": true
       }
     },
+    "/api/ExecSignInExplanationNote": {
+      "post": {
+        "summary": "Posts a sign-in failure explanation as an internal note on an existing ConnectWise Manage ticket (preview by default)",
+        "operationId": "ExecSignInExplanationNote",
+        "tags": [
+          "Identity > Reports"
+        ],
+        "description": "Body: tenantFilter, TicketId (the ConnectWise ticket number), Bundle (the ListSignInExplanation result) and\nPreview. Without a Bundle the explanation is run again from userPrincipalName / correlationId / hours.\nPreview defaults to true and returns the note text without posting; send Preview=false to post. The note is\nMarkdown on the Internal Analysis tab with processNotifications off (no ConnectWise email, not on the\ncustomer portal). Refused unless the tenant has a ConnectWise company mapping and the ticket belongs to that\ncompany; unlike the mail triage note there is no Force override. Changes nothing in the tenant.\nAspendora fork addition (Vikunja CIPP-10).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "Bundle": {
+                    "type": "object",
+                    "properties": {
+                      "CorrelationId": {
+                        "type": "string"
+                      },
+                      "Counts": {
+                        "type": "object",
+                        "properties": {
+                          "Failures": {
+                            "type": "string"
+                          },
+                          "Interrupts": {
+                            "type": "string"
+                          },
+                          "Successes": {
+                            "type": "string"
+                          },
+                          "Total": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "GeneratedAt": {
+                        "type": "object",
+                        "properties": {
+                          "Display": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "Headline": {
+                        "type": "string"
+                      },
+                      "Hours": {
+                        "type": "string"
+                      },
+                      "IncludeNonInteractive": {
+                        "type": "string"
+                      },
+                      "LatestSuccess": {
+                        "type": "string"
+                      },
+                      "LicenseRequired": {
+                        "type": "string"
+                      },
+                      "PasswordAttempts": {
+                        "type": "object",
+                        "properties": {
+                          "Summary": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "SecurityDefaultsEnabled": {
+                        "type": "boolean"
+                      },
+                      "SignIns": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "Links": {
+                              "type": "object",
+                              "properties": {
+                                "EntraUserSignIns": {
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            "Outcome": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      },
+                      "Tenant": {
+                        "type": "string"
+                      },
+                      "Truncated": {
+                        "type": "string"
+                      },
+                      "User": {
+                        "type": "object",
+                        "properties": {
+                          "AccountEnabled": {
+                            "type": "boolean"
+                          },
+                          "PerUserMfaState": {
+                            "type": "string"
+                          },
+                          "Synced": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "UserPrincipalName": {
+                        "type": "string"
+                      },
+                      "WindowEnd": {
+                        "type": "object",
+                        "properties": {
+                          "Display": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "WindowStart": {
+                        "type": "object",
+                        "properties": {
+                          "Display": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "correlationId": {
+                    "type": "string"
+                  },
+                  "hours": {
+                    "type": "integer"
+                  },
+                  "includeNonInteractive": {
+                    "type": "string"
+                  },
+                  "Preview": {
+                    "type": "string"
+                  },
+                  "tenantFilter": {
+                    "type": "string"
+                  },
+                  "TicketId": {
+                    "type": "string"
+                  },
+                  "userPrincipalName": {
+                    "$ref": "#/components/schemas/LabelValue"
+                  }
+                },
+                "required": [
+                  "tenantFilter"
+                ]
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/tenantFilter"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Derived from the fields written into the storage table it reads. Fields taken from the storage writers may be omitted by this endpoint, and the response may carry computed fields not listed here.",
+                  "properties": {
+                    "ETag": {
+                      "type": "string",
+                      "x-cipp-field-source": "storage"
+                    },
+                    "IntegrationId": {
+                      "x-cipp-field-source": "storage"
+                    },
+                    "IntegrationName": {
+                      "x-cipp-field-source": "storage"
+                    },
+                    "lastEndTime": {
+                      "type": "string",
+                      "x-cipp-field-source": "storage"
+                    },
+                    "PartitionKey": {
+                      "x-cipp-field-source": "storage"
+                    },
+                    "RowKey": {
+                      "x-cipp-field-source": "storage"
+                    },
+                    "Timestamp": {
+                      "type": "string",
+                      "x-cipp-field-source": "storage"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - missing required field or invalid input"
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cipp-role": "Identity.User.ReadWrite",
+        "x-cipp-reads-via": [
+          "ConvertTo-CIPPSignInExplanationNote"
+        ]
+      }
+    },
     "/api/ExecSiteBrowserActions": {
       "post": {
         "summary": "ExecSiteBrowserActions",
@@ -56497,6 +56725,54 @@
         "x-cipp-any-tenant": true
       }
     },
+    "/api/ListExoProvisioningHealth": {
+      "get": {
+        "summary": "Check that Exchange Online provisioned correctly in one tenant (organisation, RBAC, accepted domains, mailboxes)",
+        "operationId": "ListExoProvisioningHealth",
+        "tags": [
+          "Email-Exchange > Reports"
+        ],
+        "description": "Read only. Runs Get-CIPPExoProvisioningHealth against one tenant and returns one row per check\n(Check, Status Pass/Warn/Fail/Info, Detail, Fix, Errored) plus a Summary: Get-OrganizationConfig answers\n(and IsDehydrated), the built-in role groups and core management roles exist, Organization Management holds\nits expected roles (the comparison the Tenant Access check and ExecExchangeRoleRepair use), verified Entra\nemail domains are accepted domains, and users licensed for a mailbox for longer than graceHours have an\nExchange recipient. Also returns MissingDomains, UsersWithoutMailbox, LicensedMailUsers and\nMissingOrgManagementRoles. A tenant without an Exchange licence returns Info rows, not failures. Nothing is\nrepaired here: when Organization Management roles are missing, Summary.RepairSuggested is true and the\nrepair is a separate, confirmed call to ExecExchangeRoleRepair. Single tenant only.\nAspendora fork addition (Vikunja CIPP-36).",
+        "parameters": [
+          {
+            "name": "graceHours",
+            "in": "query",
+            "description": "Hours a user must have held a mailbox licence before a missing mailbox is reported. Defaults to 24, 1-720.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/tenantFilter"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardResults"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cipp-role": "Exchange.Mailbox.Read"
+      }
+    },
     "/api/ListExoRequest": {
       "post": {
         "summary": "ListExoRequest",
@@ -60015,6 +60291,64 @@
         "x-cipp-role": "Endpoint.MEM.Read"
       }
     },
+    "/api/ListIntuneCloudOnlyLint": {
+      "get": {
+        "summary": "Flags Intune settings that misbehave or do nothing on Entra joined (cloud-only) devices",
+        "operationId": "ListIntuneCloudOnlyLint",
+        "tags": [
+          "Endpoint > MEM"
+        ],
+        "description": "Lints either the live Intune policies of one tenant (Settings Catalog, custom OMA-URI profiles and\nAdministrative Templates) or one saved CIPP Intune template against a curated rule list\n(Config/IntuneCloudOnlyLintRules.json): settings such as 'Display information about previous logons during\nuser logon' that only work for local or Active Directory accounts, Windows LAPS backup to Active Directory,\nand on-premises-only Kerberos, Net Logon and Group Policy settings. Each finding carries the symptom, why it\nhappens, the alternative and a Microsoft Learn source. With a tenant, also returns how many Windows devices\nare Entra joined (cloud-only) versus hybrid joined and whether the tenant syncs from on-premises AD, and marks\neach finding's relevance accordingly.\nReport only: nothing is changed. Aspendora fork addition (Vikunja CIPP-28).",
+        "parameters": [
+          {
+            "name": "templateId",
+            "in": "query",
+            "description": "A saved CIPP Intune template GUID. When set, that template is linted instead of the tenant's live policies.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/tenantFilter"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "description": "Not described statically: this endpoint returns the upstream response as-is, so its fields are determined by the upstream API rather than by CIPP. Call the endpoint to see the actual shape, or add a response schema in backend/Config/openapi-overrides."
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - missing required field or invalid input"
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cipp-role": "Endpoint.MEM.Read"
+      }
+    },
     "/api/ListIntuneDeploymentStatus": {
       "get": {
         "summary": "ListIntuneDeploymentStatus",
@@ -60731,6 +61065,9 @@
                     "type": "object",
                     "description": "Derived from the fields written into the storage table it reads, and the fields the endpoint selects onto each record, and the columns the CIPP UI renders. Fields taken from the storage writers may be omitted by this endpoint, and the response may carry computed fields not listed here.",
                     "properties": {
+                      "cloudOnlyWarnings": {
+                        "x-cipp-field-source": "frontend"
+                      },
                       "ContentHash": {
                         "x-cipp-field-source": "storage"
                       },
@@ -63868,6 +64205,72 @@
         "x-cipp-role": "Security.Defender.Read"
       }
     },
+    "/api/ListMessageCenterDigest": {
+      "get": {
+        "summary": "Deduplicated Message Center digest with each post classified (action required, retirement, security, opt-in, default change) and its deadline",
+        "operationId": "ListMessageCenterDigest",
+        "tags": [
+          "Tenant > Reports"
+        ],
+        "description": "Read only. Reads Microsoft 365 Message Center posts from the CIPP reporting database (cache type\nMessageCenterMessages; a single tenant with nothing cached is read live from Graph), returns each post once\nwith the tenants it was posted to, and classifies it: Action required / deadline (Microsoft set an act-by date,\nseverity high, Breaking change), Retirement, Security / compliance, New feature off by default / opt-in,\nOn by default (admin opt-out) or Informational. Each item carries the deadline as a US Central date, days\nleft, whether it is due within deadlineDays, why it is in the digest (New, Updated, Deadline approaching) and\nthe admin center link. Body: Items, Summary (counts per category, tenants covered, tenants with no cached\nposts, cache age) and Errors. The MessageCenterDigest alert uses the same rules. Aspendora fork addition\n(Vikunja CIPP-37).",
+        "parameters": [
+          {
+            "name": "days",
+            "in": "query",
+            "description": "Days back to look for new or updated posts. Defaults to 7.",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "deadlineDays",
+            "in": "query",
+            "description": "Posts whose deadline is this many days away or fewer are flagged Due soon and included even if not updated recently. Defaults to 30.",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "includeInformational",
+            "in": "query",
+            "description": "true to include Informational posts. By default only classified posts are returned.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/tenantFilter"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardResults"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cipp-role": "Tenant.Administration.Read"
+      }
+    },
     "/api/ListMessageCenterMessages": {
       "get": {
         "summary": "ListMessageCenterMessages",
@@ -65182,6 +65585,63 @@
           },
           "500": {
             "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cipp-role": "Exchange.Mailbox.Read"
+      }
+    },
+    "/api/ListOooExposure": {
+      "get": {
+        "summary": "Out-of-office exposure: mailboxes with a live external auto-reply and what the message gives away",
+        "operationId": "ListOooExposure",
+        "tags": [
+          "Email-Exchange > Reports"
+        ],
+        "description": "Read only. Lists the user and shared mailboxes in one tenant whose automatic reply is Enabled, or Scheduled and\ninside its window, with ExternalAudience All or Known. The external message is reduced to text and flagged for\ncolleague (accepted-domain) and external email addresses, phone numbers, travel terms, return dates, job titles\nand finance cues (invoices, payments, wires, payroll). Severity: High = audience All and the message names a\ncolleague address, a phone number or a finance cue; Medium = audience All otherwise; Low = audience Known.\nEach row carries the schedule as UTC, Unix seconds and US Central text, a redacted snippet (addresses and phone\nnumbers masked) and the full message text. A tenant without Exchange Online returns Status NoExchange.\nSettings are read with two EXO bulk requests (state for every mailbox, then messages for live ones only).\nSingle tenant only. Aspendora fork addition (Vikunja CIPP-40).",
+        "parameters": [
+          {
+            "name": "includeUpcoming",
+            "in": "query",
+            "description": "true to also list scheduled replies that start within the next upcomingDays. Defaults to false.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/tenantFilter"
+          },
+          {
+            "name": "upcomingDays",
+            "in": "query",
+            "description": "Days ahead to look for upcoming scheduled replies when includeUpcoming is true (1-90). Defaults to 14.",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardResults"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
           }
         },
         "security": [
@@ -70259,6 +70719,90 @@
           }
         ],
         "x-cipp-role": "Sharepoint.Site.Read"
+      }
+    },
+    "/api/ListSignInExplanation": {
+      "get": {
+        "summary": "Explains a user's failed sign-ins in plain language: error code, Conditional Access result, MFA source, device, risk and the fix",
+        "operationId": "ListSignInExplanation",
+        "tags": [
+          "Identity > Reports"
+        ],
+        "description": "Read only, single tenant. Give userPrincipalName (with hours, default 24, max 720) or correlationId (a sign-in\ncorrelation ID or request ID, searched over the last 30 days). Reads beta auditLogs/signIns (interactive;\nnon-interactive too with includeNonInteractive=true), keeps the newest failures and interrupts plus the\nlatest success, and for each returns the time (US Central and UTC), app, client app and whether it is legacy\nauthentication, IP and location, device (compliant / managed / join type), the AADSTS code with\nMicrosoft's failure reason, a plain-English explanation and fix, every Conditional Access policy that was\nevaluated with its result and, for failed ones, the enforced controls and matched conditions. Also returns\nthe user's per-user MFA state, security defaults, a wrong-password / lockout summary across the window, and\na Markdown SummaryText for copying or posting to ConnectWise (see ExecSignInExplanationNote). Tenants without\nEntra ID P1 have no sign-in logs: the result then has LicenseRequired=true and a message.\nAspendora fork addition (Vikunja CIPP-10).",
+        "parameters": [
+          {
+            "name": "correlationId",
+            "in": "query",
+            "description": "A sign-in correlation ID or request ID (GUID), from the user's error screen or a ticket. Searches the last 30 days.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "hours",
+            "in": "query",
+            "description": "Hours to look back from now, 1 to 720. Defaults to 24. Ignored with correlationId.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "includeNonInteractive",
+            "in": "query",
+            "description": "true to include non-interactive sign-ins (apps refreshing tokens in the background). Defaults to false.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "maxResults",
+            "in": "query",
+            "description": "How many failed or interrupted sign-ins to explain in full, 1 to 100, newest first. Defaults to 25.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/tenantFilter"
+          },
+          {
+            "name": "userPrincipalName",
+            "in": "query",
+            "description": "The user whose sign-ins to explain: UPN or Entra object ID. Required unless correlationId is given.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardResults"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cipp-role": "Identity.User.Read"
       }
     },
     "/api/ListSignIns": {
