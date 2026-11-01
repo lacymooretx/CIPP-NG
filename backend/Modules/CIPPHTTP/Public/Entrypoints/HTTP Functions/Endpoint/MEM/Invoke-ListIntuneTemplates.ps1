@@ -123,6 +123,19 @@ function Invoke-ListIntuneTemplates {
             }
             $Tpl | Add-Member -NotePropertyName 'usage' -NotePropertyValue @($Usage) -Force
         }
+
+        # Aspendora fork addition (Vikunja CIPP-28): advisory "Cloud-only warnings" column. Pure, no Graph
+        # calls, and wrapped so a rule or template problem can never fail or change the template list.
+        try {
+            $CloudOnlyRules = @((Get-Content -Path (Join-Path $env:CIPPRootPath 'Config/IntuneCloudOnlyLintRules.json') -Raw -ErrorAction Stop | ConvertFrom-Json).rules)
+            foreach ($Tpl in @($Templates)) {
+                if ($null -eq $Tpl -or $Tpl.corrupt) { continue }
+                $LintHits = try { @(Test-CIPPIntuneCloudOnlyLint -Policies @([pscustomobject]@{ Id = $Tpl.GUID; Name = $Tpl.displayName; Body = $Tpl }) -Rules $CloudOnlyRules) } catch { @() }
+                $Tpl | Add-Member -NotePropertyName 'cloudOnlyWarnings' -NotePropertyValue (@($LintHits | ForEach-Object { "$($_.Severity): $($_.Title)" }) -join '; ') -Force
+            }
+        } catch {
+            Write-Warning "Cloud-only template lint skipped: $($_.Exception.Message)"
+        }
     } else {
         if ($Request.query.mode -eq 'Tag') {
             #when the mode is tag, show all the potential tags, return the object with: label: tag, value: tag, count: number of templates with that tag, unique only
