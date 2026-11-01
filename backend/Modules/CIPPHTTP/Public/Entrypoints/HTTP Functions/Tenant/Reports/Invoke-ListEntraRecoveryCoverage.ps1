@@ -25,7 +25,7 @@ function Invoke-ListEntraRecoveryCoverage {
     # Days after which the last CIPP backup counts as stale. Defaults to 2 (backups run daily).
     $MaxBackupAgeDays = if ($Request.Query.maxBackupAgeDays -as [int]) { [int]$Request.Query.maxBackupAgeDays } else { 2 }
     # true skips the live Graph reads (snapshots, soft-deleted CA objects) and returns licence and CIPP coverage only.
-    $SkipLive = $Request.Query.skipLive -eq 'true' -or $Request.Query.skipLive -eq $true
+    $SkipLive = $Request.Query.skipLive -eq $true
 
     if (-not $TenantFilter) {
         return ([HttpResponseContext]@{
