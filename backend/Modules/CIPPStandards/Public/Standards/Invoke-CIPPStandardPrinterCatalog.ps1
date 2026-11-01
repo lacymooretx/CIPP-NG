@@ -50,7 +50,6 @@ function Invoke-CIPPStandardPrinterCatalog {
         Write-LogMessage -API 'Standards' -tenant $Tenant -message 'PrinterCatalog: no printers catalogued for this tenant; nothing to enforce.' -sev Info
         if ($Settings.report -eq $true) {
             Set-CIPPStandardsCompareField -FieldName 'standards.PrinterCatalog' -CurrentValue @{ Catalogued = 0; Missing = @() } -ExpectedValue @{ Catalogued = 0; Missing = @() } -TenantFilter $Tenant
-            Add-CIPPBPAField -FieldName 'PrinterCatalog' -FieldValue $true -StoreAs bool -Tenant $Tenant
         }
         return
     }
@@ -120,6 +119,5 @@ function Invoke-CIPPStandardPrinterCatalog {
         $CurrentValue = @{ Catalogued = $Catalog.Count; Missing = @($Missing.Name | Sort-Object); ReadFailures = @($ReadFailures) }
         $ExpectedValue = @{ Catalogued = $Catalog.Count; Missing = @(); ReadFailures = @() }
         Set-CIPPStandardsCompareField -FieldName 'standards.PrinterCatalog' -CurrentValue $CurrentValue -ExpectedValue $ExpectedValue -TenantFilter $Tenant
-        Add-CIPPBPAField -FieldName 'PrinterCatalog' -FieldValue $StateIsCorrect -StoreAs bool -Tenant $Tenant
     }
 }

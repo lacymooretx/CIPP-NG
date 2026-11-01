@@ -155,6 +155,5 @@ function Invoke-CIPPStandardTeamsPolicyTemplate {
             DriftedValues = @()
         }
         Set-CIPPStandardsCompareField -FieldName 'standards.TeamsPolicyTemplate' -CurrentValue $CurrentValue -ExpectedValue $ExpectedValue -Tenant $Tenant
-        Add-CIPPBPAField -FieldName 'TeamsPolicyTemplate' -FieldValue $StateIsCorrect -StoreAs bool -Tenant $Tenant
     }
 }

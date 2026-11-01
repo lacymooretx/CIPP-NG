@@ -102,6 +102,5 @@ function Invoke-CIPPStandardSyncAppManagedDomains {
             allowedDomainGuidsForSyncApp          = $AllowedDomains
         }
         Set-CIPPStandardsCompareField -FieldName 'standards.SyncAppManagedDomains' -CurrentValue $CurrentValue -ExpectedValue $ExpectedValue -Tenant $Tenant
-        Add-CIPPBPAField -FieldName 'SyncAppManagedDomains' -FieldValue $StateIsCorrect -StoreAs bool -Tenant $Tenant
     }
 }
