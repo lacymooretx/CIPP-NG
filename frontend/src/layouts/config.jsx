@@ -321,6 +321,12 @@ export const nativeMenuItems = [
             path: '/tenant/reports/custom-test-report',
             permissions: ['Tenant.Reports.*'],
           },
+          // Aspendora fork addition (Vikunja CIPP-37): deduplicated, classified Message Center digest.
+          {
+            title: 'Message Center Digest',
+            path: '/tenant/reports/message-center-digest',
+            permissions: ['Tenant.Administration.*'],
+          },
         ],
       },
       {
