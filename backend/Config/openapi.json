@@ -41596,6 +41596,14 @@
                   "EndTime": {
                     "type": "integer"
                   },
+                  "ExternalAudience": {
+                    "allOf": [
+                      {
+                        "$ref": "#/components/schemas/LabelValue"
+                      }
+                    ],
+                    "description": "Aspendora fork (Vikunja CIPP-40): optional ExternalAudience (None, Known or All). Omitted = the old behaviour (All when an external message is sent, otherwise None). Sent alone with the current state and schedule, it changes only the audience; the Out-of-office Exposure page uses it to limit replies to known senders."
+                  },
                   "ExternalMessage": {
                     "type": "string"
                   },
