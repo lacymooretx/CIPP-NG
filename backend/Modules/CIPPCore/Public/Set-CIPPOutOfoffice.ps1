@@ -19,7 +19,11 @@ function Set-CIPPOutOfOffice {
         [bool]$DeclineEventsForScheduledOOF,
         [bool]$DeclineAllEventsForScheduledOOF,
         [string]$DeclineMeetingMessage,
-        [string]$Timezone
+        [string]$Timezone,
+        # Aspendora fork (Vikunja CIPP-40): optional. When omitted the audience follows the existing rule below
+        # (All with an external message, None without), so existing callers are unchanged.
+        [ValidateSet('None', 'Known', 'All')]
+        [string]$ExternalAudience
     )
 
     try {
@@ -37,6 +41,12 @@ function Set-CIPPOutOfOffice {
         if ($PSBoundParameters.ContainsKey('ExternalMessage')) {
             $CmdParams.ExternalMessage = $ExternalMessage
             $CmdParams.ExternalAudience = 'All'
+        }
+
+        # Explicit audience wins. Lets a caller limit external replies to Known without resending the messages,
+        # which Set-MailboxAutoReplyConfiguration then leaves untouched.
+        if ($PSBoundParameters.ContainsKey('ExternalAudience')) {
+            $CmdParams.ExternalAudience = $ExternalAudience
         }
 
         if ($State -eq 'Scheduled') {

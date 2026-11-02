@@ -34,7 +34,13 @@ The **Snippet** column masks addresses and phone numbers. The full message text 
 
 ## Fixing an exposed reply
 
-Set the mailbox's external audience to **Known** (contacts only) and take colleague addresses, phone numbers and payment instructions out of the external message. Today CIPP's out-of-office editor (Exchange settings on the user page, or the Set Out of Office user action) always sets the external audience to **All** when an external message is saved, so it cannot make this change; use Exchange admin center, or Outlook on the web as the user. Note that a reply scheduled through **Vacation Mode** with an external message gets audience All again when the vacation's start task runs.
+The row action **Limit external replies to known senders** (needs Exchange.Mailbox.ReadWrite; shown for audience All rows) sets the external audience to **Known** (contacts only). It resends only the reply's current state and, for a scheduled reply, its start and end; the internal and external messages are not sent, so Exchange keeps them unchanged. Also ask the user to take colleague addresses, phone numbers and payment instructions out of the external message.
+
+Watch for these, which set the audience back to **All**:
+
+* Saving an external message in CIPP's out-of-office editor (Exchange settings on the user page, or the Set Out of Office user action).
+* A **Vacation Mode** reply with an external message, when the vacation's start task runs. If the task has not run yet, fix the reply after the vacation starts.
+* The user editing their automatic replies in Outlook and choosing "Anyone outside my organization".
 
 ## Alert
 
@@ -43,5 +49,5 @@ The scripted alert **Alert on out-of-office replies that expose colleagues, phon
 Tenants without Exchange Online are reported as such, not as errors.
 
 {% hint style="info" %}
-Aspendora fork addition (Vikunja CIPP-40). API: `ListOooExposure` (Exchange.Mailbox.Read; `tenantFilter`, optional `includeUpcoming`, `upcomingDays`). Settings are read with two Exchange bulk requests per tenant: state and schedule for every mailbox, then the external message for the listed mailboxes only.
+Aspendora fork addition (Vikunja CIPP-40). API: `ListOooExposure` (Exchange.Mailbox.Read; `tenantFilter`, optional `includeUpcoming`, `upcomingDays`). The action calls the existing `ExecSetOoO` (Exchange.Mailbox.ReadWrite) with the new optional `ExternalAudience` body field (None, Known or All; omitted keeps the old behaviour). Settings are read with two Exchange bulk requests per tenant: state and schedule for every mailbox, then the external message for the listed mailboxes only.
 {% endhint %}

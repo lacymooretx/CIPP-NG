@@ -3,6 +3,8 @@
 // to external senders and flags what the external message gives away (colleague addresses, phone numbers,
 // travel, return dates, titles, finance cues). Why: an external OOO reply hands attackers the timing and the
 // impersonation target for BEC payment fraud. The scripted alert "OooExposure" raises the High rows.
+// The only write is the row action below: the existing ExecSetOoO endpoint with ExternalAudience Known plus the
+// reply's current state and schedule, and no messages, so Exchange keeps both messages as they are.
 import { useState } from "react";
 import { Alert, Button, Container, Grid, Stack } from "@mui/material";
 import { Layout as DashboardLayout } from "../../../../layouts/index";
@@ -10,17 +12,21 @@ import { CippDataTable } from "../../../../components/CippTable/CippDataTable";
 import { CippInfoBar } from "../../../../components/CippCards/CippInfoBar";
 import { CippIcons } from "../../../../utils/icon-registry";
 import { useSettings } from "../../../../hooks/use-settings";
+import { usePermissions } from "../../../../hooks/use-permissions";
 import { ApiGetCall } from "../../../../api/ApiCall";
 
 const Page = () => {
   const tenant = useSettings().currentTenant;
   const allTenants = !tenant || tenant === "AllTenants";
   const [includeUpcoming, setIncludeUpcoming] = useState(false);
+  const { checkPermissions } = usePermissions();
+  const canWriteMailbox = checkPermissions(["Exchange.Mailbox.ReadWrite"]);
+  const queryKey = `OooExposure-${tenant}-${includeUpcoming}`;
 
   const report = ApiGetCall({
     url: "/api/ListOooExposure",
     data: { tenantFilter: tenant, includeUpcoming },
-    queryKey: `OooExposure-${tenant}-${includeUpcoming}`,
+    queryKey,
     waiting: !allTenants,
   });
 
@@ -39,7 +45,32 @@ const Page = () => {
   const errors = Array.isArray(report.data?.Errors) ? report.data.Errors : [];
   const noExchange = report.data?.Status === "NoExchange";
 
-  const actions = [];
+  const actions = [
+    {
+      label: "Limit external replies to known senders",
+      type: "POST",
+      icon: <CippIcons.LockPerson />,
+      url: "/api/ExecSetOoO",
+      // "!" sends the literal value; the other strings are row fields. StartTime/EndTime are Unix seconds, the
+      // same form the Exchange settings editor sends, and only used for Scheduled replies. No messages are sent.
+      data: {
+        userId: "Mailbox",
+        AutoReplyState: "AutoReplyState",
+        ExternalAudience: "!Known",
+        StartTime: "StartTimeUnix",
+        EndTime: "EndTimeUnix",
+      },
+      confirmText:
+        "Limit the external out-of-office reply for [Mailbox] to known senders (contacts only)? The internal and external messages and the schedule stay as they are. Review the external message for colleague addresses, phone numbers and payment instructions as well.",
+      multiPost: false,
+      relatedQueryKeys: [queryKey],
+      condition: (row) =>
+        canWriteMailbox &&
+        row.ExternalAudience === "All" &&
+        (row.AutoReplyState === "Enabled" ||
+          (row.AutoReplyState === "Scheduled" && row.StartTimeUnix && row.EndTimeUnix)),
+    },
+  ];
 
   return (
     <Container maxWidth={false} sx={{ flexGrow: 1, py: 2 }}>
@@ -90,7 +121,7 @@ const Page = () => {
             title={`Out-of-office exposure - ${tenant}`}
             data={rows}
             isFetching={report.isFetching}
-            queryKey={`OooExposure-${tenant}-${includeUpcoming}-table`}
+            queryKey={`${queryKey}-table`}
             actions={actions}
             offCanvas={{
               extendedInfoFields: [

@@ -71,6 +71,15 @@ function Invoke-ExecSetOoO {
             }
         }
 
+        # Aspendora fork (Vikunja CIPP-40): optional ExternalAudience (None, Known or All). Omitted = the old behaviour
+        # (All when an external message is sent, otherwise None). Sent alone with the current state and schedule, it
+        # changes only the audience; the Out-of-office Exposure page uses it to limit replies to known senders.
+        $ExternalAudience = $Request.Body.ExternalAudience.value ?? $Request.Body.ExternalAudience
+        if (-not [string]::IsNullOrWhiteSpace($ExternalAudience)) {
+            if ($ExternalAudience -notin @('None', 'Known', 'All')) { throw "ExternalAudience must be None, Known or All, not '$ExternalAudience'." }
+            $SplatParams.ExternalAudience = $ExternalAudience
+        }
+
         if (-not [string]::IsNullOrWhiteSpace($Request.Body.timezone)) {
             $SplatParams.Timezone = $Request.Body.timezone
         }
