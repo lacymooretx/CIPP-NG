@@ -116,6 +116,7 @@ Describe 'Get-CIPPEntraRecoveryCoverage' {
             $Row.cippComponents | Should -Be 'ca, groups, intuneconfig, users'
             $Row.cippBackupCount | Should -Be 2
             $Row.cippLastBackupAgeDays | Should -BeLessThan 1
+            $Row.cippLastBackup | Should -BeOfType [string]
             $Row.cippLastBackupItems | Should -Be 'ca: 12, users: 40'
             $Row.cippTasks | Should -Be 'CIPP Backup'
             $script:BackupProperty | Should -Not -Contain 'Backup'
@@ -254,6 +255,9 @@ Describe 'Get-CIPPEntraRecoveryCoverage' {
             $Row.nativeLatestAgeHours | Should -BeLessOrEqual 3.1
             $Row.nativeWindowDays | Should -Be 4.5
             $Row.nativeLatestChangedObjects | Should -Be 7
+            # A string, not a DateTime: the HTTP layer serialised a raw DateTime as an object of its parts (2026-11-01).
+            $Row.nativeLatestSnapshot | Should -BeOfType [string]
+            $Row.nativeLatestSnapshot | Should -Match '^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$'
             $Row.softDeletedCaPolicies | Should -Be 1
             $Row.softDeletedCaPolicyNames | Should -Be 'Block legacy auth'
             $Row.softDeletedNamedLocations | Should -Be 0

@@ -282,7 +282,8 @@ function Get-CIPPEntraRecoveryCoverage {
             nativeEligible             = ($Licence -in @('P1', 'P2'))
             nativeStatus               = $NativeStatus
             nativeSnapshotCount        = $SnapshotCount
-            nativeLatestSnapshot       = $LatestSnapshot
+            # ISO string, not the DateTime: the HTTP layer serialises a raw DateTime as an object of its parts.
+            nativeLatestSnapshot       = if ($LatestSnapshot) { $LatestSnapshot.ToString('yyyy-MM-ddTHH:mm:ssZ') } else { $null }
             nativeLatestAgeHours       = if ($LatestSnapshot) { [math]::Round(($Now - $LatestSnapshot).TotalHours, 1) } else { $null }
             nativeWindowDays           = if ($OldestSnapshot) { [math]::Round(($Now - $OldestSnapshot).TotalDays, 1) } else { $null }
             nativeLatestChangedObjects = $SnapshotChanged
@@ -290,7 +291,7 @@ function Get-CIPPEntraRecoveryCoverage {
             cippTasks                  = (@($Covering | ForEach-Object { if ($_.Disabled) { "$($_.Name) (disabled)" } else { $_.Name } }) -join ', ')
             cippComponents             = (@($Components | Sort-Object) -join ', ')
             cippBackupCount            = $TenantBackups.Count
-            cippLastBackup             = $LatestTime
+            cippLastBackup             = if ($LatestTime) { ([datetime]$LatestTime).ToString('yyyy-MM-ddTHH:mm:ssZ') } else { $null }
             cippLastBackupAgeDays      = $AgeDays
             cippLastBackupItems        = $ItemCounts
             gaps                       = ($Gaps -join '; ')
