@@ -9364,5 +9364,19 @@
     "addedDate": "2026-11-01",
     "powershellEquivalent": "Update-MgBetaOrganizationBrandingLocalization -IsKeepMeSignedInDisabled",
     "recommendedBy": []
+  },
+  {
+    "name": "standards.AuthenticatorCredentialRegistration",
+    "cat": "Entra (AAD) Standards",
+    "tag": [],
+    "helpText": "Creates the service principal for Microsoft Authenticator Credential Registration (6aa00308-ea33-4caa-90d6-ae905d8cb51b), so the resource can be selected in Conditional Access. Without it, a template that excludes this app has nothing to exclude. Provisioning changes no Conditional Access policy.",
+    "docsDescription": "Microsoft Learn documents that registering a passkey in Microsoft Authenticator is blocked by an All resources Conditional Access policy that requires a phishing-resistant authentication strength, an approved client app or an app protection policy, and that the fix is to exclude this resource after provisioning it. This standard reads the service principal and creates it when absent. It never changes a Conditional Access policy and never enables a service principal someone has disabled; a disabled one is reported as not compliant. The Conditional Access gap analysis lists the policies that actually block registration.",
+    "addedComponent": [],
+    "label": "Provision the Microsoft Authenticator Credential Registration app",
+    "impact": "Low Impact",
+    "impactColour": "info",
+    "addedDate": "2026-11-03",
+    "powershellEquivalent": "New-MgServicePrincipal -AppId 6aa00308-ea33-4caa-90d6-ae905d8cb51b",
+    "recommendedBy": []
   }
 ]

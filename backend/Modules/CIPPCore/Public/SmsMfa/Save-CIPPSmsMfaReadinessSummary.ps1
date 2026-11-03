@@ -52,6 +52,11 @@ function Save-CIPPSmsMfaReadinessSummary {
             RegistrationCampaignMethods   = [string]$S.RegistrationCampaignMethods
             RegistrationCampaignOk        = [bool]$S.RegistrationCampaignOk
             TelephonyProvider             = [string]$S.TelephonyProvider
+            CaWouldBlockRegistration      = [string]$S.CaWouldBlockRegistration
+            CaBlockEnforcedPolicies       = [string]$S.CaBlockEnforcedPolicies
+            CaBlockReportOnlyPolicies     = [string]$S.CaBlockReportOnlyPolicies
+            CaBlockPhoneOnlyUsers         = [int]$S.CaBlockPhoneOnlyUsers
+            RegisterSecurityInfoPolicy    = [string]$S.RegisterSecurityInfoPolicy
             Errors                 = @($Report.Findings | Where-Object Severity -EQ 'Error').Count
             Warnings               = @($Report.Findings | Where-Object Severity -EQ 'Warning').Count
         } | Out-Null

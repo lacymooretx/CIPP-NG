@@ -23,6 +23,29 @@ Every policy:
 | `06-signin-risk-high-block.CATemplate.json` | Sign-in risk high: block. Together with 05, high-risk sign-ins are blocked (block wins) and medium-risk sign-ins must do MFA. | **Entra ID P2** |
 | `07-user-risk-high-password-change.CATemplate.json` | User risk high: require MFA **and** a secure password change (`operator: AND`, `mfa` + `passwordChange`), sign-in frequency `everyTime`. This is Microsoft's "Require secure password change for elevated user risk" template. | **Entra ID P2** |
 
+## CIPP-7 and Microsoft Authenticator Credential Registration (Vikunja CIPP-53)
+
+`cipp7-phishres-admins.json` excludes `6aa00308-ea33-4caa-90d6-ae905d8cb51b`, Microsoft Authenticator Credential
+Registration. Microsoft Learn documents that an All resources policy requiring a phishing-resistant strength stops
+people registering a passkey in Authenticator, and the built-in strength does not allow a Temporary Access Pass.
+
+- **This file only.** The exclusion is on this template because it matches Learn's pattern. Do not copy it to MFA,
+  risk or block policies. Live policies and the template stored in CIPP's table (`ca58640f`) are unchanged: re-import
+  the file when you are ready, and only then does a deployment carry the exclusion.
+- **A missing service principal cannot drop it.** `New-CIPPCAPolicy` removes excluded apps with no service principal
+  in the tenant, and now logs a warning when it does. This app is the exception: it is provisioned instead, and if
+  that fails the deployment throws. The standard `AuthenticatorCredentialRegistration` provisions it ahead of time.
+- **What it costs.** It lets someone reach registration without phishing-resistant sign-in, and no tenant had a
+  Register security info policy as of 2026-11-03. Add one before enforcing. The gap analysis check
+  `Test-CIPPCAGapAuthenticatorRegistration` flags the matching policies, enforced and report-only separately, and a
+  missing Register security info policy. `Test-CIPPCAGapResourceExclusionBypass` raises a finding once this is on an
+  enforced policy, unless a policy covers Azure AD Graph.
+- **Test:** `pwsh backend/Tests/Invoke-CippTests.ps1 -Path Tests/Standards/Invoke-CIPPStandardAuthenticatorCredentialRegistration.Tests.ps1`,
+  and the same for `Tests/Security/AuthenticatorRegistrationBlock.Tests.ps1` and
+  `Tests/Private/New-CIPPCAPolicy.RequiredExclusions.Tests.ps1`.
+- **Rollback:** set `excludeApplications` back to `[]`. Provisioned service principals carry no permissions and can
+  stay.
+
 ## Licensing summary
 
 - **P2 needed:** 05, 06, 07 (any policy using `signInRiskLevels` or `userRiskLevels`). On a tenant without P2

@@ -38,6 +38,7 @@ function Get-CIPPCAGapAnalysis {
         'Test-CIPPCAGapPrivilegedRoleExclusion'
         'Test-CIPPCAGapGuestExclusion'
         'Test-CIPPCAGapCredentialRegistration'
+        'Test-CIPPCAGapAuthenticatorRegistration'
         'Test-CIPPCAGapGuestAuthStrength'
         'Test-CIPPCAGapProtectedActions'
         'Test-CIPPCAGapBreakGlass'
