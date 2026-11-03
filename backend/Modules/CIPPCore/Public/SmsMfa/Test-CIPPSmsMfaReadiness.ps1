@@ -45,6 +45,13 @@ function Test-CIPPSmsMfaReadiness {
         Guests stay out of Users and every pre-existing count (unchanged since CIPP-6); phone-only guests are
         returned in Guests and counted in the retirement figures only.
 
+        CA would block registration (CIPP-53): a phone-only user has to register a passkey at sign-in after their
+        date, so a policy that blocks registration turns the nudge into a lockout. CaWouldBlockRegistration is Yes,
+        ReportOnly, No or Unknown (from Get-CIPPCARegistrationBlock; Unknown when CA could not be read).
+        CaBlockPhoneOnlyUsers is an upper bound: phone-only accounts an enforced match could reach. Admin-role policies
+        count phone-only admins, other policies count everyone but their excluded users, and groups are not expanded.
+        ReadyByFeb2027 and ReadyByJul2027 do not consider this field.
+
         Report only: nothing is changed. Aspendora fork addition (Vikunja CIPP-6, CIPP-46).
     .FUNCTIONALITY
         Internal
@@ -65,6 +72,8 @@ function Test-CIPPSmsMfaReadiness {
         # earlier (February) date - the safe side for planning.
         [string[]]$GlobalAdminIds,
         [string[]]$GlobalAdminEligibleIds,
+        # Get-CIPPCARegistrationBlock result, or $null if Conditional Access could not be read.
+        $RegistrationBlock,
         # Injected for tests; "today" is this instant's US Central date.
         [datetime]$NowUtc = [datetime]::UtcNow
     )
@@ -374,6 +383,24 @@ function Test-CIPPSmsMfaReadiness {
         $What = if ($CampaignState -notin @('default', 'enabled')) { "is $CampaignState" } else { "targets $(if ($CampaignMethods.Count) { $CampaignMethods -join ', ' } else { 'no method' }), not passkeys" }
         & $Add 'SmsRetirementCampaign' 'Info' 'SMS/voice retirement: registration campaign' '' "The registration campaign $What." 'Set the registration campaign to Microsoft managed (or enabled) targeting passkeys, including your SMS/voice users (Entra > Authentication methods > Registration campaign).'
     }
+    # Conditional Access that would block the passkey registration (CIPP-53).
+    $CaWouldBlock = if ($null -ne $RegistrationBlock) { [string]$RegistrationBlock.CaWouldBlock } else { 'Unknown' }
+    $CaEnforcedNames = @($RegistrationBlock.Enforced | Where-Object { $_ } | ForEach-Object { $_.DisplayName })
+    $CaReportOnlyNames = @($RegistrationBlock.ReportOnly | Where-Object { $_ } | ForEach-Object { $_.DisplayName })
+    $CaBlockedIds = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+    foreach ($CaRow in @($RegistrationBlock.Enforced | Where-Object { $_ })) {
+        $InScope = if ($CaRow.UserScope -eq 'AdminRoles') { @($PhoneOnly | Where-Object IsAdmin) } else { $RetireAll }
+        foreach ($Person in $InScope) {
+            if (@($CaRow.ExcludeUsers) -notcontains $Person.Id) { [void]$CaBlockedIds.Add([string]$Person.Id) }
+        }
+    }
+    if ($CaWouldBlock -eq 'Yes') {
+        $CaSeverity = if ($CaBlockedIds.Count -gt 0) { 'Warning' } else { 'Info' }
+        $CaReach = if ($CaBlockedIds.Count -gt 0) { "Up to $($CaBlockedIds.Count) account(s) whose only MFA is SMS/voice are in scope and could be locked out after their retirement date." } else { 'No account whose only MFA is SMS/voice is in scope today.' }
+        & $Add 'SmsRetirementCaBlocksRegistration' $CaSeverity 'SMS/voice retirement: Conditional Access' '' "Enforced Conditional Access blocks passkey registration in Microsoft Authenticator: $($CaEnforcedNames -join ', '). $CaReach" 'Exclude the Authenticator Credential Registration app from these policies only, or split them for mobile (see the Conditional Access gap analysis).'
+    } elseif ($CaWouldBlock -eq 'ReportOnly') {
+        & $Add 'SmsRetirementCaMayBlockRegistration' 'Info' 'SMS/voice retirement: Conditional Access' '' "Report-only Conditional Access would block passkey registration in Microsoft Authenticator once enforced: $($CaReportOnlyNames -join ', ')." 'Add the Authenticator Credential Registration exclusion before enforcing these policies.'
+    }
     if ($Telephony -eq 'Configured') {
         & $Add 'SmsRetirementTelephonyProvider' 'Info' 'SMS/voice retirement: telephony provider' '' 'A telephony provider setting is present on the SMS or voice method, so SMS/voice may continue past the retirement dates for users moved to it.' 'Check the provider in Entra > Authentication methods and which users it covers.'
     }
@@ -421,6 +448,11 @@ function Test-CIPPSmsMfaReadiness {
         RegistrationCampaignTargetsPasskey = $CampaignTargetsPasskey
         RegistrationCampaignOk             = $CampaignOk
         TelephonyProvider                  = $Telephony
+        CaWouldBlockRegistration           = $CaWouldBlock
+        CaBlockEnforcedPolicies            = ($CaEnforcedNames -join ', ')
+        CaBlockReportOnlyPolicies          = ($CaReportOnlyNames -join ', ')
+        CaBlockPhoneOnlyUsers              = $CaBlockedIds.Count
+        RegisterSecurityInfoPolicy         = if ($null -ne $RegistrationBlock) { [string]$RegistrationBlock.RegisterSecurityInfoPolicy } else { 'Unknown' }
         GlobalAdminsKnown                  = $GaKnown
         GlobalAdmins                       = $GaSet.Count
         TodayCentral                       = $TodayCentral.ToString('yyyy-MM-dd')

@@ -292,11 +292,30 @@ function New-CIPPCAPolicy {
         # passed through untouched - filtering them out empties the array and Graph rejects the policy with a 1011.
         if ($JSONobj.conditions.applications.excludeApplications -and $JSONobj.conditions.applications.excludeApplications -notcontains 'All') {
             $ValidExclusions = [system.collections.generic.list[string]]::new()
+            $DroppedExclusions = [system.collections.generic.list[string]]::new()
+            # Aspendora fork addition (Vikunja CIPP-53): an exclusion the policy cannot work without must not be dropped.
+            # Without this one, users in scope cannot register a passkey in Authenticator, and the deploy still succeeds.
+            # The check is live because a preloaded list can predate the app being provisioned.
+            $RequiredExclusions = @('6aa00308-ea33-4caa-90d6-ae905d8cb51b')
             foreach ($appId in $JSONobj.conditions.applications.excludeApplications) {
                 if ([string]::IsNullOrWhiteSpace($appId)) { continue }
                 if (-not (Test-IsGuid -String $appId) -or $AllServicePrincipals.appId -contains $appId) {
                     $ValidExclusions.Add($appId)
+                } elseif ($RequiredExclusions -contains $appId) {
+                    $RequiredApp = Confirm-CIPPServicePrincipal -TenantFilter $TenantFilter -AppId $appId -Provision
+                    if (-not $RequiredApp.Present) {
+                        throw "Policy '$displayName' excludes application $appId, which has no service principal in tenant $TenantFilter and could not be provisioned ($($RequiredApp.State): $($RequiredApp.Error)). Deploying without the exclusion would block users, so the policy was not deployed."
+                    }
+                    if ($RequiredApp.Created) {
+                        Write-LogMessage -Tenant $TenantFilter -Headers $Headers -API $APIName -message "Provisioned the service principal for application $appId, which policy '$displayName' excludes." -Sev 'Info'
+                    }
+                    $ValidExclusions.Add($appId)
+                } else {
+                    $DroppedExclusions.Add($appId)
                 }
+            }
+            if ($DroppedExclusions.Count -gt 0) {
+                Write-LogMessage -Tenant $TenantFilter -Headers $Headers -API $APIName -message "Policy '$displayName': dropped excluded application(s) $($DroppedExclusions -join ', ') because they have no service principal in this tenant. The policy will apply to those applications if they are added later." -Sev 'Warning'
             }
             $JSONobj.conditions.applications.excludeApplications = $ValidExclusions
         }

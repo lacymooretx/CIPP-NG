@@ -15,6 +15,8 @@ function Get-CIPPSmsMfaReadiness {
                                                                        (role-assignable groups expanded)
           v1.0 roleManagement/directory/roleEligibilitySchedules        PIM-eligible Global Admins (P2; skipped
                                                                        silently without it)
+          v1.0 identity/conditionalAccess/policies                      policies that would block passkey registration
+                                                                       (app token; unreadable = Unknown, not an error)
         Sign-in activity (which method users actually used) is not read: the sign-in log has no filter on the
         method used, so it would mean paging every sign-in. Registration is what decides lock-out anyway.
         Returns @{ Tenant; Summary; Users; Guests; Findings; RegisteredByMethod; Errors }. Errors lists reads that should have
@@ -89,6 +91,16 @@ function Get-CIPPSmsMfaReadiness {
         @($R.userRegistrationMethodCounts | Where-Object { $_.userCount -gt 0 } | ForEach-Object { [pscustomobject]@{ Method = $_.authenticationMethod; Users = $_.userCount } })
     } catch { @() }
 
+    # CIPP-53. Not added to Errors when unreadable: that would stop the report being stored over an optional field.
+    # The grant carries each strength's allowedCombinations inline (seen live 2026-11-03), so strengths are not read.
+    $RegistrationBlock = $null
+    try {
+        $CaPolicies = @(New-GraphGetRequest -uri "$Graph/v1.0/identity/conditionalAccess/policies" -tenantid $TenantFilter -AsApp $true -ErrorAction Stop)
+        $RegistrationBlock = Get-CIPPCARegistrationBlock -Policies $CaPolicies
+    } catch {
+        Write-Information "SMS MFA readiness: could not read Conditional Access for $($TenantFilter): $(& $Err $_)"
+    }
+
     if ($null -eq $Registrations) {
         return [pscustomobject]@{ Tenant = $TenantFilter; Summary = $null; Users = @(); Guests = @(); Findings = @(); RegisteredByMethod = $ByMethod; Errors = @($Errors) }
     }
@@ -97,6 +109,7 @@ function Get-CIPPSmsMfaReadiness {
     if ($null -ne $Users) { $Params.Users = $Users }
     if ($null -ne $GlobalAdminIds) { $Params.GlobalAdminIds = $GlobalAdminIds }
     if ($null -ne $GlobalAdminEligibleIds) { $Params.GlobalAdminEligibleIds = $GlobalAdminEligibleIds }
+    if ($null -ne $RegistrationBlock) { $Params.RegistrationBlock = $RegistrationBlock }
     $Result = Test-CIPPSmsMfaReadiness @Params
 
     [pscustomobject]@{

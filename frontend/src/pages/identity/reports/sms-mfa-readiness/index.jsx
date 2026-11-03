@@ -23,6 +23,17 @@ const campaignText = (summary) => {
     summary.RegistrationCampaignState === "default" ? "Microsoft managed" : summary.RegistrationCampaignState;
   return summary.RegistrationCampaignMethods ? `${state}: ${summary.RegistrationCampaignMethods}` : state;
 };
+// Would Conditional Access stop the passkey registration Microsoft will require (CIPP-53)?
+const caBlockText = (value) =>
+  value === "Yes"
+    ? "Yes"
+    : value === "ReportOnly"
+      ? "Once report-only policies are enforced"
+      : value === "No"
+        ? "No"
+        : "Unknown";
+const caBlockColor = (value) =>
+  value === "Yes" ? "error" : value === "No" ? "success" : "warning";
 const optOutText = (value) =>
   value === "true" ? "Opted out (until 1 Feb 2027)" : value === "false" ? "Not opted out" : "Unknown";
 
@@ -74,6 +85,11 @@ const Page = () => {
                 "RegistrationCampaignMethods",
                 "PasskeyState",
                 "TelephonyProvider",
+                "CaWouldBlockRegistration",
+                "CaBlockEnforcedPolicies",
+                "CaBlockReportOnlyPolicies",
+                "CaBlockPhoneOnlyUsers",
+                "RegisterSecurityInfoPolicy",
                 "CheckedUtc",
               ]}
             />
@@ -170,6 +186,35 @@ const Page = () => {
                   summary?.PasskeyScope === "Groups" ? ` for ${summary.PasskeyGroups} group(s)` : ""
                 })`,
                 color: summary?.RegistrationCampaignOk ? "success" : "warning",
+              },
+            ]}
+          />
+        </Grid>
+        <Grid size={12}>
+          <CippInfoBar
+            isFetching={report.isFetching}
+            data={[
+              {
+                icon: <CippIcons.Block />,
+                data: caBlockText(summary?.CaWouldBlockRegistration),
+                name: `CA would block registration${
+                  summary?.CaBlockEnforcedPolicies || summary?.CaBlockReportOnlyPolicies
+                    ? ` (${summary?.CaBlockEnforcedPolicies || summary?.CaBlockReportOnlyPolicies})`
+                    : ""
+                }`,
+                color: caBlockColor(summary?.CaWouldBlockRegistration),
+              },
+              {
+                icon: <CippIcons.PhoneAndroid />,
+                data: summary?.CaBlockPhoneOnlyUsers ?? "-",
+                name: "SMS/voice-only accounts in scope of an enforced block (up to)",
+                color: summary?.CaBlockPhoneOnlyUsers > 0 ? "error" : "success",
+              },
+              {
+                icon: <CippIcons.Policy />,
+                data: summary?.RegisterSecurityInfoPolicy ?? "Unknown",
+                name: "Register security info policy",
+                color: summary?.RegisterSecurityInfoPolicy === "Enforced" ? "success" : "warning",
               },
             ]}
           />

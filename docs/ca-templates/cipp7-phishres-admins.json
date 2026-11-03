@@ -47,7 +47,7 @@
       "includeApplications": ["All"],
       "includeUserActions": [],
       "includeAuthenticationContextClassReferences": [],
-      "excludeApplications": []
+      "excludeApplications": ["6aa00308-ea33-4caa-90d6-ae905d8cb51b"]
     }
   },
   "displayName": "Aspendora - Require phishing-resistant MFA for admin roles (CIPP-7)"
