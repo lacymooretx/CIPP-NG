@@ -45,15 +45,20 @@ const Page = () => {
                 "P1Pool",
                 "P1InScope",
                 "P1Shortfall",
+                "P1ActiveShortfall",
+                "P1InactiveInScope",
                 "P1UserGaps",
                 "P2Pool",
                 "P2InScope",
                 "P2Shortfall",
+                "P2ActiveShortfall",
+                "P2InactiveInScope",
                 "P2UserGaps",
                 "P1InScopeWithReportOnly",
                 "P2InScopeWithReportOnly",
                 "EnabledMembers",
                 "NonPersonExcluded",
+                "ProvisioningExcluded",
                 "GuestsInScope",
                 "CheckedUtc",
               ]}
@@ -92,13 +97,13 @@ const Page = () => {
               {
                 icon: summary?.CoveredP1 ? <CippIcons.CheckCircle /> : <CippIcons.Cancel />,
                 data: seats(summary?.P1Pool, summary?.P1InScope),
-                name: `Entra ID P1 (${summary?.P1Shortfall ?? "-"} short)`,
+                name: `Entra ID P1 (${summary?.P1Shortfall ?? "-"} short, ${summary?.P1ActiveShortfall ?? "-"} counting active only)`,
                 color: summary?.CoveredP1 ? "success" : "error",
               },
               {
                 icon: summary?.CoveredP2 ? <CippIcons.CheckCircle /> : <CippIcons.Cancel />,
                 data: seats(summary?.P2Pool, summary?.P2InScope),
-                name: `Entra ID P2 (${summary?.P2Shortfall ?? "-"} short)`,
+                name: `Entra ID P2 (${summary?.P2Shortfall ?? "-"} short, ${summary?.P2ActiveShortfall ?? "-"} counting active only)`,
                 color: summary?.CoveredP2 ? "success" : "error",
               },
               {
@@ -158,6 +163,8 @@ const Page = () => {
               "InP2Scope",
               "HasP1Plan",
               "HasP2Plan",
+              "Inactive",
+              "LastSignIn",
             ]}
           />
         </Grid>

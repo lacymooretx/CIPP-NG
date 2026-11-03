@@ -26,7 +26,7 @@ function Invoke-ListEntraEntitlement {
             $AllowedIds = @(Test-CIPPAccess -Request $Request -TenantList)
             $Allowed = @(Get-Tenants | Where-Object { $AllowedIds -contains 'AllTenants' -or $_.customerId -in $AllowedIds } | ForEach-Object { [string]$_.defaultDomainName })
             $Rows = @(Get-CIPPAzDataTableEntity @Table -Filter "PartitionKey eq 'Summary'" | Where-Object { $_.RowKey -in $Allowed } |
-                    Select-Object Tenant, CheckedUtc, CoveredP1, CoveredP2, P1Pool, P1InScope, P1Shortfall, P1UserGaps, P2Pool, P2InScope, P2Shortfall, P2UserGaps, P1InScopeWithReportOnly, P2InScopeWithReportOnly, EnforcedPolicies, EnforcedRiskPolicies, EnabledMembers, NonPersonExcluded, GuestsInScope, Warnings |
+                    Select-Object Tenant, CheckedUtc, CoveredP1, CoveredP2, P1Pool, P1InScope, P1Shortfall, P1ActiveShortfall, P1InactiveInScope, P1UserGaps, P2Pool, P2InScope, P2Shortfall, P2ActiveShortfall, P2InactiveInScope, P2UserGaps, P1InScopeWithReportOnly, P2InScopeWithReportOnly, EnforcedPolicies, EnforcedRiskPolicies, EnabledMembers, NonPersonExcluded, ProvisioningExcluded, GuestsInScope, Warnings |
                     Sort-Object Tenant)
             return ([HttpResponseContext]@{ StatusCode = [HttpStatusCode]::OK; Body = @{ Results = $Rows } })
         }

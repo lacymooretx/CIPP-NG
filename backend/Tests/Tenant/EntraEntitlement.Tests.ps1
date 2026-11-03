@@ -23,9 +23,9 @@ BeforeAll {
         }
     }
     function New-TestUser {
-        param($Id, [string[]]$Plans = @(), $Enabled = $true, $Type = 'Member', $PlanStatus = 'Enabled')
+        param($Id, [string[]]$Plans = @(), $Enabled = $true, $Type = 'Member', $PlanStatus = 'Enabled', $Created = '2020-01-01T00:00:00Z')
         [pscustomobject]@{
-            id = $Id; userPrincipalName = "$Id@contoso.com"; displayName = $Id; accountEnabled = $Enabled; userType = $Type
+            id = $Id; userPrincipalName = "$Id@contoso.com"; displayName = $Id; accountEnabled = $Enabled; userType = $Type; createdDateTime = $Created
             assignedPlans = @($Plans | ForEach-Object { [pscustomobject]@{ servicePlanId = $_; capabilityStatus = $PlanStatus } })
         }
     }
@@ -157,6 +157,73 @@ Describe 'Test-CIPPEntraEntitlement scope' {
     }
 }
 
+Describe 'Test-CIPPEntraEntitlement inactive and provisioning accounts' {
+    BeforeAll {
+        $script:AsOf = [datetimeoffset]'2026-11-03T00:00:00Z'
+        $script:Recent = '2026-10-20T00:00:00Z'
+        $script:Old = '2025-01-01T00:00:00Z'
+    }
+
+    It 'leaves provisioning package accounts out and reports them' {
+        $Pkg = New-TestUser 'pkg'
+        $Pkg.userPrincipalName = 'package_132ea6ea-3d06-4792-a727-1937f3733577@contoso.com'
+        $R = Test-CIPPEntraEntitlement -Users @((New-TestUser 'a'), $Pkg) -Policies @((New-CaPolicy))
+        $R.Summary.P1InScope | Should -Be 1
+        $R.Summary.ProvisioningExcluded | Should -Be 1
+        ($R.Findings | Where-Object Key -EQ 'ProvisioningAccountsExcluded').Severity | Should -Be 'Info'
+    }
+
+    It 'does not treat a person whose name starts with package_ as a provisioning account' {
+        $U = New-TestUser 'p'
+        $U.userPrincipalName = 'package_room@contoso.com'
+        (Test-CIPPEntraEntitlement -Users @($U) -Policies @((New-CaPolicy))).Summary.ProvisioningExcluded | Should -Be 0
+    }
+
+    It 'keeps a Warning when the active accounts alone exceed the pool, and gives both numbers' {
+        $R = Test-CIPPEntraEntitlement -AsOf $AsOf -Skus @((New-Sku 'SPB' @($P1) 1)) -Users @((New-TestUser 'a'), (New-TestUser 'b'), (New-TestUser 'c')) -Policies @((New-CaPolicy)) -LastSignIn @{ a = $Recent; b = $Recent; c = $Old }
+        $R.Summary.P1Shortfall | Should -Be 2
+        $R.Summary.P1ActiveShortfall | Should -Be 1
+        $Finding = $R.Findings | Where-Object Key -EQ 'P1Shortfall'
+        $Finding.Severity | Should -Be 'Warning'
+        $Finding.Message | Should -Match '1 of these accounts have no sign-in for 90 days; without them the tenant is 1 short'
+    }
+
+    It 'downgrades to Info when only inactive accounts exceed the pool' {
+        $R = Test-CIPPEntraEntitlement -AsOf $AsOf -Skus @((New-Sku 'SPB' @($P1) 1)) -Users @((New-TestUser 'a'), (New-TestUser 'c')) -Policies @((New-CaPolicy)) -LastSignIn @{ a = $Recent; c = $Old }
+        $R.Summary.P1Shortfall | Should -Be 1
+        $R.Summary.P1ActiveShortfall | Should -Be 0
+        $R.Summary.CoveredP1 | Should -BeFalse
+        @($R.Findings | Where-Object Severity -EQ 'Warning').Count | Should -Be 0
+        ($R.Findings | Where-Object Key -EQ 'P1InactiveOnly').Severity | Should -Be 'Info'
+    }
+
+    It 'applies the same rule to P2' {
+        $Risk = New-CaPolicy -SignInRisk @('high')
+        $R = Test-CIPPEntraEntitlement -AsOf $AsOf -Skus @((New-Sku 'E5' @($P1, $P2) 1)) -Users @((New-TestUser 'a'), (New-TestUser 'c')) -Policies @($Risk) -LastSignIn @{ a = $Recent; c = $Old }
+        $R.Summary.P2ActiveShortfall | Should -Be 0
+        ($R.Findings | Where-Object Key -EQ 'P2InactiveOnly').Severity | Should -Be 'Info'
+    }
+
+    It 'treats no recorded sign-in as inactive for an old account and active for a new one' {
+        $R = Test-CIPPEntraEntitlement -AsOf $AsOf -Users @((New-TestUser 'old'), (New-TestUser 'new' -Created '2026-10-30T00:00:00Z')) -Policies @((New-CaPolicy)) -LastSignIn @{ old = $null; new = $null }
+        ($R.Users | Where-Object Id -EQ 'old').Inactive | Should -BeTrue
+        ($R.Users | Where-Object Id -EQ 'new').Inactive | Should -BeFalse
+    }
+
+    It 'counts everyone as active without sign-in data, and an account missing from it as active' {
+        $None = Test-CIPPEntraEntitlement -AsOf $AsOf -Skus @((New-Sku 'SPB' @($P1) 0)) -Users @((New-TestUser 'a')) -Policies @((New-CaPolicy))
+        $None.Summary.SignInDataAvailable | Should -BeFalse
+        $None.Summary.P1ActiveShortfall | Should -Be 1
+        $Missing = Test-CIPPEntraEntitlement -AsOf $AsOf -Users @((New-TestUser 'a')) -Policies @((New-CaPolicy)) -LastSignIn @{ other = $Old }
+        ($Missing.Users | Where-Object Id -EQ 'a').Inactive | Should -BeFalse
+    }
+
+    It 'accepts DateTime values as ConvertFrom-Json produces them' {
+        $R = Test-CIPPEntraEntitlement -AsOf $AsOf -Users @((New-TestUser 'a')) -Policies @((New-CaPolicy)) -LastSignIn @{ a = [datetime]'2026-10-20T00:00:00Z' }
+        ($R.Users | Where-Object Id -EQ 'a').Inactive | Should -BeFalse
+    }
+}
+
 Describe 'Get-CIPPEntraEntitlement' {
     BeforeAll {
         function Get-CippException { param($Exception) [pscustomobject]@{ NormalizedError = "$Exception" } }
@@ -232,6 +299,35 @@ Describe 'Get-CIPPEntraEntitlement' {
         $R.Summary.P1InScope | Should -Be 1
     }
 
+    It 'uses the latest of the sign-in dates and passes them to the evaluator' {
+        $script:Graph.Insert(0, 'signInActivity', @(
+                [pscustomobject]@{ id = 'a'; signInActivity = [pscustomobject]@{ lastSignInDateTime = '2020-01-01T00:00:00Z'; lastNonInteractiveSignInDateTime = ([datetimeoffset]::UtcNow.AddDays(-1).ToString('o')); lastSuccessfulSignInDateTime = '0001-01-01T00:00:00Z' } }
+                [pscustomobject]@{ id = 'b'; signInActivity = [pscustomobject]@{ lastSignInDateTime = '2020-01-01T00:00:00Z' } }
+                [pscustomobject]@{ id = 'c'; signInActivity = $null }
+            ))
+        $script:Graph['v1.0/users'] = @((New-TestUser 'a'), (New-TestUser 'b'), (New-TestUser 'c'))
+        $R = Get-CIPPEntraEntitlement -TenantFilter 'contoso.com'
+        $R.Summary.SignInDataAvailable | Should -BeTrue
+        ($R.Users | Where-Object Id -EQ 'a').Inactive | Should -BeFalse
+        ($R.Users | Where-Object Id -EQ 'b').Inactive | Should -BeTrue
+        ($R.Users | Where-Object Id -EQ 'c').Inactive | Should -BeTrue
+    }
+
+    It 'counts everyone as active with a note when the sign-in read fails' {
+        $script:Graph.Insert(0, 'signInActivity', 'THROW:Authentication_RequestFromNonPremiumTenantOrB2CTenant')
+        $R = Get-CIPPEntraEntitlement -TenantFilter 'contoso.com'
+        $R.Errors | Should -BeNullOrEmpty
+        $R.Summary.SignInDataAvailable | Should -BeFalse
+        ($R.Notes -join ' ') | Should -Match 'every account counts as active'
+    }
+
+    It 'treats a read with no activity for anyone as unavailable, not as everyone inactive' {
+        $script:Graph.Insert(0, 'signInActivity', @([pscustomobject]@{ id = 'a'; signInActivity = $null }))
+        $R = Get-CIPPEntraEntitlement -TenantFilter 'contoso.com'
+        $R.Summary.SignInDataAvailable | Should -BeFalse
+        $R.Summary.P1InactiveInScope | Should -Be 0
+    }
+
     It 'notes when there is no mailbox cache' {
         $script:Mailboxes = @()
         $R = Get-CIPPEntraEntitlement -TenantFilter 'contoso.com'
@@ -295,11 +391,13 @@ Describe 'Invoke-CippTestGenericTestEntraEntitlement' {
         function Get-CippException { param($Exception) [pscustomobject]@{ NormalizedError = "$Exception" } }
         function Add-CippTestResult { param($TenantFilter, $TestId, $TestType, $Name, $UserImpact, $ImplementationEffort, $Category, $Status, $Risk, $ResultMarkdown) $script:Result = [pscustomobject]@{ TestId = $TestId; Status = $Status; Markdown = [string]$ResultMarkdown } }
         function Add-Summary {
-            param([bool]$Covered = $true)
-            Add-CIPPAzDataTableEntity -TableName 'EntraEntitlement' -Force -Entity @{
-                PartitionKey = 'Summary'; RowKey = 'contoso.com'; CheckedUtc = '2026-11-02T18:00:00Z'; CoveredP1 = $Covered; CoveredP2 = $true
-                P1Pool = 5; P1InScope = 7; P1Shortfall = 2; P1UserGaps = 1; P1InScopeWithReportOnly = 7; P2Pool = 0; P2InScope = 0; P2Shortfall = 0; P2UserGaps = 0; P2InScopeWithReportOnly = 0
+            param([int]$Short = 0, $Active = 0)
+            $Entity = @{
+                PartitionKey = 'Summary'; RowKey = 'contoso.com'; CheckedUtc = '2026-11-02T18:00:00Z'; CoveredP1 = $Short -eq 0; CoveredP2 = $true
+                P1Pool = 5; P1InScope = 5 + $Short; P1Shortfall = $Short; P1UserGaps = 1; P1InScopeWithReportOnly = 7; P2Pool = 0; P2InScope = 0; P2Shortfall = 0; P2UserGaps = 0; P2InScopeWithReportOnly = 0
             }
+            if ($null -ne $Active) { $Entity.P1ActiveShortfall = $Active; $Entity.P2ActiveShortfall = 0 }
+            Add-CIPPAzDataTableEntity -TableName 'EntraEntitlement' -Force -Entity $Entity
         }
     }
     BeforeEach { Reset-AlertStore; $script:Result = $null }
@@ -310,7 +408,7 @@ Describe 'Invoke-CippTestGenericTestEntraEntitlement' {
     }
 
     It 'fails on a shortfall and shows the check time in US Central' {
-        Add-Summary -Covered $false
+        Add-Summary -Short 2 -Active 1
         Invoke-CippTestGenericTestEntraEntitlement -Tenant 'contoso.com'
         $script:Result.Status | Should -Be 'Failed'
         $script:Result.TestId | Should -Be 'GenericTestEntraEntitlement'
@@ -321,5 +419,18 @@ Describe 'Invoke-CippTestGenericTestEntraEntitlement' {
         Add-Summary
         Invoke-CippTestGenericTestEntraEntitlement -Tenant 'contoso.com'
         $script:Result.Status | Should -Be 'Passed'
+    }
+
+    It 'passes and says so when only inactive accounts exceed the seats' {
+        Add-Summary -Short 2 -Active 0
+        Invoke-CippTestGenericTestEntraEntitlement -Tenant 'contoso.com'
+        $script:Result.Status | Should -Be 'Passed'
+        $script:Result.Markdown | Should -Match 'Only inactive accounts exceed them'
+    }
+
+    It 'falls back to the full shortfall for a summary stored before the active counts existed' {
+        Add-Summary -Short 2 -Active $null
+        Invoke-CippTestGenericTestEntraEntitlement -Tenant 'contoso.com'
+        $script:Result.Status | Should -Be 'Failed'
     }
 }

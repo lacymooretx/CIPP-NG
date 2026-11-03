@@ -11,6 +11,7 @@ function Get-CIPPEntraEntitlement {
           v1.0 groups/{id}/transitiveMembers                      only groups those policies reference
           v1.0 roleManagement/directory/roleAssignments           only roles those policies reference
           v1.0 roleManagement/directory/roleEligibilitySchedules  PIM-eligible holders (needs P2; silent without it)
+          v1.0 users (with signInActivity)                        last sign-in, best effort (needs a premium tenant)
           CIPP cache: Mailboxes                                   shared and resource mailbox accounts, best effort
 
         Role assignments are read with $select only: $expand=principal fails the whole query if one assignment points
@@ -37,7 +38,7 @@ function Get-CIPPEntraEntitlement {
     catch { $Errors.Add("Licences: $(& $Err $_)") }
 
     $Users = @()
-    try { $Users = @(New-GraphGetRequest -uri "$Graph/users?`$select=id,displayName,userPrincipalName,accountEnabled,userType,assignedPlans&`$top=999" -tenantid $TenantFilter -ErrorAction Stop) }
+    try { $Users = @(New-GraphGetRequest -uri "$Graph/users?`$select=id,displayName,userPrincipalName,accountEnabled,userType,createdDateTime,assignedPlans&`$top=999" -tenantid $TenantFilter -ErrorAction Stop) }
     catch { $Errors.Add("Users: $(& $Err $_)") }
 
     $Policies = @()
@@ -47,6 +48,32 @@ function Get-CIPPEntraEntitlement {
     $Active = @($Policies | Where-Object { [string]$_.state -in @('enabled', 'enabledForReportingButNotEnforced') })
     $UserIds = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
     foreach ($U in $Users) { if ($U.id) { [void]$UserIds.Add([string]$U.id) } }
+
+    # --- Last sign-in: asked for separately because Graph caps the page at 500 with signInActivity. Best effort: without
+    # it every account counts as active, so a failed read can only overstate a shortfall. A read returning no activity
+    # for anyone is treated as unavailable, or a silent null would make every account look inactive and hide a shortfall.
+    $LastSignIn = $null
+    try {
+        $Activity = @(New-GraphGetRequest -uri "$Graph/users?`$select=id,signInActivity&`$top=500" -tenantid $TenantFilter -AsApp $true -ErrorAction Stop)
+        if (@($Activity | Where-Object { $_.signInActivity }).Count -gt 0) {
+            $Map = @{}
+            foreach ($Row in $Activity) {
+                $Dates = @(foreach ($Name in 'lastSignInDateTime', 'lastNonInteractiveSignInDateTime', 'lastSuccessfulSignInDateTime') {
+                        $Value = $Row.signInActivity.$Name
+                        if ($Value) {
+                            $Date = if ($Value -is [datetime]) { [datetimeoffset]$Value } else { [datetimeoffset][string]$Value }
+                            if ($Date.Year -ge 2000) { $Date }
+                        }
+                    })
+                $Map[[string]$Row.id] = if ($Dates.Count -gt 0) { ($Dates | Sort-Object -Descending | Select-Object -First 1) } else { $null }
+            }
+            $LastSignIn = $Map
+        } else {
+            $Notes.Add('Graph returned no sign-in activity, so every account counts as active.')
+        }
+    } catch {
+        $Notes.Add("Could not read sign-in activity, so every account counts as active: $(& $Err $_)")
+    }
 
     # --- Referenced groups ---
     $GroupMembers = @{}
@@ -112,7 +139,7 @@ function Get-CIPPEntraEntitlement {
         return [pscustomobject]@{ Tenant = $TenantFilter; Summary = $null; Skus = @(); Users = @(); Findings = @(); Errors = @($Errors); Notes = @($Notes) }
     }
 
-    $Result = Test-CIPPEntraEntitlement -Skus $Skus -Users $Users -Policies $Policies -GroupMembers $GroupMembers -RoleMembers $RoleMembers -NonPersonIds $NonPersonIds
+    $Result = Test-CIPPEntraEntitlement -Skus $Skus -Users $Users -Policies $Policies -GroupMembers $GroupMembers -RoleMembers $RoleMembers -NonPersonIds $NonPersonIds -LastSignIn $LastSignIn
     [pscustomobject]@{
         Tenant   = $TenantFilter
         Summary  = $Result.Summary

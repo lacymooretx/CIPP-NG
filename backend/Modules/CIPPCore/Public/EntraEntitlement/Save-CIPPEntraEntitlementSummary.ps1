@@ -32,6 +32,13 @@ function Save-CIPPEntraEntitlementSummary {
             P2InScope               = [int]$S.P2InScope
             P1Shortfall             = [int]$S.P1Shortfall
             P2Shortfall             = [int]$S.P2Shortfall
+            P1ActiveShortfall       = [int]$S.P1ActiveShortfall
+            P2ActiveShortfall       = [int]$S.P2ActiveShortfall
+            P1InactiveInScope       = [int]$S.P1InactiveInScope
+            P2InactiveInScope       = [int]$S.P2InactiveInScope
+            InactiveDays            = [int]$S.InactiveDays
+            SignInDataAvailable     = [bool]$S.SignInDataAvailable
+            ProvisioningExcluded    = [int]$S.ProvisioningExcluded
             P1UserGaps              = [int]$S.P1UserGaps
             P2UserGaps              = [int]$S.P2UserGaps
             P1InScopeWithReportOnly = [int]$S.P1InScopeWithReportOnly

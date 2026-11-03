@@ -17,7 +17,13 @@ function Test-CIPPEntraEntitlement {
 
         Severity: a pool smaller than the users in scope of enforced policies is a Warning. Users in scope with no plan
         assigned are Info: true-up evidence, not a failure. Shared and resource mailbox accounts are left out of the
-        counts and reported, because they are not people, though an enabled one can still sign in.
+        counts and reported, because they are not people, though an enabled one can still sign in. So are Windows
+        provisioning package accounts (package_<guid>@...), created by Windows Configuration Designer for bulk enrolment.
+
+        Accounts in scope with no sign-in for InactiveDays are flagged, and stay in the counts. A shortfall is a Warning
+        only if the active accounts alone exceed the pool; if only inactive accounts push it over it is Info, because
+        the fix is to clean up accounts and not to buy seats. Accounts newer than InactiveDays are active. With no
+        sign-in data, or for an account missing from it, the account counts as active, so nothing is hidden.
 
         Report only. Aspendora fork addition (Vikunja CIPP-47), written from Microsoft's documentation.
     .FUNCTIONALITY
@@ -37,6 +43,10 @@ function Test-CIPPEntraEntitlement {
         [hashtable]$RoleMembers = @{},
         # Object ids of shared, room and equipment mailbox accounts.
         [string[]]$NonPersonIds = @(),
+        # User id -> latest sign-in (datetime or ISO string), $null for none recorded. Omit if sign-in data is unavailable.
+        [hashtable]$LastSignIn = $null,
+        [int]$InactiveDays = 90,
+        [datetimeoffset]$AsOf = [datetimeoffset]::UtcNow,
         # Accounts named per aggregate finding before "and N more".
         [int]$ListLimit = 25
     )
@@ -104,9 +114,22 @@ function Test-CIPPEntraEntitlement {
     }
 
     # --- Per-user evaluation ---
+    $ToDate = {
+        param($Value)
+        if ($null -eq $Value -or "$Value" -eq '') { return $null }
+        if ($Value -is [datetimeoffset]) { return $Value }
+        if ($Value -is [datetime]) { return [datetimeoffset]$Value }
+        return [datetimeoffset][string]$Value
+    }
+    $Cutoff = $AsOf.AddDays(-$InactiveDays)
+    $SignInKnown = @{}
+    if ($null -ne $LastSignIn) {
+        foreach ($Id in @($LastSignIn.Keys)) { $SignInKnown[([string]$Id).ToLowerInvariant()] = $LastSignIn[$Id] }
+    }
     $Rows = [System.Collections.Generic.List[object]]::new()
     $EnabledMembers = 0
     $NonPersonExcluded = 0
+    $ProvisioningExcluded = 0
     $GuestsEnabled = 0
     $GuestsInScope = 0
     foreach ($U in @($Users)) {
@@ -125,6 +148,7 @@ function Test-CIPPEntraEntitlement {
             continue
         }
         if ($NonPerson.Contains([string]$U.id)) { $NonPersonExcluded++; continue }
+        if ([string]$U.userPrincipalName -match '^package_[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}@') { $ProvisioningExcluded++; continue }
         $EnabledMembers++
 
         $P1Scope = & $InScopeOfAny $Enforced $Principal
@@ -136,6 +160,13 @@ function Test-CIPPEntraEntitlement {
         $Assigned = @($U.assignedPlans | Where-Object { [string]$_.capabilityStatus -in @('Enabled', 'Warning') } | ForEach-Object { [string]$_.servicePlanId })
         $HasP2 = $Assigned -contains $P2Plan
         $HasP1 = $HasP2 -or $Assigned -contains $P1Plan
+        $Last = $null
+        $Inactive = $false
+        if ($SignInKnown.ContainsKey($Key)) {
+            $Last = & $ToDate $SignInKnown[$Key]
+            $Created = & $ToDate $U.createdDateTime
+            $Inactive = if ($Last) { $Last -lt $Cutoff } else { $Created -and $Created -lt $Cutoff }
+        }
         $Rows.Add([pscustomobject]@{
                 Id                = [string]$U.id
                 UserPrincipalName = [string]$U.userPrincipalName
@@ -148,6 +179,8 @@ function Test-CIPPEntraEntitlement {
                 P1Gap             = [bool]($P1Scope -and -not $HasP1)
                 P2Gap             = [bool]($P2Scope -and -not $HasP2)
                 PlannedP2         = [bool]$P2Planned
+                Inactive          = [bool]$Inactive
+                LastSignIn        = if ($Last) { $Last.UtcDateTime.ToString('o') } else { '' }
             })
     }
 
@@ -159,6 +192,14 @@ function Test-CIPPEntraEntitlement {
     $P2Gaps = @($Rows | Where-Object P2Gap)
     $P1Short = [math]::Max(0, $P1InScope - $P1Pool)
     $P2Short = [math]::Max(0, $P2InScope - $P2Pool)
+    $P1Inactive = @($Rows | Where-Object { $_.InP1Scope -and $_.Inactive })
+    $P2Inactive = @($Rows | Where-Object { $_.InP2Scope -and $_.Inactive })
+    $P1ActiveShort = [math]::Max(0, $P1InScope - $P1Inactive.Count - $P1Pool)
+    $P2ActiveShort = [math]::Max(0, $P2InScope - $P2Inactive.Count - $P2Pool)
+    $InactiveText = {
+        param($Count, $ActiveShort)
+        if ($Count -gt 0) { " $Count of these accounts have no sign-in for $InactiveDays days; without them the tenant is $ActiveShort short." } else { '' }
+    }
 
     # --- Findings ---
     $Findings = [System.Collections.Generic.List[object]]::new()
@@ -174,12 +215,19 @@ function Test-CIPPEntraEntitlement {
     }
     $SuspendedP2 = @($SkuRows | Where-Object { $_.Plans -match 'P2' -and $_.Suspended -gt 0 } | ForEach-Object { $_.Sku })
 
-    if ($P1Short -gt 0) {
-        & $Add 'P1Shortfall' 'Warning' 'Entra ID P1 pool smaller than Conditional Access scope' "$P1InScope enabled member user(s) are in scope of $($Enforced.Count) enforced Conditional Access policies, but the tenant owns $P1Pool seat(s) carrying Entra ID P1: $P1Short short." 'Buy more seats carrying Entra ID P1, or narrow the policies. Check for accounts that do not need to be enabled.'
+    if ($P1ActiveShort -gt 0) {
+        & $Add 'P1Shortfall' 'Warning' 'Entra ID P1 pool smaller than Conditional Access scope' "$P1InScope enabled member user(s) are in scope of $($Enforced.Count) enforced Conditional Access policies, but the tenant owns $P1Pool seat(s) carrying Entra ID P1: $P1Short short.$(& $InactiveText $P1Inactive.Count $P1ActiveShort)" 'Review the account list first: disable accounts that are not needed, then buy seats carrying Entra ID P1 for the rest, or narrow the policies.'
+    } elseif ($P1Short -gt 0) {
+        & $Add 'P1InactiveOnly' 'Info' 'Only inactive accounts exceed the P1 pool' "$P1InScope accounts are in scope and the tenant owns $P1Pool P1 seat(s), but $($P1Inactive.Count) of them have no sign-in for $InactiveDays days, so the active accounts fit." 'Disable the accounts that are not needed.'
     }
-    if ($P2Short -gt 0) {
+    if ($P2ActiveShort -gt 0) {
         $Why = if ($SuspendedP2.Count -gt 0) { " Suspended SKU(s) carrying P2, which add no seats: $($SuspendedP2 -join ', ')." } else { '' }
-        & $Add 'P2Shortfall' 'Warning' 'Entra ID P2 pool smaller than risk-based policy scope' "$P2InScope enabled member user(s) are in scope of $($EnforcedRisk.Count) enforced risk-based Conditional Access policies ($(@($EnforcedRisk | ForEach-Object { $_.displayName }) -join ', ')), but the tenant owns $P2Pool seat(s) carrying Entra ID P2: $P2Short short.$Why" 'Buy seats carrying Entra ID P2, or remove the risk conditions from these policies.'
+        & $Add 'P2Shortfall' 'Warning' 'Entra ID P2 pool smaller than risk-based policy scope' "$P2InScope enabled member user(s) are in scope of $($EnforcedRisk.Count) enforced risk-based Conditional Access policies ($(@($EnforcedRisk | ForEach-Object { $_.displayName }) -join ', ')), but the tenant owns $P2Pool seat(s) carrying Entra ID P2: $P2Short short.$(& $InactiveText $P2Inactive.Count $P2ActiveShort)$Why" 'Buy seats carrying Entra ID P2, or remove the risk conditions from these policies.'
+    } elseif ($P2Short -gt 0) {
+        & $Add 'P2InactiveOnly' 'Info' 'Only inactive accounts exceed the P2 pool' "$P2InScope accounts are in scope of risk-based policies and the tenant owns $P2Pool P2 seat(s), but $($P2Inactive.Count) of them have no sign-in for $InactiveDays days, so the active accounts fit." 'Disable the accounts that are not needed.'
+    }
+    if ($P1Inactive.Count -gt 0) {
+        & $Add 'InactiveInScope' 'Info' "In scope with no sign-in for $InactiveDays days" "$($P1Inactive.Count) account(s): $(& $Names $P1Inactive)." 'Disable the account if nothing uses it. Check service accounts before disabling: a few sign in rarely.'
     }
     if ($P1Gaps.Count -gt 0) {
         & $Add 'P1UserGaps' 'Info' 'In scope of Conditional Access with no P1 plan assigned' "True-up evidence: $($P1Gaps.Count) user(s): $(& $Names $P1Gaps)." 'Assign a licence carrying Entra ID P1 where the account is a person. Service accounts need a decision.'
@@ -200,6 +248,10 @@ function Test-CIPPEntraEntitlement {
         & $Add 'NonPersonAccountsExcluded' 'Info' 'Shared and resource mailbox accounts left out of the counts' "$NonPersonExcluded enabled shared, room or equipment mailbox account(s) were not counted." 'Block sign-in on these accounts if nothing signs in with them.'
     }
 
+    if ($ProvisioningExcluded -gt 0) {
+        & $Add 'ProvisioningAccountsExcluded' 'Info' 'Provisioning package accounts left out of the counts' "$ProvisioningExcluded enabled Windows provisioning package account(s) (package_...) were not counted." 'Delete the accounts of packages no longer in use, or disable them.'
+    }
+
     $Order = @{ Warning = 0; Info = 1 }
     [pscustomobject]@{
         Summary  = [pscustomobject]@{
@@ -211,6 +263,13 @@ function Test-CIPPEntraEntitlement {
             P2InScope             = $P2InScope
             P1Shortfall           = $P1Short
             P2Shortfall           = $P2Short
+            P1ActiveShortfall     = $P1ActiveShort
+            P2ActiveShortfall     = $P2ActiveShort
+            P1InactiveInScope     = $P1Inactive.Count
+            P2InactiveInScope     = $P2Inactive.Count
+            InactiveDays          = $InactiveDays
+            SignInDataAvailable   = $null -ne $LastSignIn
+            ProvisioningExcluded  = $ProvisioningExcluded
             P1UserGaps            = $P1Gaps.Count
             P2UserGaps            = $P2Gaps.Count
             P1InScopeWithReportOnly = $P1WithReportOnly

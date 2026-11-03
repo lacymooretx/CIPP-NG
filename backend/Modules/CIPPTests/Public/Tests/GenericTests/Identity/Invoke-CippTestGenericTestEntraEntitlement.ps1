@@ -24,18 +24,22 @@ function Invoke-CippTestGenericTestEntraEntitlement {
             Add-CippTestResult @Common -Status 'Skipped' -Risk 'Medium' -ResultMarkdown 'Not checked yet. Open **Identity > Reports > Entra ID P1/P2 True-Up** for this tenant, or schedule the Entra ID P1/P2 alert.'
             return
         }
-        $Covered = [bool]$S.CoveredP1 -and [bool]$S.CoveredP2
+        # Same rule as the alert: inactive accounts alone do not fail the test. Summaries stored before the active
+        # counts existed fall back to the full shortfall.
+        $P1Active = $S.P1ActiveShortfall ?? $S.P1Shortfall
+        $P2Active = $S.P2ActiveShortfall ?? $S.P2Shortfall
+        $Covered = ([int]$P1Active + [int]$P2Active) -eq 0
         $Checked = try {
             $Zone = [System.TimeZoneInfo]::FindSystemTimeZoneById('America/Chicago')
             $Local = [System.TimeZoneInfo]::ConvertTimeFromUtc(([datetimeoffset][string]$S.CheckedUtc).UtcDateTime, $Zone)
             "$($Local.ToString('yyyy-MM-dd HH:mm')) US Central"
         } catch { [string]$S.CheckedUtc }
-        $Lead = if ($Covered) { 'The tenant owns enough seats for the users in scope of enforced policies.' } else { 'The tenant owns fewer seats than the users in scope of enforced policies.' }
+        $Lead = if ($Covered -and ([int]$S.P1Shortfall + [int]$S.P2Shortfall) -gt 0) { 'The tenant owns enough seats for its active users in scope of enforced policies. Only inactive accounts exceed them.' } elseif ($Covered) { 'The tenant owns enough seats for the users in scope of enforced policies.' } else { 'The tenant owns fewer seats than the users in scope of enforced policies.' }
         $Md = [System.Text.StringBuilder]::new("$Lead`n`n")
-        $null = $Md.Append("| Tier | Seats owned | Users in scope | Short | In scope with no plan assigned | In scope if report-only policies were enabled |`n")
-        $null = $Md.Append("|---|---|---|---|---|---|`n")
-        $null = $Md.Append("| P1 | $($S.P1Pool) | $($S.P1InScope) | $($S.P1Shortfall) | $($S.P1UserGaps) | $($S.P1InScopeWithReportOnly) |`n")
-        $null = $Md.Append("| P2 | $($S.P2Pool) | $($S.P2InScope) | $($S.P2Shortfall) | $($S.P2UserGaps) | $($S.P2InScopeWithReportOnly) |`n`n")
+        $null = $Md.Append("| Tier | Seats owned | Users in scope | Short | Short counting active accounts only | In scope with no plan assigned | In scope if report-only policies were enabled |`n")
+        $null = $Md.Append("|---|---|---|---|---|---|---|`n")
+        $null = $Md.Append("| P1 | $($S.P1Pool) | $($S.P1InScope) | $($S.P1Shortfall) | $P1Active | $($S.P1UserGaps) | $($S.P1InScopeWithReportOnly) |`n")
+        $null = $Md.Append("| P2 | $($S.P2Pool) | $($S.P2InScope) | $($S.P2Shortfall) | $P2Active | $($S.P2UserGaps) | $($S.P2InScopeWithReportOnly) |`n`n")
         $null = $Md.Append("Checked $Checked. Guests are billed on monthly active users and are not counted. Users with no plan assigned are advisory true-up evidence.")
         Add-CippTestResult @Common -Status $(if ($Covered) { 'Passed' } else { 'Failed' }) -Risk 'Medium' -ResultMarkdown $Md.ToString()
     } catch {
