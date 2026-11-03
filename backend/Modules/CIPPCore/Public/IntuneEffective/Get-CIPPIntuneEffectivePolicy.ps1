@@ -127,7 +127,7 @@ function Get-CIPPIntuneEffectivePolicy {
                     $Old = $StatusById[[string]$S.id]
                     if (-not $Old -or ($Rank[[string]$S.state] ?? 3) -lt ($Rank[$Old] ?? 3)) { $StatusById[[string]$S.id] = [string]$S.state }
                 }
-            } catch { $Notes.Add("Device status ($C) could not be read: $(& $Msg $_)") }
+            } catch { $Errors.Add("Device status ($C) could not be read: $(& $Msg $_)") }
         }
     }
     foreach ($R in $Rows) { $R | Add-Member -NotePropertyName DeviceStatus -NotePropertyValue ([string]$StatusById[$R.PolicyId]) -Force }
