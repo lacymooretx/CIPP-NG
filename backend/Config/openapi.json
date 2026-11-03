@@ -65059,6 +65059,12 @@
                       "AlertTitle": {
                         "x-cipp-field-source": "storage"
                       },
+                      "ConnectWiseNoteTicketId": {
+                        "x-cipp-field-source": "storage"
+                      },
+                      "ConnectWiseTicketWindow": {
+                        "x-cipp-field-source": "storage"
+                      },
                       "Data": {
                         "type": "string",
                         "x-cipp-field-source": "storage"
@@ -75067,6 +75073,67 @@
         "x-cipp-any-tenant": true
       }
     },
+    "/api/ListTenantChanges": {
+      "get": {
+        "summary": "What changed in one tenant: new, reopened and resolved alerts, new and fixed tests, Secure Score moves and Message Center deadlines",
+        "operationId": "ListTenantChanges",
+        "tags": [
+          "Tenant > Reports"
+        ],
+        "description": "Read only. Assembles the change record from data CIPP already holds: the AlertLifecycle table, the stored test\nresults and posture snapshots, and the cached Secure Score and Message Center posts. Nothing is stored and no\ntenant is called. Each source reports its own Status, and one that failed is CouldNotRead with null counts,\nnever zero. Body: Verdict (Changes, Quiet, Incomplete, Unreadable), Summary, Sources, Changes and\nOlderTestChanges (differences from a posture snapshot too old to date within the window). Returns 200 when every\nsource was read, 207 when some failed and 500 when all failed, each with the same body. Aspendora fork addition\n(Vikunja CIPP-58).",
+        "parameters": [
+          {
+            "name": "days",
+            "in": "query",
+            "description": "Days back to look. Defaults to 1, at most 30.",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/tenantFilter"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "description": "Not described statically: this endpoint returns the upstream response as-is, so its fields are determined by the upstream API rather than by CIPP. Call the endpoint to see the actual shape, or add a response schema in backend/Config/openapi-overrides."
+                  }
+                }
+              }
+            }
+          },
+          "207": {
+            "description": "Partial success - some items failed; per-item results are in the body"
+          },
+          "400": {
+            "description": "Bad request - missing required field or invalid input"
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cipp-role": "Tenant.Reports.Read"
+      }
+    },
     "/api/ListTenantDetails": {
       "get": {
         "summary": "ListTenantDetails",
@@ -78784,6 +78851,12 @@
                         "x-cipp-field-source": "storage"
                       },
                       "AlertTitle": {
+                        "x-cipp-field-source": "storage"
+                      },
+                      "ConnectWiseNoteTicketId": {
+                        "x-cipp-field-source": "storage"
+                      },
+                      "ConnectWiseTicketWindow": {
                         "x-cipp-field-source": "storage"
                       },
                       "Data": {
@@ -83381,6 +83454,12 @@
                       "x-cipp-field-source": "storage"
                     },
                     "AlertTitle": {
+                      "x-cipp-field-source": "storage"
+                    },
+                    "ConnectWiseNoteTicketId": {
+                      "x-cipp-field-source": "storage"
+                    },
+                    "ConnectWiseTicketWindow": {
                       "x-cipp-field-source": "storage"
                     },
                     "Data": {

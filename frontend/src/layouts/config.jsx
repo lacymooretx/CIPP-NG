@@ -332,6 +332,12 @@ export const nativeMenuItems = [
             path: '/tenant/reports/custom-test-report',
             permissions: ['Tenant.Reports.*'],
           },
+          // Aspendora fork addition (Vikunja CIPP-58): per-tenant change record. A quiet day shows nothing to read.
+          {
+            title: 'What Changed',
+            path: '/tenant/reports/tenant-changes',
+            permissions: ['Tenant.Reports.*'],
+          },
           // Aspendora fork addition (Vikunja CIPP-37): deduplicated, classified Message Center digest.
           {
             title: 'Message Center Digest',
