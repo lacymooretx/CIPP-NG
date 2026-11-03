@@ -11,6 +11,7 @@ BeforeAll {
     function Get-CIPPTable { param([string]$TableName) }
     function Get-CIPPAzDataTableEntity { param($TableName, $Filter, $Property, $First) }
     function Get-Tenants { param($TenantFilter, [switch]$IncludeErrors) }
+    function Add-CIPPAzDataTableEntity { param($TableName, $Entity, [switch]$Force) }
     function New-HaloPSATicket { param($Title, $Description, $Client, $UserUPN, $AzureOID, $DisplayName, $TicketId) }
     function New-GradientAlert { param($Title, $Description, $Client) }
     function New-ConnectWiseTicket { param($Title, $Description, $Client) }
@@ -378,6 +379,112 @@ Describe 'New-CippExtAlert - ConnectWise note on a referenced ticket' {
 
         Should -Invoke Add-ConnectWiseTicketNote -Times 0 -Exactly
         Should -Invoke New-ConnectWiseTicket -Times 1 -Exactly
+    }
+}
+
+Describe 'New-CippExtAlert - ConnectWise role grant ticket window' {
+    BeforeAll {
+        $script:WindowRow = $null
+        function Set-WindowRow { param($MinutesAgo, $TicketID = '60300') $script:WindowRow = [pscustomobject]@{ TicketID = $TicketID; OpenedUtc = [datetimeoffset]::UtcNow.AddMinutes(-$MinutesAgo).ToString('o') } }
+    }
+    BeforeEach {
+        $script:WindowRow = $null
+        $script:SavedRow = $null
+        Mock -CommandName Get-CIPPTable -MockWith { param([string]$TableName) @{ TableName = $TableName } }
+        Mock -CommandName Get-Tenants -MockWith { [pscustomobject]@{ customerId = 'customer-guid'; defaultDomainName = 'contoso.com' } }
+        Mock -CommandName Write-LogMessage -MockWith { }
+        Mock -CommandName New-ConnectWiseTicket -MockWith { 'Ticket created in ConnectWise: 60400' }
+        Mock -CommandName Add-ConnectWiseTicketNote -MockWith { [pscustomobject]@{ Success = $true; Message = 'Added an internal note to ConnectWise ticket 60300 (x).' } }
+        Mock -CommandName Add-CIPPAzDataTableEntity -MockWith { param($TableName, $Entity, [switch]$Force) $script:SavedRow = $Entity }
+        Mock -CommandName Get-CIPPAzDataTableEntity -MockWith {
+            param($TableName, $Filter)
+            if ($Filter -like '*ConnectWiseMapping*') { return [pscustomobject]@{ RowKey = 'customer-guid'; IntegrationId = '250' } }
+            if ($Filter -like '*ConnectWiseAlertWindow*') { return $script:WindowRow }
+            [pscustomobject]@{ config = (@{ ConnectWise = @{ enabled = $true; BaseURL = 'https://cw.invalid' } } | ConvertTo-Json -Depth 5) }
+        }
+        $script:GrantAlert = @{ TenantId = 'contoso.com'; AlertTitle = '[CIPP] SECURITY: Add member to role.'; AlertText = '<p>body</p>'; ConnectWiseTicketWindow = 'RoleGrant' }
+    }
+
+    It 'opens a ticket and records it when no window is open' {
+        $Result = New-CippExtAlert -Alert ([pscustomobject]$script:GrantAlert)
+
+        $Result | Should -Be 'Ticket created in ConnectWise: 60400'
+        Should -Invoke Add-ConnectWiseTicketNote -Times 0 -Exactly
+        $script:SavedRow.PartitionKey | Should -Be 'ConnectWiseAlertWindow'
+        $script:SavedRow.RowKey | Should -Be '250-RoleGrant'
+        $script:SavedRow.TicketID | Should -Be '60400'
+    }
+
+    It 'files a grant inside the hour as a note on the open window ticket' {
+        Set-WindowRow -MinutesAgo 59
+        New-CippExtAlert -Alert ([pscustomobject]$script:GrantAlert) | Out-Null
+
+        Should -Invoke New-ConnectWiseTicket -Times 0 -Exactly
+        Should -Invoke Add-CIPPAzDataTableEntity -Times 0 -Exactly
+        Should -Invoke Add-ConnectWiseTicketNote -Times 1 -Exactly -ParameterFilter {
+            $TicketId -eq 60300 -and $ExpectedCompanyId -eq 250 -and $RequireOpen -and $Text -like '*within the last hour*treat it as a security incident*text:<p>body</p>*'
+        }
+    }
+
+    It 'opens a new ticket and starts a new window once the hour has passed' {
+        Set-WindowRow -MinutesAgo 61
+        New-CippExtAlert -Alert ([pscustomobject]$script:GrantAlert) | Out-Null
+
+        Should -Invoke Add-ConnectWiseTicketNote -Times 0 -Exactly
+        Should -Invoke New-ConnectWiseTicket -Times 1 -Exactly
+        $script:SavedRow.TicketID | Should -Be '60400'
+    }
+
+    It 'opens a new ticket without a warning when the window ticket was closed' {
+        Set-WindowRow -MinutesAgo 5
+        Mock -CommandName Add-ConnectWiseTicketNote -MockWith { [pscustomobject]@{ Success = $false; Message = 'Ticket 60300 is closed. Nothing was posted.' } }
+        New-CippExtAlert -Alert ([pscustomobject]$script:GrantAlert) | Out-Null
+
+        Should -Invoke New-ConnectWiseTicket -Times 1 -Exactly
+        $script:SavedRow.TicketID | Should -Be '60400'
+        Should -Invoke Write-LogMessage -Times 0 -Exactly -ParameterFilter { $sev -eq 'Warning' }
+    }
+
+    It 'opens a ticket and warns when ConnectWise refuses for another reason' {
+        Set-WindowRow -MinutesAgo 5
+        Mock -CommandName Add-ConnectWiseTicketNote -MockWith { [pscustomobject]@{ Success = $false; Message = "Ticket 60300 belongs to 'Other'" } }
+        New-CippExtAlert -Alert ([pscustomobject]$script:GrantAlert) | Out-Null
+
+        Should -Invoke New-ConnectWiseTicket -Times 1 -Exactly
+        Should -Invoke Write-LogMessage -Times 1 -Exactly -ParameterFilter { $sev -eq 'Warning' }
+    }
+
+    It 'opens a ticket when the window row is unreadable or the table fails' {
+        $script:WindowRow = [pscustomobject]@{ TicketID = '60300'; OpenedUtc = 'not a date' }
+        New-CippExtAlert -Alert ([pscustomobject]$script:GrantAlert) | Out-Null
+        Should -Invoke New-ConnectWiseTicket -Times 1 -Exactly
+        Should -Invoke Write-LogMessage -Times 1 -Exactly -ParameterFilter { $sev -eq 'Warning' }
+    }
+
+    It 'keeps the ticket when the window cannot be saved' {
+        Mock -CommandName Add-CIPPAzDataTableEntity -MockWith { throw 'table down' }
+        $Result = New-CippExtAlert -Alert ([pscustomobject]$script:GrantAlert)
+
+        $Result | Should -Be 'Ticket created in ConnectWise: 60400'
+        Should -Invoke Write-LogMessage -Times 1 -Exactly -ParameterFilter { $sev -eq 'Warning' }
+    }
+
+    It 'records no window when the ticket could not be created' {
+        Mock -CommandName New-ConnectWiseTicket -MockWith { 'Failed to send ticket to ConnectWise: 500' }
+        $Result = New-CippExtAlert -Alert ([pscustomobject]$script:GrantAlert)
+
+        $Result | Should -Be 'Failed to send ticket to ConnectWise: 500'
+        Should -Invoke Add-CIPPAzDataTableEntity -Times 0 -Exactly
+    }
+
+    It 'never reads a window for an alert that did not ask for one' {
+        $script:GrantAlert.Remove('ConnectWiseTicketWindow')
+        Set-WindowRow -MinutesAgo 5
+        New-CippExtAlert -Alert ([pscustomobject]$script:GrantAlert) | Out-Null
+
+        Should -Invoke Add-ConnectWiseTicketNote -Times 0 -Exactly
+        Should -Invoke New-ConnectWiseTicket -Times 1 -Exactly
+        Should -Invoke Add-CIPPAzDataTableEntity -Times 0 -Exactly
     }
 }
 

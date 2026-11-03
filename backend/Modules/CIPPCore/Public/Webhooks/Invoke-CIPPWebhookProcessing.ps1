@@ -266,6 +266,11 @@ function Invoke-CippWebhookProcessing {
                 } catch {
                     Write-Information "Audit ticket reference failed for $($Data.Id): $($_.Exception.Message)"
                 }
+                # Role grants come in bursts (302 tickets on 2026-10-18), so one ticket per tenant per hour, with later
+                # grants as notes on it. Only this operation: the same rule's MFA disables keep their own tickets.
+                if ($Data.Operation -eq 'Add member to role.' -and -not $CIPPAlert.ConnectWiseNoteTicketId) {
+                    $CIPPAlert.ConnectWiseTicketWindow = 'RoleGrant'
+                }
                 Send-CIPPAlert @CIPPAlert
             }
             'generateWebhook' {

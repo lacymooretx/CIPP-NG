@@ -16,7 +16,7 @@ BeforeAll {
     function Add-CIPPAzDataTableEntity { param($TableName, $Context, $Entity, [switch]$Force, $OperationType) }
     function Get-Tenants { param([switch]$IncludeErrors, [switch]$IncludeAll) }
     function New-CIPPAlertTemplate { param($format, $data, $ActionResults, $CIPPURL, $AlertComment, $CustomSubject, $Tenant, $AuditLogLink) }
-    function Send-CIPPAlert { param($Type, $Title, $HTMLContent, $JSONContent, $TenantFilter, $APIName, $SchemaSource, $InvokingCommand, $AffectedUser, $PsaTicketPriority, $ConnectWiseNoteTicketId) }
+    function Send-CIPPAlert { param($Type, $Title, $HTMLContent, $JSONContent, $TenantFilter, $APIName, $SchemaSource, $InvokingCommand, $AffectedUser, $PsaTicketPriority, $ConnectWiseNoteTicketId, $ConnectWiseTicketWindow) }
     function Write-LogMessage { param($API, $tenant, $message, $sev, $LogData) }
     function Get-CIPPAuditTicketReference { param($Data) }
     function ConvertTo-CIPPODataFilterValue { param([string]$Value, $Type) $Value -replace "'", "''" }
@@ -333,6 +333,33 @@ Describe 'Invoke-CippWebhookProcessing' {
             Invoke-CippWebhookProcessing -TenantFilter 'contoso.com' -Data $script:PsaData -CIPPURL 'https://cipp.invalid'
 
             Should -Invoke Send-CIPPAlert -Times 1 -Exactly -ParameterFilter { $Type -eq 'psa' -and -not $ConnectWiseNoteTicketId }
+        }
+
+        It 'puts a role grant in the hourly ticket window' {
+            Mock -CommandName Get-CIPPAuditTicketReference -MockWith { $null }
+            $script:PsaData | Add-Member -NotePropertyName Operation -NotePropertyValue 'Add member to role.' -Force
+
+            Invoke-CippWebhookProcessing -TenantFilter 'contoso.com' -Data $script:PsaData -CIPPURL 'https://cipp.invalid'
+
+            Should -Invoke Send-CIPPAlert -Times 1 -Exactly -ParameterFilter { $Type -eq 'psa' -and $ConnectWiseTicketWindow -eq 'RoleGrant' }
+        }
+
+        It 'keeps an MFA disable out of the window: the same rule, but it gets its own ticket' {
+            Mock -CommandName Get-CIPPAuditTicketReference -MockWith { $null }
+            $script:PsaData | Add-Member -NotePropertyName Operation -NotePropertyValue 'Disable Strong Authentication.' -Force
+
+            Invoke-CippWebhookProcessing -TenantFilter 'contoso.com' -Data $script:PsaData -CIPPURL 'https://cipp.invalid'
+
+            Should -Invoke Send-CIPPAlert -Times 1 -Exactly -ParameterFilter { $Type -eq 'psa' -and -not $ConnectWiseTicketWindow }
+        }
+
+        It 'lets a named ticket win over the window' {
+            Mock -CommandName Get-CIPPAuditTicketReference -MockWith { 60047 }
+            $script:PsaData | Add-Member -NotePropertyName Operation -NotePropertyValue 'Add member to role.' -Force
+
+            Invoke-CippWebhookProcessing -TenantFilter 'contoso.com' -Data $script:PsaData -CIPPURL 'https://cipp.invalid'
+
+            Should -Invoke Send-CIPPAlert -Times 1 -Exactly -ParameterFilter { $ConnectWiseNoteTicketId -eq 60047 -and -not $ConnectWiseTicketWindow }
         }
     }
 }

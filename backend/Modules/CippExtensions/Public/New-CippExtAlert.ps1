@@ -146,8 +146,45 @@ function New-CippExtAlert {
                                 Write-LogMessage -API 'Alerts' -tenant $Alert.TenantId -message "ConnectWise: raising a new ticket instead of a note on ticket $($Alert.ConnectWiseNoteTicketId): $($_.Exception.Message)" -sev Warning
                             }
                         }
+                        # A ticket window (role grants, Vikunja MSP-3): the first alert of the hour opens a ticket
+                        # and later ones become notes on it, so a burst of grants is one ticket and each grant stays
+                        # on record. Anchored on the first ticket, so a long burst still opens one ticket an hour.
+                        # Doubt fails toward a ticket: a closed ticket, an unreadable window or any error opens one.
+                        $WindowTable = $null
+                        $WindowRowKey = $null
+                        if (-not $NotePosted -and $Alert.ConnectWiseTicketWindow) {
+                            try {
+                                $CompanyId = [int]($MappedId | Select-Object -Last 1)
+                                if ($CompanyId -le 0) { throw "'$MappedId' is not a usable ConnectWise company id" }
+                                $WindowTable = Get-CIPPTable -TableName 'PSATickets'
+                                $WindowRowKey = "$CompanyId-$($Alert.ConnectWiseTicketWindow)"
+                                $WindowRow = Get-CIPPAzDataTableEntity @WindowTable -Filter "PartitionKey eq 'ConnectWiseAlertWindow' and RowKey eq '$WindowRowKey'" | Select-Object -First 1
+                                if ($WindowRow.TicketID -and [datetimeoffset]::Parse([string]$WindowRow.OpenedUtc, [cultureinfo]::InvariantCulture) -gt [datetimeoffset]::UtcNow.AddHours(-1)) {
+                                    $NoteText = "$($Alert.AlertTitle)`n`nFiled here instead of opening a new ticket: this ticket was opened for the same kind of change in this tenant within the last hour. If this change was not expected, treat it as a security incident.`n`n$(ConvertFrom-CIPPHtmlToText -Html $Alert.AlertText)"
+                                    $Note = Add-ConnectWiseTicketNote -TicketId ([int]$WindowRow.TicketID) -Text $NoteText -ExpectedCompanyId $CompanyId -RequireOpen -Configuration $Configuration.ConnectWise
+                                    if ($Note.Success) {
+                                        $NotePosted = $true
+                                        $Note.Message
+                                    } else {
+                                        # Someone closing the ticket inside the hour is routine; anything else is worth a look.
+                                        $WindowSev = if ("$($Note.Message)" -match 'is closed') { 'Info' } else { 'Warning' }
+                                        Write-LogMessage -API 'Alerts' -tenant $Alert.TenantId -message "ConnectWise: raising a new ticket instead of a note on window ticket $($WindowRow.TicketID): $($Note.Message)" -sev $WindowSev
+                                    }
+                                }
+                            } catch {
+                                Write-LogMessage -API 'Alerts' -tenant $Alert.TenantId -message "ConnectWise: raising a new ticket because the ticket window could not be used: $($_.Exception.Message)" -sev Warning
+                            }
+                        }
                         if (-not $NotePosted) {
-                            New-ConnectWiseTicket -Title $Alert.AlertTitle -Description $Alert.AlertText -Client $MappedId
+                            $TicketResult = New-ConnectWiseTicket -Title $Alert.AlertTitle -Description $Alert.AlertText -Client $MappedId
+                            if ($WindowRowKey -and "$TicketResult" -match 'Ticket created in ConnectWise: (\d+)') {
+                                try {
+                                    Add-CIPPAzDataTableEntity @WindowTable -Entity @{ PartitionKey = 'ConnectWiseAlertWindow'; RowKey = $WindowRowKey; TicketID = [string]$Matches[1]; OpenedUtc = [datetimeoffset]::UtcNow.ToString('o') } -Force
+                                } catch {
+                                    Write-LogMessage -API 'Alerts' -tenant $Alert.TenantId -message "ConnectWise: could not record ticket window $WindowRowKey, so the next alert may open another ticket: $($_.Exception.Message)" -sev Warning
+                                }
+                            }
+                            $TicketResult
                         }
                     } else {
                         Write-LogMessage -API 'Alerts' -tenant $Alert.TenantId -message 'ConnectWise: No mapping found for tenant. Skipping ticket creation.' -sev Warning
