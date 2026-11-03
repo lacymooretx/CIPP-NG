@@ -9,12 +9,13 @@ BeforeAll {
         . (Join-Path $Ops "$Name.ps1")
     }
     . (Join-Path $RepoRoot 'Modules/CIPPCore/Public/Tools/ConvertTo-CIPPBoolean.ps1')
+    . (Join-Path $RepoRoot 'Modules/CIPPCore/Public/GraphHelper/New-CIPPGraphReadWithAppFallback.ps1')
     . (Join-Path $RepoRoot 'Modules/CIPPCore/Public/GraphHelper/Get-AlertContentHash.ps1')
     foreach ($Name in 'IntuneStaleCheckIn', 'IntuneEnrollmentFailures', 'IntuneNewDevices', 'IntuneDuplicateDevices', 'IntuneNoCompliancePolicy', 'IntuneWindowsUpdateFailures', 'DriverUpdatesBlocked', 'EnrollmentDiscovery') {
         . (Join-Path $Alerts "Get-CIPPAlert$Name.ps1")
     }
 
-    function New-GraphGetRequest { [CmdletBinding()] param($uri, $tenantid, $AsApp) }
+    function New-GraphGetRequest { [CmdletBinding()] param($uri, $tenantid, $AsApp, $noPagination) }
     function New-GraphPOSTRequest { [CmdletBinding()] param($uri, $tenantid, $type, $body, $ContentType) }
     function Get-CIPPDriverBlockingPolicies { param($TenantFilter) }
     function Get-CIPPEnrollmentDiscovery { param($TenantFilter) }

@@ -12,7 +12,7 @@ BeforeAll {
     function Write-LogMessage { param($API, $tenant, $message, $sev, $LogData) $script:Logs.Add($message) }
     function Write-AlertTrace { param($cmdletName, $tenantFilter, $data, [switch]$Append) $script:Traced = @{ Data = @($data); Append = [bool]$Append }; $data }
     function New-GraphGetRequest {
-        param($uri, $tenantid, $ErrorAction)
+        param($uri, $tenantid, $ErrorAction, $noPagination, $AsApp)
         $script:Uris.Add($uri)
         if ($uri -match 'riskDetections') {
             if ($script:DetectionsThrow) { throw $script:DetectionsThrow }
@@ -21,6 +21,7 @@ BeforeAll {
         if ($uri -match 'riskyUsers') { return @() }
     }
 
+    . (Join-Path $RepoRoot 'Modules/CIPPCore/Public/GraphHelper/New-CIPPGraphReadWithAppFallback.ps1')
     . (Join-Path $RepoRoot 'Modules/CIPPAlerts/Public/Alerts/Get-CIPPAlertNewRiskyUsers.ps1')
 
     function Det {
@@ -77,5 +78,24 @@ Describe 'Get-CIPPAlertNewRiskyUsers' {
         Get-CIPPAlertNewRiskyUsers -TenantFilter 'contoso.com' | Out-Null
         ($script:Uris | Where-Object { $_ -match 'riskyUsers' }) | Should -Not -BeNullOrEmpty
         ($script:Uris | Where-Object { $_ -match 'riskDetections' }) | Should -BeNullOrEmpty
+    }
+}
+
+Describe 'Get-CIPPAlertNewRiskyUsers in the partner tenant' {
+    It 'reads as the app when the delegated user lacks the roles' {
+        Mock Get-CIPPTenantCapabilities { [pscustomobject]@{ AAD_PREMIUM_P2 = $true } }
+        Mock Get-CIPPTable { @{} }
+        Mock Get-CIPPAzDataTableEntity { $null }
+        Mock Add-CIPPAzDataTableEntity { }
+        Mock Write-AlertTrace { }
+        Mock Write-LogMessage { }
+        $script:AppReads = 0
+        Mock New-GraphGetRequest {
+            if ($AsApp) { $script:AppReads++; return @() }
+            throw 'You cannot perform the requested operation, Signed in user is missing required roles.'
+        } -ParameterFilter { $uri -match 'riskyUsers' }
+        Get-CIPPAlertNewRiskyUsers -TenantFilter 'aspendoracsp.com'
+        $script:AppReads | Should -Be 1
+        Should -Invoke Write-LogMessage -Times 0 -ParameterFilter { $sev -eq 'Error' }
     }
 }

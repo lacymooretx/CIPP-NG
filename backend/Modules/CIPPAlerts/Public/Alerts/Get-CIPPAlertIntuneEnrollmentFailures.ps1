@@ -26,7 +26,7 @@ function Get-CIPPAlertIntuneEnrollmentFailures {
     if ($null -ne $InputValue.EnrollmentFailureLookbackHours -and [int]::TryParse([string]$InputValue.EnrollmentFailureLookbackHours, [ref]$Parsed) -and $Parsed -gt 0) { $Hours = $Parsed }
     $Cutoff = [datetime]::UtcNow.AddHours(-$Hours).ToString('yyyy-MM-ddTHH:mm:ssZ')
     try {
-        $Events = @(New-GraphGetRequest -uri "https://graph.microsoft.com/beta/deviceManagement/troubleshootingEvents?`$filter=eventDateTime ge $Cutoff" -tenantid $TenantFilter -ErrorAction Stop)
+        $Events = @(New-CIPPGraphReadWithAppFallback -uri "https://graph.microsoft.com/beta/deviceManagement/troubleshootingEvents?`$filter=eventDateTime ge $Cutoff" -tenantid $TenantFilter -ErrorAction Stop)
     } catch {
         Write-LogMessage -API 'Alerts' -tenant $TenantFilter -message "Intune enrollment failures: could not read troubleshootingEvents: $((Get-CippException -Exception $_).NormalizedError)" -sev Warning
         return

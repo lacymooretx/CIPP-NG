@@ -23,7 +23,7 @@ function Get-CIPPAlertNewRiskyUsers {
             # Low-risk and already-closed detections are skipped; a level of 'hidden' (licence-limited) is kept.
             $Since = (Get-Date).ToUniversalTime().AddDays(-7).ToString('yyyy-MM-ddTHH:mm:ssZ')
             try {
-                $Detections = @(New-GraphGetRequest -uri "https://graph.microsoft.com/v1.0/identityProtection/riskDetections?`$filter=detectedDateTime ge $Since&`$top=500" -tenantid $TenantFilter -ErrorAction Stop | Where-Object { $_.id })
+                $Detections = @(New-CIPPGraphReadWithAppFallback -uri "https://graph.microsoft.com/v1.0/identityProtection/riskDetections?`$filter=detectedDateTime ge $Since&`$top=500" -tenantid $TenantFilter -ErrorAction Stop | Where-Object { $_.id })
             } catch {
                 Write-LogMessage -API 'Alerts' -tenant $($TenantFilter) -message "Tenant has no Entra ID P2 and risk detections could not be read either: $((Get-CippException -Exception $_).NormalizedError)" -sev Warning
                 return
@@ -56,7 +56,7 @@ function Get-CIPPAlertNewRiskyUsers {
         $RiskyUsersDelta = (Get-CIPPAzDataTableEntity @Deltatable -Filter $Filter).delta | ConvertFrom-Json -ErrorAction SilentlyContinue
 
         # Get current risky users with more detailed information
-        $NewDelta = (New-GraphGetRequest -uri 'https://graph.microsoft.com/v1.0/identityProtection/riskyUsers?`$top=500' -tenantid $TenantFilter) | Select-Object userPrincipalName, riskLevel, riskState, riskDetail, riskLastUpdatedDateTime, isProcessing, history
+        $NewDelta = (New-CIPPGraphReadWithAppFallback -uri 'https://graph.microsoft.com/v1.0/identityProtection/riskyUsers?`$top=500' -tenantid $TenantFilter) | Select-Object userPrincipalName, riskLevel, riskState, riskDetail, riskLastUpdatedDateTime, isProcessing, history
 
         $NewDeltatoSave = $NewDelta | ConvertTo-Json -Depth 10 -Compress -ErrorAction SilentlyContinue | Out-String
         $DeltaEntity = @{

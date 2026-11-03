@@ -1,6 +1,7 @@
 BeforeAll {
     $RepoRoot = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $PSCommandPath))
     . (Join-Path $RepoRoot 'Modules/CIPPAlerts/Public/Get-CIPPCompromiseSweepSuccess.ps1')
+    . (Join-Path $RepoRoot 'Modules/CIPPCore/Public/GraphHelper/New-CIPPGraphReadWithAppFallback.ps1')
     . (Join-Path $RepoRoot 'Modules/CIPPAlerts/Public/Alerts/Get-CIPPAlertCompromiseSweep.ps1')
 
     function Write-LogMessage { param($API, $tenant, $message, $sev, $LogData) $script:Logs.Add("[$sev] $message") }

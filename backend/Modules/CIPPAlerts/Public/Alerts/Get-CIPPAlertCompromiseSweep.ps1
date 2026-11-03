@@ -63,7 +63,7 @@ function Get-CIPPAlertCompromiseSweep {
         # but returns quickly over 24 hours, which is why the lookback is short.
         try {
             $Uri = "$Beta/auditLogs/signIns?`$filter=createdDateTime ge $Cutoff and authenticationProtocol eq 'deviceCode'&`$select=createdDateTime,userPrincipalName,userId,appDisplayName,appId,ipAddress,location,status&`$top=200"
-            $DeviceCode = @(New-GraphGetRequest -uri $Uri -tenantid $TenantFilter -noPagination $true -ErrorAction Stop |
+            $DeviceCode = @(New-CIPPGraphReadWithAppFallback -uri $Uri -tenantid $TenantFilter -noPagination $true -ErrorAction Stop |
                     Where-Object { [int]$_.status.errorCode -eq 0 })
             foreach ($Group in ($DeviceCode | Group-Object { "$($_.userPrincipalName)|$($_.appId)" })) {
                 $First = $Group.Group | Sort-Object createdDateTime | Select-Object -First 1
@@ -93,7 +93,7 @@ function Get-CIPPAlertCompromiseSweep {
             try {
                 # 50126 = bad username/password, 50053 = locked (smart lockout or malicious IP).
                 $Uri = "$Beta/auditLogs/signIns?`$filter=createdDateTime ge $Cutoff and (status/errorCode eq 50126 or status/errorCode eq 50053)&`$select=createdDateTime,userPrincipalName,ipAddress,location,appDisplayName,status&`$top=999"
-                $Failures = @(New-GraphGetRequest -uri $Uri -tenantid $TenantFilter -noPagination $true -ErrorAction Stop)
+                $Failures = @(New-CIPPGraphReadWithAppFallback -uri $Uri -tenantid $TenantFilter -noPagination $true -ErrorAction Stop)
                 if ($Failures.Count -ge 999) {
                     Write-LogMessage -API 'Alerts' -tenant $TenantFilter -message "Compromise sweep: 999+ failed sign-ins in $LookbackHours h; only the first page was analysed." -sev Warning
                 }
@@ -176,7 +176,7 @@ function Get-CIPPAlertCompromiseSweep {
         # ---- DormantMfa ------------------------------------------------------------------------
         try {
             $Uri = "https://graph.microsoft.com/v1.0/auditLogs/directoryAudits?`$filter=activityDateTime ge $Cutoff and (activityDisplayName eq 'User registered security info' or activityDisplayName eq 'Admin registered security info')&`$top=100"
-            $Registrations = @(New-GraphGetRequest -uri $Uri -tenantid $TenantFilter -noPagination $true -ErrorAction Stop)
+            $Registrations = @(New-CIPPGraphReadWithAppFallback -uri $Uri -tenantid $TenantFilter -noPagination $true -ErrorAction Stop)
             foreach ($Reg in $Registrations) {
                 $Target = @($Reg.targetResources | Where-Object { $_.type -eq 'User' }) | Select-Object -First 1
                 if (-not $Target.id) { continue }
@@ -187,7 +187,7 @@ function Get-CIPPAlertCompromiseSweep {
                 $EventTime = ([datetime]$Reg.activityDateTime).ToUniversalTime()
                 $From = $Now.AddDays(-$DormantDays).ToString('yyyy-MM-ddTHH:mm:ssZ')
                 $Before = $EventTime.AddHours(-1).ToString('yyyy-MM-ddTHH:mm:ssZ')
-                $Prior = @(New-GraphGetRequest -uri "$Beta/auditLogs/signIns?`$filter=userId eq '$($Target.id)' and createdDateTime ge $From and createdDateTime le $Before and status/errorCode eq 0&`$select=createdDateTime&`$top=1" -tenantid $TenantFilter -noPagination $true -ErrorAction Stop | Where-Object { $_ })
+                $Prior = @(New-CIPPGraphReadWithAppFallback -uri "$Beta/auditLogs/signIns?`$filter=userId eq '$($Target.id)' and createdDateTime ge $From and createdDateTime le $Before and status/errorCode eq 0&`$select=createdDateTime&`$top=1" -tenantid $TenantFilter -noPagination $true -ErrorAction Stop | Where-Object { $_ })
                 if ($Prior.Count -gt 0) { continue }
                 $Rows.Add([PSCustomObject]@{
                         'Id'         = "DormantMfa|$($Target.id)|$($EventTime.ToString('yyyyMMdd'))"
