@@ -16,8 +16,9 @@ BeforeAll {
     function Add-CIPPAzDataTableEntity { param($TableName, $Context, $Entity, [switch]$Force, $OperationType) }
     function Get-Tenants { param([switch]$IncludeErrors, [switch]$IncludeAll) }
     function New-CIPPAlertTemplate { param($format, $data, $ActionResults, $CIPPURL, $AlertComment, $CustomSubject, $Tenant, $AuditLogLink) }
-    function Send-CIPPAlert { param($Type, $Title, $HTMLContent, $JSONContent, $TenantFilter, $APIName, $SchemaSource, $InvokingCommand, $AffectedUser) }
+    function Send-CIPPAlert { param($Type, $Title, $HTMLContent, $JSONContent, $TenantFilter, $APIName, $SchemaSource, $InvokingCommand, $AffectedUser, $PsaTicketPriority, $ConnectWiseNoteTicketId) }
     function Write-LogMessage { param($API, $tenant, $message, $sev, $LogData) }
+    function Get-CIPPAuditTicketReference { param($Data) }
     function ConvertTo-CIPPODataFilterValue { param([string]$Value, $Type) $Value -replace "'", "''" }
 
     function New-WebhookData {
@@ -301,6 +302,37 @@ Describe 'Invoke-CippWebhookProcessing' {
             Invoke-CippWebhookProcessing -TenantFilter 'contoso.com' -Data $Data -CIPPURL 'https://cipp.invalid'
             Should -Invoke New-CIPPAlertTemplate -Times 1 -Exactly -ParameterFilter { $format -eq 'html' }
             Should -Invoke Send-CIPPAlert -Times 1 -Exactly -ParameterFilter { $Type -eq 'email' }
+        }
+    }
+
+    Context 'our own change naming its ticket' {
+        BeforeEach {
+            $script:PsaData = New-WebhookData -Id 'rec-psa'
+            $script:PsaData.CIPPAction = (ConvertTo-Json -Compress -InputObject @(@{ label = 'PSA'; value = 'generatePSA' }))
+        }
+
+        It 'passes the ticket number to the PSA alert' {
+            Mock -CommandName Get-CIPPAuditTicketReference -MockWith { 60047 }
+
+            Invoke-CippWebhookProcessing -TenantFilter 'contoso.com' -Data $script:PsaData -CIPPURL 'https://cipp.invalid'
+
+            Should -Invoke Send-CIPPAlert -Times 1 -Exactly -ParameterFilter { $Type -eq 'psa' -and $ConnectWiseNoteTicketId -eq 60047 }
+        }
+
+        It 'sends an ordinary alert when the record names no ticket' {
+            Mock -CommandName Get-CIPPAuditTicketReference -MockWith { $null }
+
+            Invoke-CippWebhookProcessing -TenantFilter 'contoso.com' -Data $script:PsaData -CIPPURL 'https://cipp.invalid'
+
+            Should -Invoke Send-CIPPAlert -Times 1 -Exactly -ParameterFilter { $Type -eq 'psa' -and -not $ConnectWiseNoteTicketId }
+        }
+
+        It 'still sends the alert when reading the reference fails' {
+            Mock -CommandName Get-CIPPAuditTicketReference -MockWith { throw 'bad record' }
+
+            Invoke-CippWebhookProcessing -TenantFilter 'contoso.com' -Data $script:PsaData -CIPPURL 'https://cipp.invalid'
+
+            Should -Invoke Send-CIPPAlert -Times 1 -Exactly -ParameterFilter { $Type -eq 'psa' -and -not $ConnectWiseNoteTicketId }
         }
     }
 }

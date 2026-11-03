@@ -36,6 +36,14 @@ Describe 'Add-ConnectWiseTicketNote' {
         Should -Invoke Invoke-RestMethod -ParameterFilter { $Method -eq 'POST' } -Times 0 -Exactly
     }
 
+    It 'refuses a closed ticket when asked to, and posts nothing' {
+        Mock Invoke-RestMethod -ParameterFilter { $Method -eq 'GET' } { [pscustomobject]@{ id = 60001; summary = 'Done'; company = [pscustomobject]@{ id = 250; name = 'Contoso' }; closedFlag = $true } }
+        $R = Add-ConnectWiseTicketNote -TicketId 60001 -Text 'evidence' -Configuration $script:Config -RequireOpen
+        $R.Success | Should -BeFalse
+        $R.Message | Should -Match 'is closed'
+        Should -Invoke Invoke-RestMethod -ParameterFilter { $Method -eq 'POST' } -Times 0 -Exactly
+    }
+
     It 'reports a missing ticket instead of throwing' {
         Mock Invoke-RestMethod -ParameterFilter { $Method -eq 'GET' } { throw 'Not Found' }
         $R = Add-ConnectWiseTicketNote -TicketId 1 -Text 'evidence' -Configuration $script:Config

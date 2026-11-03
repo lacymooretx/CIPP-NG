@@ -5,7 +5,7 @@ function Get-CIPPAlertStorageQuota {
     .SYNOPSIS
         Alert on mailboxes genuinely near their quota, for managed clients only.
     .DESCRIPTION
-        Differs from the built-in Get-CIPPAlertQuotaUsed in three ways that exist because
+        Differs from the built-in Get-CIPPAlertQuotaUsed in four ways that exist because
         of what real tenant data and real ticket history did to the naive version:
 
         1. MANAGED CLIENTS ONLY. Membership syncs daily from ConnectWise, so scope follows
@@ -19,7 +19,13 @@ function Get-CIPPAlertStorageQuota {
            full at-risk set (keyed on UserPrincipalName), so the alert-management page shows
            the true state, and a snooze set there suppresses this alert's notifications too.
 
-        3. JUDGED ON THE HARD QUOTA. issueWarningQuota is not always rescaled when a
+        3. CONFIRMED LIVE. The usage report lags by days and does not show a cleanup, which raised
+           the same false ticket for 3E NDT three times (CW #58755, #59128, #59853). Anything about
+           to notify is re-read with Get-MailboxStatistics first. A mailbox now under the threshold
+           is dropped; one still over it reports the live figure. If the live read fails, the report
+           figure stands, because a duplicate ticket is recoverable and a missed full mailbox is not.
+
+        4. JUDGED ON THE HARD QUOTA. issueWarningQuota is not always rescaled when a
            mailbox moves to a larger plan - on 3E NDT it sits at 45 GB on a 100 GB mailbox -
            so alerting on it raises capacity tickets for mailboxes with 30 GB free.
 
@@ -64,15 +70,18 @@ function Get-CIPPAlertStorageQuota {
     $Risk = Get-CIPPMailboxQuotaRisk -Mailboxes $Mailboxes -RiskPercent $Threshold
 
     # Bands, not percentages: a mailbox drifting 91% -> 92% must not re-alert.
-    $Findings = foreach ($M in $Risk.AtRisk) {
-        $Band = if ($M.PercentUsed -ge 95) { 95 } elseif ($M.PercentUsed -ge 90) { 90 } else { $Threshold }
-        @{
-            Key     = "Mailbox:$($M.Upn)"
-            Band    = $Band
-            Message = "$($M.Upn) is $($M.PercentUsed)% full ($([math]::Round($M.UsedBytes / 1GB, 2)) GB of $([math]::Round($M.HardBytes / 1GB, 2)) GB). Remaining: $([math]::Round(($M.HardBytes - $M.UsedBytes) / 1GB, 2)) GB."
-        }
+    $BuildFindings = {
+        param($AtRisk)
+        @(foreach ($M in @($AtRisk)) {
+                $Band = if ($M.PercentUsed -ge 95) { 95 } elseif ($M.PercentUsed -ge 90) { 90 } else { $Threshold }
+                @{
+                    Key     = "Mailbox:$($M.Upn)"
+                    Band    = $Band
+                    Message = "$($M.Upn) is $($M.PercentUsed)% full ($([math]::Round($M.UsedBytes / 1GB, 2)) GB of $([math]::Round($M.HardBytes / 1GB, 2)) GB). Remaining: $([math]::Round(($M.HardBytes - $M.UsedBytes) / 1GB, 2)) GB."
+                }
+            })
     }
-    $Findings = @($Findings)
+    $Findings = & $BuildFindings $Risk.AtRisk
 
     # ---- suppression state --------------------------------------------------------------
     $Table = Get-CIPPTable -TableName 'CippStorageAlertState'
@@ -93,8 +102,32 @@ function Get-CIPPAlertStorageQuota {
         $Prior = @{}
     }
 
-    $Decision = Select-CIPPStorageAlertToNotify -Findings $Findings -Prior $Prior `
-        -Now (Get-Date).ToUniversalTime() -ReNotifyDays $ReNotifyDays
+    $Now = (Get-Date).ToUniversalTime()
+    $Decision = Select-CIPPStorageAlertToNotify -Findings $Findings -Prior $Prior -Now $Now -ReNotifyDays $ReNotifyDays
+
+    # ---- live confirmation ---------------------------------------------------------------
+    # Only what would notify, so a held mailbox costs no Exchange call. This runs before the state is
+    # saved: a false finding recorded as notified would hold back the real alert when it later fills.
+    if (@($Decision.Notify).Count -gt 0) {
+        $Confirmed = foreach ($M in @($Risk.AtRisk)) {
+            if ("Mailbox:$($M.Upn)" -notin @($Decision.Notify.Key)) { $M; continue }
+            try {
+                $Stats = New-ExoRequest -tenantid $TenantFilter -cmdlet 'Get-MailboxStatistics' -cmdParams @{ Identity = $M.Upn } | Select-Object -First 1
+                if (-not $Stats -or -not $Stats.TotalItemSize) { throw 'no statistics returned' }
+                $LiveUsed = [long](Get-ExoOnlineStringBytes -SizeString ([string]$Stats.TotalItemSize))
+                if ($Stats.TotalDeletedItemSize) { $LiveUsed += [long](Get-ExoOnlineStringBytes -SizeString ([string]$Stats.TotalDeletedItemSize)) }
+                $M.UsedBytes = $LiveUsed
+                $M.PercentUsed = [math]::Round(($LiveUsed / [double]$M.HardBytes) * 100, 1)
+                if ($M.PercentUsed -ge $Threshold) { $M }
+            } catch {
+                Write-LogMessage -API 'Alerts' -tenant $TenantFilter -sev Warning -message "Storage quota alert: could not confirm $($M.Upn) live, using the usage report figure. $($_.Exception.Message)"
+                $M
+            }
+        }
+        $Risk.AtRisk = @($Confirmed)
+        $Findings = & $BuildFindings $Risk.AtRisk
+        $Decision = Select-CIPPStorageAlertToNotify -Findings $Findings -Prior $Prior -Now $Now -ReNotifyDays $ReNotifyDays
+    }
 
     try {
         $null = Add-CIPPAzDataTableEntity @Table -Force -Entity @{

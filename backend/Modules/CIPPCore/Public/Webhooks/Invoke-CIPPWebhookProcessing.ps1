@@ -258,6 +258,14 @@ function Invoke-CippWebhookProcessing {
                 if ($Data.CIPPPsaTicketPriority) {
                     $CIPPAlert.PsaTicketPriority = $Data.CIPPPsaTicketPriority
                 }
+                # Our own change that names its ConnectWise ticket becomes a note on that ticket. A failure
+                # here must never cost the alert, so it falls through to an ordinary ticket.
+                try {
+                    $NoteTicketId = Get-CIPPAuditTicketReference -Data $Data
+                    if ($NoteTicketId) { $CIPPAlert.ConnectWiseNoteTicketId = $NoteTicketId }
+                } catch {
+                    Write-Information "Audit ticket reference failed for $($Data.Id): $($_.Exception.Message)"
+                }
                 Send-CIPPAlert @CIPPAlert
             }
             'generateWebhook' {

@@ -13,6 +13,9 @@ BeforeAll {
     function Get-Tenants { param($TenantFilter, [switch]$IncludeErrors) }
     function New-HaloPSATicket { param($Title, $Description, $Client, $UserUPN, $AzureOID, $DisplayName, $TicketId) }
     function New-GradientAlert { param($Title, $Description, $Client) }
+    function New-ConnectWiseTicket { param($Title, $Description, $Client) }
+    function Add-ConnectWiseTicketNote { param($TicketId, $Text, $ExpectedCompanyId, [switch]$RequireOpen, $Configuration) }
+    function ConvertFrom-CIPPHtmlToText { param($Html) "text:$Html" }
     function New-GraphGetRequest { param($uri, $tenantid, $AsApp) }
     function Write-LogMessage { param($API, $tenant, $message, $sev, $LogData, $headers) }
 
@@ -300,5 +303,99 @@ Describe 'New-CippExtAlert - PSA consolidation key' {
 
         $script:GradientArgs.Client |
             Should -Be 'contoso.onmicrosoft.com'
+    }
+}
+
+Describe 'New-CippExtAlert - ConnectWise note on a referenced ticket' {
+    BeforeEach {
+        Mock -CommandName Get-CIPPTable -MockWith { param([string]$TableName) @{ TableName = $TableName } }
+        Mock -CommandName Get-Tenants -MockWith { [pscustomobject]@{ defaultDomainName = 'contoso.com'; customerId = 'customer-guid' } }
+        Mock -CommandName Write-LogMessage -MockWith { }
+        Mock -CommandName New-ConnectWiseTicket -MockWith { 'Ticket created in ConnectWise: 1' }
+        Mock -CommandName Add-ConnectWiseTicketNote -MockWith { [pscustomobject]@{ Success = $true; Message = 'Added an internal note to ConnectWise ticket 60047 (x).' } }
+        Mock -CommandName Get-CIPPAzDataTableEntity -MockWith {
+            param($TableName, $Filter)
+            if ($Filter -like '*ConnectWiseMapping*') { return [pscustomobject]@{ RowKey = 'customer-guid'; IntegrationId = '250' } }
+            [pscustomobject]@{ config = (@{ ConnectWise = @{ enabled = $true; BaseURL = 'https://cw.invalid' } } | ConvertTo-Json -Depth 5) }
+        }
+        $script:CwAlert = @{ TenantId = 'contoso.com'; AlertTitle = '[CIPP] SECURITY: New-TransportRule'; AlertText = '<p>body</p>'; ConnectWiseNoteTicketId = 60047 }
+    }
+
+    It 'adds a note and opens no ticket' {
+        $Result = New-CippExtAlert -Alert $script:CwAlert
+
+        $Result | Should -BeLike 'Added an internal note*'
+        Should -Invoke New-ConnectWiseTicket -Times 0 -Exactly
+    }
+
+    It 'requires the ticket to be open and belong to the mapped company' {
+        $null = New-CippExtAlert -Alert $script:CwAlert
+
+        Should -Invoke Add-ConnectWiseTicketNote -Times 1 -Exactly -ParameterFilter { $TicketId -eq 60047 -and $ExpectedCompanyId -eq 250 -and $RequireOpen }
+    }
+
+    It 'keeps the alert title and readable text in the note, and says why it is there' {
+        $null = New-CippExtAlert -Alert $script:CwAlert
+
+        Should -Invoke Add-ConnectWiseTicketNote -Times 1 -Exactly -ParameterFilter {
+            $Text -like '*SECURITY: New-TransportRule*' -and $Text -like '*text:<p>body</p>*' -and $Text -like '*instead of opening a new ticket*'
+        }
+    }
+
+    It 'opens a ticket and warns when the note is refused' {
+        Mock -CommandName Add-ConnectWiseTicketNote -MockWith { [pscustomobject]@{ Success = $false; Message = 'Ticket 60047 is closed. Nothing was posted.' } }
+
+        $Result = New-CippExtAlert -Alert $script:CwAlert
+
+        $Result | Should -Be 'Ticket created in ConnectWise: 1'
+        Should -Invoke Write-LogMessage -Times 1 -Exactly -ParameterFilter { $sev -eq 'Warning' -and $message -like '*is closed*' }
+    }
+
+    It 'opens a ticket and warns when posting throws' {
+        Mock -CommandName Add-ConnectWiseTicketNote -MockWith { throw 'network' }
+
+        $null = New-CippExtAlert -Alert $script:CwAlert
+
+        Should -Invoke New-ConnectWiseTicket -Times 1 -Exactly
+        Should -Invoke Write-LogMessage -Times 1 -Exactly -ParameterFilter { $sev -eq 'Warning' -and $message -like '*network*' }
+    }
+
+    It 'opens a ticket as before when the alert names no ticket' {
+        $script:CwAlert.Remove('ConnectWiseNoteTicketId')
+
+        $null = New-CippExtAlert -Alert $script:CwAlert
+
+        Should -Invoke Add-ConnectWiseTicketNote -Times 0 -Exactly
+        Should -Invoke New-ConnectWiseTicket -Times 1 -Exactly
+    }
+
+    It 'does not let a scheduled task PsaTicketId redirect a ConnectWise alert' {
+        # PsaTicketId is HaloPSA's; only the audit reference may turn a ConnectWise alert into a note.
+        $script:CwAlert.Remove('ConnectWiseNoteTicketId')
+        $script:CwAlert.PsaTicketId = 60047
+
+        $null = New-CippExtAlert -Alert $script:CwAlert
+
+        Should -Invoke Add-ConnectWiseTicketNote -Times 0 -Exactly
+        Should -Invoke New-ConnectWiseTicket -Times 1 -Exactly
+    }
+}
+
+Describe 'New-CippExtAlert - HaloPSA ignores the ConnectWise note ticket' {
+    It 'still opens a Halo ticket' {
+        Mock -CommandName Get-CIPPTable -MockWith { param([string]$TableName) @{ TableName = $TableName } }
+        Mock -CommandName Get-Tenants -MockWith { [pscustomobject]@{ customerId = 'customer-guid' } }
+        Mock -CommandName Write-LogMessage -MockWith { }
+        $script:HaloTicketId = 'unset'
+        Mock -CommandName New-HaloPSATicket -MockWith { param($Title, $Description, $Client, $UserUPN, $AzureOID, $DisplayName, $TicketId) $script:HaloTicketId = $TicketId }
+        Mock -CommandName Get-CIPPAzDataTableEntity -MockWith {
+            param($TableName, $Filter)
+            if ($Filter -like '*HaloMapping*') { return [pscustomobject]@{ RowKey = 'customer-guid'; IntegrationId = 19 } }
+            [pscustomobject]@{ config = (@{ HaloPSA = @{ enabled = $true } } | ConvertTo-Json -Depth 5) }
+        }
+
+        New-CippExtAlert -Alert ([pscustomobject]@{ TenantId = 'contoso.com'; AlertTitle = 't'; AlertText = 'b'; ConnectWiseNoteTicketId = 60047 })
+
+        $script:HaloTicketId | Should -BeNullOrEmpty
     }
 }

@@ -22,6 +22,14 @@ BeforeAll {
         if ($script:GraphThrows) { throw 'report unavailable' }
         $script:Mailboxes
     }
+    function New-ExoRequest {
+        param($tenantid, $cmdlet, $cmdParams)
+        if ($script:ExoThrows) { throw 'exchange unavailable' }
+        $script:ExoCalls.Add($cmdParams.Identity)
+        $script:LiveStats[$cmdParams.Identity]
+    }
+    function Get-ExoOnlineStringBytes { param($SizeString) [long]$SizeString }
+    function Write-LogMessage { param($API, $tenant, $message, $sev, $LogData) $script:Logged.Add($message) }
     function New-Mailbox {
         param($Upn, [double]$Percent)
         $Hard = 100GB
@@ -44,6 +52,76 @@ Describe 'Get-CIPPAlertStorageQuota' {
         $script:Managed = $true
         $script:GraphThrows = $false
         $script:Mailboxes = @()
+        $script:ExoThrows = $false
+        $script:LiveStats = @{}
+        $script:ExoCalls = [System.Collections.Generic.List[string]]::new()
+        $script:Logged = [System.Collections.Generic.List[string]]::new()
+    }
+
+    Context 'live confirmation' {
+        It 'drops a mailbox the live figure shows is under the threshold, and resolves it' {
+            # The real false alert: the report still said 94% after the mailbox was cleaned up.
+            $script:Mailboxes = @(New-Mailbox 'ken@contoso.com' 94)
+            $script:LiveStats['ken@contoso.com'] = [pscustomobject]@{ TotalItemSize = [long](32GB); TotalDeletedItemSize = [long](1GB) }
+
+            Invoke-Alert | Should -BeNullOrEmpty
+            (Get-QuotaState) | Where-Object { $_.Status -eq 'Open' } | Should -BeNullOrEmpty
+        }
+
+        It 'does not record a false finding as notified, so a real one later still alerts' {
+            $script:Mailboxes = @(New-Mailbox 'ken@contoso.com' 94)
+            $script:LiveStats['ken@contoso.com'] = [pscustomobject]@{ TotalItemSize = [long](32GB) }
+            $null = Invoke-Alert
+
+            $script:LiveStats['ken@contoso.com'] = [pscustomobject]@{ TotalItemSize = [long](94GB) }
+            $Second = Invoke-Alert
+            $Second | Should -HaveCount 1
+            $Second[0].Notified | Should -Be 'new'
+        }
+
+        It 'reports the live figure, counting deleted items' {
+            $script:Mailboxes = @(New-Mailbox 'amber@contoso.com' 86)
+            $script:LiveStats['amber@contoso.com'] = [pscustomobject]@{ TotalItemSize = [long](90GB); TotalDeletedItemSize = [long](6GB) }
+
+            $Alert = Invoke-Alert
+            $Alert[0].PercentUsed | Should -Be 96
+            $Alert[0].Message | Should -BeLike '*96% full*'
+        }
+
+        It 'moves to the band the live figure lands in' {
+            $script:Mailboxes = @(New-Mailbox 'amber@contoso.com' 86)
+            $script:LiveStats['amber@contoso.com'] = [pscustomobject]@{ TotalItemSize = [long](96GB) }
+            $null = Invoke-Alert
+
+            # Held at the 95 band: the same live figure on the next run must stay quiet.
+            Invoke-Alert | Should -BeNullOrEmpty
+        }
+
+        It 'still notifies from the report when the live read fails, and says so' {
+            $script:ExoThrows = $true
+            $script:Mailboxes = @(New-Mailbox 'amber@contoso.com' 91)
+
+            $Alert = Invoke-Alert
+            $Alert | Should -HaveCount 1
+            $Alert[0].PercentUsed | Should -Be 91
+            ($script:Logged -join ' ') | Should -BeLike '*could not confirm amber@contoso.com*'
+        }
+
+        It 'still notifies from the report when Exchange returns nothing' {
+            $script:Mailboxes = @(New-Mailbox 'amber@contoso.com' 91)
+
+            Invoke-Alert | Should -HaveCount 1
+        }
+
+        It 'makes no Exchange call for a mailbox that is being held' {
+            $script:Mailboxes = @(New-Mailbox 'amber@contoso.com' 91)
+            $script:LiveStats['amber@contoso.com'] = [pscustomobject]@{ TotalItemSize = [long](91GB) }
+            $null = Invoke-Alert
+            $script:ExoCalls.Clear()
+
+            $null = Invoke-Alert
+            $script:ExoCalls | Should -HaveCount 0
+        }
     }
 
     It 'notifies a new at-risk mailbox once, then holds it' {

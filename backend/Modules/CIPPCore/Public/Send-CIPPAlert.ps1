@@ -21,6 +21,9 @@ function Send-CIPPAlert {
         $PSAReference,
         $PSATicketId,
         $PSAConsolidationKey,
+        # ConnectWise only: add this alert to the ticket as a note instead of opening one (Get-CIPPAuditTicketReference).
+        # Separate from PSATicketId, which HaloPSA also honours and which scheduled tasks set.
+        $ConnectWiseNoteTicketId,
         [switch]$UseStandardizedSchema,
         # push only: the CIPP user (UPN) whose registered devices receive it
         $TargetUser,
@@ -440,6 +443,10 @@ function Send-CIPPAlert {
                 if ($PSATicketId) {
                     $Alert.PsaTicketId = $PSATicketId
                     Write-Information "PSA alert target ticket: $PSATicketId"
+                }
+                if ($ConnectWiseNoteTicketId) {
+                    $Alert.ConnectWiseNoteTicketId = $ConnectWiseNoteTicketId
+                    Write-Information "PSA alert ConnectWise note ticket: $ConnectWiseNoteTicketId"
                 }
                 if ($PSAConsolidationKey) {
                     # Optional stable key for PSA extensions that support consolidation.

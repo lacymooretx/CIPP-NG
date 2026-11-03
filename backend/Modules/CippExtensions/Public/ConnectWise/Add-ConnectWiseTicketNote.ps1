@@ -19,6 +19,8 @@ function Add-ConnectWiseTicketNote {
         [Parameter(Mandatory)][string]$Text,
         [ValidateSet('Internal', 'Discussion')][string]$NoteType = 'Internal',
         [int]$ExpectedCompanyId = 0,
+        # Refuse a closed ticket. Alert routing uses this: a note on a closed ticket is one nobody reads.
+        [switch]$RequireOpen,
         $Configuration
     )
 
@@ -50,6 +52,9 @@ function Add-ConnectWiseTicketNote {
     }
     if ($ExpectedCompanyId -gt 0 -and [int]$Ticket.company.id -ne $ExpectedCompanyId) {
         return [pscustomobject]@{ Success = $false; TicketId = $TicketId; Message = "Ticket $TicketId belongs to '$($Ticket.company.name)' (company $($Ticket.company.id)), not the company this tenant is mapped to ($ExpectedCompanyId). Nothing was posted." }
+    }
+    if ($RequireOpen -and $Ticket.closedFlag) {
+        return [pscustomobject]@{ Success = $false; TicketId = $TicketId; Message = "Ticket $TicketId is closed. Nothing was posted." }
     }
 
     $Note = [ordered]@{

@@ -126,7 +126,29 @@ function New-CippExtAlert {
                     $MappedId = ($MappingFile | Where-Object { $_.RowKey -eq $TenantId }).IntegrationId
                     Write-Host "MappedId: $MappedId"
                     if ($MappedId) {
-                        New-ConnectWiseTicket -Title $Alert.AlertTitle -Description $Alert.AlertText -Client $MappedId
+                        # Our own change naming its ticket (Get-CIPPAuditTicketReference) becomes an internal note
+                        # there. These are security alerts, so anything short of a posted note opens a ticket:
+                        # a closed, missing or other client's ticket, or any error reaching ConnectWise.
+                        $NotePosted = $false
+                        if ($Alert.ConnectWiseNoteTicketId) {
+                            try {
+                                $CompanyId = [int]($MappedId | Select-Object -Last 1)
+                                if ($CompanyId -le 0) { throw "'$MappedId' is not a usable ConnectWise company id" }
+                                $NoteText = "$($Alert.AlertTitle)`n`nFiled here instead of opening a new ticket: the change was made by one of our identities and its name or comment names this ticket. If this change was not expected, treat it as a security incident.`n`n$(ConvertFrom-CIPPHtmlToText -Html $Alert.AlertText)"
+                                $Note = Add-ConnectWiseTicketNote -TicketId ([int]$Alert.ConnectWiseNoteTicketId) -Text $NoteText -ExpectedCompanyId $CompanyId -RequireOpen -Configuration $Configuration.ConnectWise
+                                if ($Note.Success) {
+                                    $NotePosted = $true
+                                    $Note.Message
+                                } else {
+                                    Write-LogMessage -API 'Alerts' -tenant $Alert.TenantId -message "ConnectWise: raising a new ticket instead of a note on ticket $($Alert.ConnectWiseNoteTicketId): $($Note.Message)" -sev Warning
+                                }
+                            } catch {
+                                Write-LogMessage -API 'Alerts' -tenant $Alert.TenantId -message "ConnectWise: raising a new ticket instead of a note on ticket $($Alert.ConnectWiseNoteTicketId): $($_.Exception.Message)" -sev Warning
+                            }
+                        }
+                        if (-not $NotePosted) {
+                            New-ConnectWiseTicket -Title $Alert.AlertTitle -Description $Alert.AlertText -Client $MappedId
+                        }
                     } else {
                         Write-LogMessage -API 'Alerts' -tenant $Alert.TenantId -message 'ConnectWise: No mapping found for tenant. Skipping ticket creation.' -sev Warning
                     }
