@@ -146,6 +146,11 @@ export const nativeMenuItems = [
             permissions: ['Identity.User.*'],
           },
           {
+            title: 'Entra ID P1/P2 True-Up',
+            path: '/identity/reports/entra-entitlement',
+            permissions: ['Tenant.ConditionalAccess.*'],
+          },
+          {
             title: 'Role Assignment Report',
             path: '/identity/reports/role-assignment-report',
             permissions: ['Identity.Role.*'],

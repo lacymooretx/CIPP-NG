@@ -1112,6 +1112,11 @@
     "description": "Weekly check of every holder of a privileged directory role (active and PIM-eligible, group assignments expanded): no passkey, FIDO2 key, Windows Hello for Business, Platform Credential or certificate (Error for Global, Privileged Role and Privileged Authentication Administrator); admin account also licensed or mail-enabled; Global Admin count outside 2-4; passkeys disabled or not self-service; AAGUID restrictions blocking Microsoft Authenticator passkeys. Report only; see ListPhishResistantMfa."
   },
   {
+    "name": "EntraEntitlementGap",
+    "label": "Alert when Entra ID P1/P2 seats do not cover the users in scope of Conditional Access",
+    "recommendedRunInterval": "7d"
+  },
+  {
     "name": "SmsMfaReliance",
     "label": "Alert on users and admins relying on SMS/voice MFA, and on Authenticator/passkey coverage regressing",
     "recommendedRunInterval": "7d",

@@ -56337,6 +56337,51 @@
         "x-cipp-role": "Endpoint.MEM.Read"
       }
     },
+    "/api/ListEntraEntitlement": {
+      "get": {
+        "summary": "Entra ID P1/P2 true-up: licence pools compared with the users Conditional Access covers",
+        "operationId": "ListEntraEntitlement",
+        "tags": [
+          "Tenant > Conditional"
+        ],
+        "description": "Single tenant: returns Summary (P1 and P2 pools, users in scope of enforced policies, shortfalls, per-user gaps,\nwhat enabling report-only policies would need), Skus, Users, Findings, Errors and Notes.\ntenantFilter=AllTenants: returns the stored per-tenant summaries (Results) from the last single-tenant view or\nEntraEntitlementGap alert run, with CheckedUtc; tenants never checked are not listed.\nReport only: nothing in the tenant is changed. Aspendora fork addition (Vikunja CIPP-47).",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/tenantFilter"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardResults"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - missing required field or invalid input"
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cipp-role": "Tenant.ConditionalAccess.Read"
+      }
+    },
     "/api/ListEntraRecoveryCoverage": {
       "get": {
         "summary": "Entra recovery coverage per tenant: Entra Backup and Recovery snapshots, CIPP scheduled backup coverage and gaps",
