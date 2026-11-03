@@ -5,7 +5,7 @@ function Get-CIPPBreakGlassPosture {
     .DESCRIPTION
         Uses the BreakGlassAccounts registry. Every Graph read that needs a licence the tenant may not have
         (sign-in activity: P1; PIM schedules: P2) degrades to "unknown" rather than producing a false finding.
-        Returns @{ Tenant; Findings; Accounts; Errors }. Aspendora fork addition (Vikunja CIPP-4).
+        Returns @{ Tenant; Findings; Accounts; PlanWarning; Errors }. Aspendora fork addition (Vikunja CIPP-4).
     .FUNCTIONALITY
         Internal
     #>
@@ -28,19 +28,20 @@ function Get-CIPPBreakGlassPosture {
 
         $User = $null
         try {
-            $User = & $Get "$Graph/beta/users/$($Id)?`$select=id,userPrincipalName,accountEnabled,onPremisesSyncEnabled,passwordPolicies,signInActivity"
+            $User = & $Get "$Graph/beta/users/$($Id)?`$select=id,userPrincipalName,accountEnabled,onPremisesSyncEnabled,passwordPolicies,signInActivity,isManagementRestricted"
             $A.SignInActivityKnown = $true
             $A.LastSuccessfulSignIn = $User.signInActivity.lastSuccessfulSignInDateTime
         } catch {
             $Err = (Get-CippException -Exception $_).NormalizedError
             if ($Err -match 'Request_ResourceNotFound|does not exist') { $A.Exists = $false; [pscustomobject]$A; continue }
             # Usually no P1 for signInActivity; read the rest without it.
-            try { $User = & $Get "$Graph/v1.0/users/$($Id)?`$select=id,userPrincipalName,accountEnabled,onPremisesSyncEnabled,passwordPolicies" } catch { $Errors.Add("User $($Id): $((Get-CippException -Exception $_).NormalizedError)"); [pscustomobject]$A; continue }
+            try { $User = & $Get "$Graph/v1.0/users/$($Id)?`$select=id,userPrincipalName,accountEnabled,onPremisesSyncEnabled,passwordPolicies,isManagementRestricted" } catch { $Errors.Add("User $($Id): $((Get-CippException -Exception $_).NormalizedError)"); [pscustomobject]$A; continue }
         }
         $A.UserPrincipalName = $User.userPrincipalName
         $A.AccountEnabled = $User.accountEnabled
         $A.OnPremisesSyncEnabled = $User.onPremisesSyncEnabled
         $A.PasswordPolicies = $User.passwordPolicies
+        $A.ManagementRestricted = $User.isManagementRestricted -eq $true
 
         $Domain = ($User.userPrincipalName -split '@')[-1]
         if (-not $DomainNeverExpires.ContainsKey($Domain)) {
@@ -82,10 +83,60 @@ function Get-CIPPBreakGlassPosture {
         $Names[$X] = try { (& $Get "$Graph/v1.0/users/$($X)?`$select=userPrincipalName").userPrincipalName } catch { $X }
     }
 
+    # Plans are on a beta API, so a failed read degrades to Info and does not block the rest of the report (Vikunja CIPP-56).
+    $PlanSummary = $null
+    try {
+        $PlanSummary = Get-CIPPCAPlanSummary -Plans @(Get-CIPPConditionalAccessPlans -TenantFilter $TenantFilter)
+    } catch {
+        Write-Information "Break-glass posture: could not read Conditional Access plans for $($TenantFilter): $((Get-CippException -Exception $_).NormalizedError)"
+    }
+
+    # Exclusion groups are not registered: one is any group that holds a registered account and is excluded from a CA policy (Vikunja CIPP-54).
+    $AccountGroupIds = @($Accounts | ForEach-Object { $_.GroupIds } | Where-Object { $_ })
+    $PolicyExcludedGroupIds = @($Policies | ForEach-Object { $_.conditions.users.excludeGroups } | Where-Object { $_ } | Select-Object -Unique)
+    $ExclusionGroups = foreach ($GroupId in @($PolicyExcludedGroupIds | Where-Object { $_ -in $AccountGroupIds })) {
+        try {
+            $Group = & $Get "$Graph/v1.0/groups/$($GroupId)?`$select=id,displayName"
+            [pscustomobject]@{
+                Id          = $GroupId
+                DisplayName = $Group.displayName
+                Members     = @(& $Get "$Graph/v1.0/groups/$($GroupId)/transitiveMembers?`$select=id,displayName,userPrincipalName&`$top=999")
+            }
+        } catch { $Errors.Add("Members of exclusion group $($GroupId): $((Get-CippException -Exception $_).NormalizedError)") }
+    }
+
+    # The property has no documented filter support, so restricted units are picked out client-side. Tenants rarely have any.
+    $RestrictedUnits = @()
+    $RestrictedUnitsUnknown = $false
+    try {
+        $RestrictedUnits = foreach ($Unit in @(& $Get "$Graph/v1.0/directory/administrativeUnits?`$select=id,displayName,isMemberManagementRestricted&`$top=999" | Where-Object { $_.isMemberManagementRestricted -eq $true })) {
+            [pscustomobject]@{
+                Id           = $Unit.id
+                DisplayName  = $Unit.displayName
+                Members      = @(& $Get "$Graph/v1.0/directory/administrativeUnits/$($Unit.id)/members?`$select=id,displayName,userPrincipalName&`$top=999")
+                ScopedAdmins = @(& $Get "$Graph/v1.0/directory/administrativeUnits/$($Unit.id)/scopedRoleMembers")
+            }
+        }
+    } catch {
+        $RestrictedUnitsUnknown = $true
+        Write-Information "Break-glass posture: could not read restricted management AUs for $($TenantFilter): $((Get-CippException -Exception $_).NormalizedError)"
+    }
+
+    $PostureArgs = @{
+        Accounts               = @($Accounts)
+        Policies               = $Policies
+        UserNames              = $Names
+        PlanSummary            = $PlanSummary
+        PlansUnknown           = $null -eq $PlanSummary
+        ExclusionGroups        = @($ExclusionGroups)
+        RestrictedUnits        = @($RestrictedUnits)
+        RestrictedUnitsUnknown = $RestrictedUnitsUnknown
+    }
     [pscustomobject]@{
-        Tenant   = $TenantFilter
-        Findings = @(Test-CIPPBreakGlassPosture -Accounts @($Accounts) -Policies $Policies -UserNames $Names)
-        Accounts = @($Accounts | ForEach-Object { [pscustomobject]@{ UserPrincipalName = $_.UserPrincipalName; Exists = $_.Exists; ActiveGlobalAdmin = $_.ActiveGlobalAdmin; Methods = $_.Methods; LastSuccessfulSignIn = $_.LastSuccessfulSignIn } })
-        Errors   = @($Errors)
+        Tenant      = $TenantFilter
+        Findings    = @(Test-CIPPBreakGlassPosture @PostureArgs)
+        Accounts    = @($Accounts | ForEach-Object { [pscustomobject]@{ UserPrincipalName = $_.UserPrincipalName; Exists = $_.Exists; ActiveGlobalAdmin = $_.ActiveGlobalAdmin; Methods = $_.Methods; LastSuccessfulSignIn = $_.LastSuccessfulSignIn; ManagementRestricted = $_.ManagementRestricted } })
+        PlanWarning = $PlanSummary.Warning
+        Errors      = @($Errors)
     }
 }

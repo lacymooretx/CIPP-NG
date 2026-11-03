@@ -142,6 +142,7 @@ function Invoke-CIPPDBCacheCollection {
         )
         ConditionalAccess  = @(
             'ConditionalAccessPolicies'
+            'ConditionalAccessPlans'
             'UserRegistrationDetails'
         )
         IdentityProtection = @(

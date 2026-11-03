@@ -137,7 +137,7 @@
   {
     "type": "AdministrativeUnits",
     "friendlyName": "Administrative Units",
-    "description": "Administrative unit ids and names"
+    "description": "Administrative unit ids, names and whether management is restricted"
   },
   {
     "type": "B2BManagementPolicy",
@@ -400,6 +400,11 @@
     "type": "ConditionalAccessPolicies",
     "friendlyName": "Conditional Access Policies",
     "description": "Azure AD Conditional Access policies"
+  },
+  {
+    "type": "ConditionalAccessPlans",
+    "friendlyName": "Conditional Access Plans",
+    "description": "Conditional Access policy plans and their rules (beta API), which do not appear among the policies"
   },
   {
     "type": "SecurityDefaults",

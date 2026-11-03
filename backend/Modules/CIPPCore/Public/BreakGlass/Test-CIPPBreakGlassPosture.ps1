@@ -18,7 +18,8 @@ function Test-CIPPBreakGlassPosture {
         # One entry per registered break-glass account:
         #   @{ Id; UserPrincipalName; Exists; AccountEnabled; OnPremisesSyncEnabled; PasswordPolicies;
         #      PasswordNeverExpiresByDomain; ActiveGlobalAdmin; EligibleGlobalAdmin; GroupIds; RoleTemplateIds;
-        #      Methods (array of @odata.type strings, or $null if unreadable); SignInActivityKnown; LastSuccessfulSignIn }
+        #      Methods (array of @odata.type strings, or $null if unreadable); SignInActivityKnown; LastSuccessfulSignIn;
+        #      ManagementRestricted (Graph isManagementRestricted; null means false) }
         [object[]]$Accounts = @(),
         # Conditional Access policies (Graph objects).
         [object[]]$Policies = @(),
@@ -27,7 +28,16 @@ function Test-CIPPBreakGlassPosture {
         [datetime]$Now = (Get-Date).ToUniversalTime(),
         [int]$TestSignInDays = 90,
         # A non-registered user excluded from at least this many enabled All-users policies is flagged.
-        [int]$BroadExclusionThreshold = 3
+        [int]$BroadExclusionThreshold = 3,
+        # Get-CIPPCAPlanSummary output. Rules in plans do not appear in -Policies, so any plan makes this report incomplete.
+        [object]$PlanSummary,
+        # The plan read failed (beta API). Reported at Info so an API change cannot page the whole estate.
+        [switch]$PlansUnknown,
+        # Groups that hold a registered account and are excluded from a CA policy: @{ Id; DisplayName; Members }.
+        [object[]]$ExclusionGroups = @(),
+        # Restricted management AUs in the tenant: @{ Id; DisplayName; Members; ScopedAdmins }.
+        [object[]]$RestrictedUnits = @(),
+        [switch]$RestrictedUnitsUnknown
     )
 
     $GlobalAdmin = '62e90394-69f5-4237-9190-012177145e10'
@@ -42,6 +52,13 @@ function Test-CIPPBreakGlassPosture {
         & $Add 'Count|0' 'Error' 'Account count' '' 'This tenant has no registered break-glass (emergency access) account. If a Conditional Access mistake, MFA outage or federation failure locks out the normal admins, there is no way back in short of a Microsoft Support recovery.' 'Create two cloud-only *.onmicrosoft.com accounts with permanent Global Administrator and FIDO2 keys, exclude them from every Conditional Access policy, store the credentials in Keeper, and register them with ExecBreakGlassAccounts.'
     } elseif ($Usable.Count -lt 2) {
         & $Add 'Count|1' 'Warning' 'Account count' '' "Only $($Usable.Count) usable break-glass account. Microsoft recommends two, so one lost key or one mistaken change does not leave the tenant without a way in." 'Create a second break-glass account with a separate FIDO2 key stored apart from the first, and register it.'
+    }
+
+    # Not clean when plans exist: a plan rule can catch the break-glass account and nothing below would see it (Vikunja CIPP-56).
+    if ($PlanSummary.PlanCount -gt 0) {
+        & $Add 'Plans|present' 'Error' 'CA policy plans' '' "$($PlanSummary.Warning) A plan rule can apply to a break-glass account, and this posture check cannot see it, so its Conditional Access results are not reliable for this tenant." 'Check every plan rule by hand in Entra and confirm the break-glass group is excluded in the shared conditions of each plan.'
+    } elseif ($PlansUnknown) {
+        & $Add 'PlansUnknown' 'Info' 'CA policy plans' '' 'Could not read Conditional Access plans (beta API), so this check does not know whether plan rules also apply to the break-glass accounts.' 'Check for plans by hand in Entra.'
     }
 
     $Active = @($Policies | Where-Object { $_.state -in @('enabled', 'enabledForReportingButNotEnforced') })
@@ -89,10 +106,44 @@ function Test-CIPPBreakGlassPosture {
                 & $Add "Untested|$($A.Id)" 'Warning' "Tested within $TestSignInDays days" $Upn "Break-glass account $Upn $When. An emergency account that has not been tested may not work when it is needed." "Sign in with it (planned, announced) at least every $TestSignInDays days and confirm it reaches the admin portals. The break-glass activity alert will fire; note the test on the ticket."
             }
         }
+
+        # Info only: optional hardening Microsoft's emergency access guidance does not call for, so it must not raise weekly tickets.
+        if ($A.ManagementRestricted -ne $true) {
+            & $Add "NotRestricted|$($A.Id)" 'Info' 'Restricted management AU' $Upn "Break-glass account $Upn is not in a restricted management administrative unit, so tenant-wide admins and apps can change it. Optional hardening: a Global Admin or Privileged Role Admin can still take it out of the unit." 'No action needed yet. Password rotation on a protected account needs an unlock first, so do not protect it until the CIPP-54 test has passed.'
+        }
+    }
+
+    $Registered = @($Accounts | ForEach-Object { [string]$_.Id })
+    $ExclusionGroupIds = @($ExclusionGroups | ForEach-Object { [string]$_.Id })
+    $MemberName = { param($M) @($M.userPrincipalName, $M.displayName, $M.id) | Where-Object { $_ } | Select-Object -First 1 }
+
+    # An exclusion group is a blanket CA bypass, so anything in it beyond the registered accounts gets that bypass unnoticed (Vikunja CIPP-54).
+    foreach ($G in $ExclusionGroups) {
+        foreach ($M in @($G.Members | Where-Object { $_.id -and [string]$_.id -notin $Registered -and [string]$_.id -notin $ExclusionGroupIds })) {
+            $Name = & $MemberName $M
+            & $Add "ExclusionGroupMember|$($G.Id)|$($M.id)" 'Error' 'Exclusion group membership' $Name "$Name is in '$($G.DisplayName)', which excludes break-glass accounts from Conditional Access, but it is not a registered break-glass account. It skips every policy that excludes this group." 'Remove it from the group and find out from the audit log who added it. If it really is a break-glass account, register it with ExecBreakGlassAccounts.'
+        }
+    }
+
+    # Restricted management AUs holding the break-glass objects. An unrelated RMAU is not our concern.
+    if ($RestrictedUnitsUnknown) {
+        & $Add 'RmauUnknown' 'Info' 'Restricted management AU' '' 'Could not read the restricted management administrative units in this tenant.' 'Check them by hand in Entra.'
+    }
+    foreach ($U in $RestrictedUnits) {
+        $Holds = @($U.Members | Where-Object { [string]$_.id -in $Registered -or [string]$_.id -in $ExclusionGroupIds })
+        if (-not $Holds) { continue }
+        foreach ($R in @($U.ScopedAdmins)) {
+            $Who = @($R.roleMemberInfo.displayName, $R.roleMemberInfo.id) | Where-Object { $_ } | Select-Object -First 1
+            if (-not $Who) { continue }
+            & $Add "RmauAdmin|$($U.Id)|$($R.id)" 'Warning' 'Restricted management AU' $Who "$Who holds a standing scoped role on restricted management AU '$($U.DisplayName)', which holds break-glass objects. That admin can change objects the unit is meant to protect." 'Remove the standing assignment. Assign a scoped role only while unlocking the unit, under a change record.'
+        }
+        foreach ($M in @($U.Members | Where-Object { $_.id -and [string]$_.id -notin $Registered -and [string]$_.id -notin $ExclusionGroupIds })) {
+            $Name = & $MemberName $M
+            & $Add "RmauMember|$($U.Id)|$($M.id)" 'Warning' 'Restricted management AU' $Name "$Name is in restricted management AU '$($U.DisplayName)' with the break-glass objects, but it is not one of them." 'Remove it, or move the break-glass objects to their own unit.'
+        }
     }
 
     # Anti-pattern: other accounts quietly excluded from many All-users policies.
-    $Registered = @($Accounts | ForEach-Object { [string]$_.Id })
     $Counts = @{}
     foreach ($P in @($Policies | Where-Object { $_.state -eq 'enabled' -and (@($_.conditions.users.includeUsers) -contains 'All') })) {
         foreach ($Id in @($P.conditions.users.excludeUsers | Where-Object { $_ -and $_ -ne 'GuestsOrExternalUsers' })) { $Counts[$Id] = 1 + ($Counts[$Id] ?? 0) }

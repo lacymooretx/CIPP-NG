@@ -2,6 +2,7 @@ import { Layout as DashboardLayout } from '../../../layouts/index'
 import { CippIcons } from '../../../utils/icon-registry'
 import { useRouter } from 'next/router'
 import {
+  Alert,
   Box,
   Stack,
   Typography,
@@ -1785,6 +1786,11 @@ const ManageDriftPage = () => {
           </Box>
         ) : (
           <Grid container spacing={3}>
+            {tenantDriftData[0]?.planWarning && (
+              <Grid size={12}>
+                <Alert severity="warning">{tenantDriftData[0].planWarning}</Alert>
+              </Grid>
+            )}
             {/* Left side - Alignment Score & Filters */}
             <Grid size={{ xs: 12, md: 4 }}>
               <Stack spacing={2}>

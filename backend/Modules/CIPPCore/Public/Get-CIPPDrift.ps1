@@ -49,6 +49,9 @@ function Get-CIPPDrift {
         return $null
     }
 
+    # Plan rules are not among the policies compared below, so they are never flagged as extra (Vikunja CIPP-56).
+    $PlanWarning = try { Get-CIPPCAPlanWarning -TenantFilter $TenantFilter } catch { $null }
+
     $IntuneCapable = Test-CIPPStandardLicense -StandardName 'IntuneTemplate_general' -TenantFilter $TenantFilter -Preset Intune
     $ConditionalAccessCapable = Test-CIPPStandardLicense -StandardName 'ConditionalAccessTemplate_general' -TenantFilter $TenantFilter -Preset Entra
     $IntuneTable = Get-CippTable -tablename 'templates'
@@ -618,6 +621,7 @@ function Get-CIPPDrift {
                 allDeviations                   = @($AllDeviations)
                 latestDataCollection            = $Alignment.LatestDataCollection
                 driftSettings                   = $AlignmentData
+                planWarning                     = $PlanWarning
             }
 
             $Results.Add($Result)

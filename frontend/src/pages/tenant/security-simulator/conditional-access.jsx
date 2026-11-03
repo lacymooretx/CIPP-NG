@@ -86,6 +86,9 @@ const Page = () => {
               Conditional Access policies to analyse.
             </Alert>
           )}
+          {tenantSelected && data?.analysis?.planWarning && (
+            <Alert severity="warning">{data.analysis.planWarning}</Alert>
+          )}
           {tenantSelected && data?.analysisError && (
             <Alert severity="warning">
               Policy analysis failed: {data.analysisError}

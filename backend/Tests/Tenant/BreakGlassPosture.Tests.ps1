@@ -11,7 +11,7 @@ BeforeAll {
         [pscustomobject]@{ Id = $Id; UserPrincipalName = $Upn; Exists = $true; AccountEnabled = $true; OnPremisesSyncEnabled = $null
             PasswordPolicies = 'DisablePasswordExpiration'; PasswordNeverExpiresByDomain = $false; ActiveGlobalAdmin = $true; EligibleGlobalAdmin = $false
             GroupIds = @('bg-group'); RoleTemplateIds = @($script:GA); Methods = @('#microsoft.graph.fido2AuthenticationMethod', '#microsoft.graph.passwordAuthenticationMethod')
-            SignInActivityKnown = $true; LastSuccessfulSignIn = $script:Now.AddDays(-10).ToString('o') }
+            SignInActivityKnown = $true; LastSuccessfulSignIn = $script:Now.AddDays(-10).ToString('o'); ManagementRestricted = $true }
     }
     function Pol { param($Id, $State = 'enabled', $IncUsers = @('All'), $ExUsers = @(), $ExGroups = @(), $IncRoles = @(), $ExRoles = @())
         [pscustomobject]@{ id = $Id; displayName = "Policy $Id"; state = $State; grantControls = @{ builtInControls = @('mfa') }

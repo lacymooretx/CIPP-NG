@@ -52131,6 +52131,55 @@
         "x-cipp-role": "Endpoint.MEM.Read"
       }
     },
+    "/api/ListConditionalAccessPlans": {
+      "get": {
+        "summary": "Conditional Access plans and rules CIPP does not evaluate, from the cache",
+        "operationId": "ListConditionalAccessPlans",
+        "tags": [
+          "Tenant > Conditional"
+        ],
+        "description": "Returns PlanCount, RuleCount, Warning and Plans for one tenant from the ConditionalAccessPlans cache,\ncollecting it on a miss. Report only: there is no plan write support. Aspendora fork addition (Vikunja CIPP-56).",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/tenantFilter"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "description": "Not described statically: this endpoint returns the upstream response as-is, so its fields are determined by the upstream API rather than by CIPP. Call the endpoint to see the actual shape, or add a response schema in backend/Config/openapi-overrides."
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - missing required field or invalid input"
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cipp-role": "Tenant.ConditionalAccess.Read"
+      }
+    },
     "/api/ListConditionalAccessPolicies": {
       "get": {
         "summary": "ListConditionalAccessPolicies",
@@ -65057,6 +65106,12 @@
                         "x-cipp-field-source": "storage"
                       },
                       "AlertTitle": {
+                        "x-cipp-field-source": "storage"
+                      },
+                      "ConnectWiseNoteTicketId": {
+                        "x-cipp-field-source": "storage"
+                      },
+                      "ConnectWiseTicketWindow": {
                         "x-cipp-field-source": "storage"
                       },
                       "Data": {
@@ -78786,6 +78841,12 @@
                       "AlertTitle": {
                         "x-cipp-field-source": "storage"
                       },
+                      "ConnectWiseNoteTicketId": {
+                        "x-cipp-field-source": "storage"
+                      },
+                      "ConnectWiseTicketWindow": {
+                        "x-cipp-field-source": "storage"
+                      },
                       "Data": {
                         "type": "string",
                         "x-cipp-field-source": "storage"
@@ -83381,6 +83442,12 @@
                       "x-cipp-field-source": "storage"
                     },
                     "AlertTitle": {
+                      "x-cipp-field-source": "storage"
+                    },
+                    "ConnectWiseNoteTicketId": {
+                      "x-cipp-field-source": "storage"
+                    },
+                    "ConnectWiseTicketWindow": {
                       "x-cipp-field-source": "storage"
                     },
                     "Data": {

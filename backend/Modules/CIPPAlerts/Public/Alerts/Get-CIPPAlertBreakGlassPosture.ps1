@@ -5,7 +5,8 @@ function Get-CIPPAlertBreakGlassPosture {
     .DESCRIPTION
         Runs Get-CIPPBreakGlassPosture and raises its Error and Warning findings: no or only one break-glass account,
         not permanent Global Admin, subject to a Conditional Access policy, expiring password, no FIDO2 or
-        person-bound MFA, untested for 90 days, and other accounts with broad CA exclusions.
+        person-bound MFA, untested for 90 days, other accounts with broad CA exclusions, Conditional Access plans it
+        cannot evaluate, members of the exclusion group that are not registered, and restricted management AU issues.
         State mode: a finding notifies once and resolves when it is fixed. A run with collection errors does not
         report, because "could not check" is not "clear". Aspendora fork addition (Vikunja CIPP-4).
     .FUNCTIONALITY

@@ -1,7 +1,7 @@
 function Set-CIPPDBCacheAdministrativeUnits {
     <#
     .SYNOPSIS
-        Caches a tenant's administrative units (id and name)
+        Caches a tenant's administrative units (id, name and whether management is restricted)
 
     .DESCRIPTION
         Lets cached views show 'AU: <name>' for role assignments scoped to an administrative unit
@@ -22,7 +22,7 @@ function Set-CIPPDBCacheAdministrativeUnits {
 
     try {
         Write-LogMessage -API 'CIPPDBCache' -tenant $TenantFilter -message 'Caching administrative units' -sev Debug
-        $Units = New-GraphGetRequest -uri 'https://graph.microsoft.com/v1.0/directory/administrativeUnits?$select=id,displayName,description,membershipType,visibility&$top=999' -tenantid $TenantFilter
+        $Units = New-GraphGetRequest -uri 'https://graph.microsoft.com/v1.0/directory/administrativeUnits?$select=id,displayName,description,membershipType,visibility,isMemberManagementRestricted&$top=999' -tenantid $TenantFilter
         # Most tenants have none; -ClearOnEmpty clears units deleted since the last run.
         Add-CIPPDbItem -TenantFilter $TenantFilter -Type 'AdministrativeUnits' -Data @($Units) -AddCount -ClearOnEmpty
         $Units = $null

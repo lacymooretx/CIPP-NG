@@ -34,6 +34,11 @@ const Page = () => {
   return (
     <Container maxWidth={false} sx={{ flexGrow: 1, py: 2 }}>
       <Grid container spacing={2}>
+        {report.data?.PlanWarning && (
+          <Grid size={12}>
+            <Alert severity="warning">{report.data.PlanWarning}</Alert>
+          </Grid>
+        )}
         <Grid size={12}>
           <CippInfoBar
             isFetching={report.isFetching}
@@ -75,6 +80,7 @@ const Page = () => {
               "ActiveGlobalAdmin",
               "Methods",
               "LastSuccessfulSignIn",
+              "ManagementRestricted",
             ]}
           />
         </Grid>

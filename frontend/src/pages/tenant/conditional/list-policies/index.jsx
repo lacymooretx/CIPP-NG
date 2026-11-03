@@ -8,6 +8,7 @@ import { CippApiLogsDrawer } from "../../../../components/CippComponents/CippApi
 import { CippCAPolicyCoverageDrawer } from "../../../../components/CippComponents/CippCAPolicyCoverageDrawer";
 import { CippCAPolicyImpactDrawer } from "../../../../components/CippComponents/CippCAPolicyImpactDrawer";
 import { CippCAPreflightDrawer } from "../../../../components/CippComponents/CippCAPreflightDrawer";
+import { CippCAPlansWarning } from "../../../../components/CippComponents/CippCAPlansWarning";
 import { PermissionButton } from "../../../../utils/permissions";
 import { useSettings } from "../../../../hooks/use-settings.js";
 
@@ -246,6 +247,7 @@ const Page = () => {
         </Box>
       }
       title={pageTitle}
+      tableFilter={<CippCAPlansWarning />}
       apiUrl={apiUrl}
       apiData={{ manualPagination: true }}
       apiDataKey="Results"

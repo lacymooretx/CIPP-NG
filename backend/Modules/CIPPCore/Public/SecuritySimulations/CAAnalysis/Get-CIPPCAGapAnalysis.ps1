@@ -10,7 +10,8 @@ function Get-CIPPCAGapAnalysis {
         affectedPolicies (display names), remediation, fix ($null or @{ caTemplate }), relatedIds ),
         personaMatrix = @{ personas; controls; cells = @( persona, control, state
         (Enforced|ReportOnly|Missing|NotApplicable), policies ) }, score         = @{ score (1-10), scoreMax
-        = 10, enforcedControls, applicableControls, criticalFindings, highFindings }, licenses, breakGlass.
+        = 10, enforcedControls, applicableControls, criticalFindings, highFindings }, licenses, breakGlass,
+        planWarning ($null, or the warning when the tenant has Conditional Access plans it cannot evaluate).
     .FUNCTIONALITY
         Internal
     #>
@@ -93,5 +94,7 @@ function Get-CIPPCAGapAnalysis {
             hasWorkloadIdPremium = [bool]$Context.Licenses.HasWorkloadIdPremium
         }
         breakGlass      = $Context.BreakGlass
+        # Rules in Conditional Access plans are not among the cached policies, so findings and score may be wrong (Vikunja CIPP-56).
+        planWarning     = $(try { Get-CIPPCAPlanWarning -TenantFilter $TenantFilter } catch { $null })
     }
 }

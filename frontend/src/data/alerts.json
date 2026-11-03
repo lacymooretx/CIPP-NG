@@ -1097,7 +1097,28 @@
     "name": "BreakGlassPosture",
     "label": "Alert on weak break-glass (emergency access) setup",
     "recommendedRunInterval": "7d",
-    "description": "Weekly check of the registered break-glass accounts: at least two, cloud-only on *.onmicrosoft.com, permanent Global Administrator, excluded from every enabled Conditional Access policy, non-expiring password, FIDO2 and no person-bound MFA, tested in the last 90 days. Also flags other accounts excluded from many All-users CA policies. Report only."
+    "description": "Weekly check of the registered break-glass accounts: at least two, cloud-only on *.onmicrosoft.com, permanent Global Administrator, excluded from every enabled Conditional Access policy, non-expiring password, FIDO2 and no person-bound MFA, tested in the last 90 days. Also flags other accounts excluded from many All-users CA policies, Conditional Access plans it cannot evaluate, exclusion-group members that are not registered, and restricted management AU issues. Report only."
+  },
+  {
+    "name": "BreakGlassExclusionChange",
+    "label": "Alert when a Conditional Access policy loses the break-glass exclusion, or the exclusion group gains a member",
+    "recommendedRunInterval": "30m",
+    "requiresInput": true,
+    "multipleInput": true,
+    "inputs": [
+      {
+        "inputType": "textField",
+        "inputLabel": "Hours of audit history to scan each run (default: 2). Events are de-duplicated, so overlap loses nothing and catches events that reach the logs late.",
+        "inputName": "BreakGlassLookbackHours"
+      }
+    ],
+    "description": "Raises a High alert, naming the actor, when a Conditional Access policy update removes a registered break-glass account or a group holding one from its exclusions, or when anything but a registered account joins an exclusion group. Each audit event alerts once. Report only."
+  },
+  {
+    "name": "ConditionalAccessPlans",
+    "label": "Alert when a Conditional Access policy plan appears",
+    "recommendedRunInterval": "1d",
+    "description": "CIPP does not evaluate plan rules, so posture, gap analysis, drift and backups all miss them. Each plan alerts once when first seen and resolves when deleted. Report only."
   },
   {
     "name": "EwsEnabled",
