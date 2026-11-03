@@ -55062,6 +55062,146 @@
         "x-cipp-role": "Identity.AuditLog.Read"
       }
     },
+    "/api/ListDeviceComplianceState": {
+      "get": {
+        "summary": "Compliance policy state for one device",
+        "operationId": "ListDeviceComplianceState",
+        "tags": [
+          "Endpoint > MEM"
+        ],
+        "description": "For one device (DeviceId: Intune managed device id or Entra deviceId, or SerialNumber), returns the device's\noverall compliance state and grace period, and each compliance policy with its worst state across user and system\ncontexts. Non-compliant policies list their failing settings; IncludeSettings=true returns every setting.\n\nA device that cannot be resolved is a 400, 404 or 409. A failed state read is a 500, never an empty list; partial\nfailures set Partial and list the Errors. Report only: nothing is changed. Aspendora fork addition.",
+        "parameters": [
+          {
+            "name": "DeviceId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "IncludeSettings",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "SerialNumber",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/tenantFilter"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardResults"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cipp-role": "Endpoint.MEM.Read"
+      }
+    },
+    "/api/ListDeviceConfigurationState": {
+      "get": {
+        "summary": "Configuration profile assignment and state for one device",
+        "operationId": "ListDeviceConfigurationState",
+        "tags": [
+          "Endpoint > MEM"
+        ],
+        "description": "For one device (DeviceId: Intune managed device id or Entra deviceId, or SerialNumber), lists the configuration\nprofiles Intune reports state for, one row per profile with its worst state across user and system contexts,\nand for failing profiles the failing settings: CSP path, state, error code and description. IncludeSettings=true\nreturns every setting of every profile (one extra Graph read per profile).\n\nUnless IncludeAssignments=false, each row also carries its type and assignment from the effective-policy\nevaluation, and profiles that target the device but have no state are added with State 'notReported'. Graph's\ndevice state collections do not cover Settings Catalog, Endpoint Security or update profiles, so 'notReported'\nmeans Graph gave no answer, not that the profile is healthy.\n\nA device that cannot be resolved is a 400, 404 or 409. A failed state read is a 500, never an empty list; partial\nfailures set Partial and list the Errors. Report only: nothing is changed. Aspendora fork addition.",
+        "parameters": [
+          {
+            "name": "DeviceId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "IncludeAssignments",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "IncludeSettings",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "SerialNumber",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/tenantFilter"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardResults"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cipp-role": "Endpoint.MEM.Read"
+      }
+    },
     "/api/ListDeviceDetails": {
       "get": {
         "summary": "ListDeviceDetails",
@@ -55152,6 +55292,64 @@
           }
         ],
         "x-cipp-role": "Identity.Device.Read"
+      }
+    },
+    "/api/ListDeviceEffectivePolicy": {
+      "get": {
+        "summary": "Effective Intune policy for one managed device, by id or serial",
+        "operationId": "ListDeviceEffectivePolicy",
+        "tags": [
+          "Endpoint > MEM"
+        ],
+        "description": "The effective-policy evaluation behind ListIntuneEffectivePolicy (CIPP-19), for callers holding a serial number\nor wanting distinct answers for a bad request (400), an unknown device (404) and an ambiguous serial (409). This\nis a simulation from assignments, groups and filters, not what the device itself reports. Devices that are not\nIntune-managed return 404 here; ListIntuneEffectivePolicy shows what would target those.\nPartial failures set Partial and list the Errors. Report only: nothing is changed. Aspendora fork addition.",
+        "parameters": [
+          {
+            "name": "DeviceId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "SerialNumber",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/tenantFilter"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StandardResults"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cipp-role": "Endpoint.MEM.Read"
       }
     },
     "/api/ListDevicePolicyConflicts": {
