@@ -34,6 +34,8 @@ function Get-CIPPMessageCenterDigest {
         [int]$DeadlineDays = 30,
         [switch]$IncludeInformational,
         [switch]$IncludeOpenDeadlines,
+        # A single tenant with nothing cached throws instead of reading Graph live (the change record reads held data only).
+        [switch]$CacheOnly,
         [System.Collections.IDictionary]$MessagesByTenant,
         [datetime]$Now = [datetime]::UtcNow
     )
@@ -88,6 +90,7 @@ function Get-CIPPMessageCenterDigest {
                 throw 'No Message Center posts are cached for any tenant yet. Run the MessageCenterMessages cache sync (CIPP DB cache) first.'
             }
         } elseif ($MessagesByTenant.Count -eq 0) {
+            if ($CacheOnly) { throw 'No Message Center posts are cached for this tenant.' }
             $Live = @(New-GraphGetRequest -uri 'https://graph.microsoft.com/v1.0/admin/serviceAnnouncement/messages' -tenantid $TenantFilter)
             $MessagesByTenant[$TenantFilter] = $Live
             $Source = 'Live'
@@ -186,6 +189,7 @@ function Get-CIPPMessageCenterDigest {
             NotCached      = [string[]]$NotCached
             Source         = $Source
             OldestCache    = if ($Oldest) { Format-CIPPCentralTime -Value $Oldest } else { '' }
+            OldestCacheUtc = if ($Oldest) { $Oldest.ToString('o') } else { '' }
             Days           = $Days
             DeadlineDays   = $DeadlineDays
             TenantFilter   = $TenantFilter
