@@ -20506,6 +20506,119 @@
         "x-cipp-any-tenant": true
       }
     },
+    "/api/ExecControlRApprovedScript": {
+      "post": {
+        "summary": "Runs a named, approved, read-only ControlR script on an Intune-managed device",
+        "operationId": "ExecControlRApprovedScript",
+        "tags": [
+          "Endpoint > MEM"
+        ],
+        "description": "Action=List returns the approved scripts. Action=Run (POST, with tenantFilter, ScriptKey, and DeviceId or\nSerialNumber) resolves the Intune device to its ControlR device and starts the script. Action=Status (with RunId)\nreturns the run and its output.\n\nOnly the scripts named here can run, and only in the tenants named here. ControlR enforces its own allow-list and\ntenant limit as well. Adding a script needs Lacy's approval and a matching change in ControlR. Each run is logged\nas \"CIPP integration\". Aspendora fork addition.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "Action": {
+                    "type": "string"
+                  },
+                  "DeviceId": {
+                    "type": "string"
+                  },
+                  "RunId": {
+                    "type": "string"
+                  },
+                  "ScriptKey": {
+                    "type": "string"
+                  },
+                  "SerialNumber": {
+                    "type": "string"
+                  },
+                  "tenantFilter": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "tenantFilter"
+                ]
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "Action",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "DeviceId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "RunId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "ScriptKey",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "SerialNumber",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/tenantFilter"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Not described statically: this endpoint returns the upstream response as-is, so its fields are determined by the upstream API rather than by CIPP. Call the endpoint to see the actual shape, or add a response schema in backend/Config/openapi-overrides."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cipp-role": "Endpoint.MEM.ReadWrite"
+      }
+    },
     "/api/ExecConvertMailbox": {
       "post": {
         "summary": "ExecConvertMailbox",
