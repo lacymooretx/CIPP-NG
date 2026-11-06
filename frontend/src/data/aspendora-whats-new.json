@@ -1,0 +1,397 @@
+{
+  "_readme": "Aspendora fork changelog shown at /cipp/whats-new. Newest first. Add an entry in the same commit/PR as any user-visible fork feature (see docs/aspendora-whats-new.md). Fields: id (unique kebab-case), date (YYYY-MM-DD, the day it went live), title, area (one of the listed areas), summary (1-3 plain sentences: what it does for the operator), optional path (page in CIPP), optional ref (Vikunja card / ticket).",
+  "areas": ["Identity", "Email", "Endpoint", "Teams & SharePoint", "Tenant", "Security", "Alerts", "Integrations", "Platform"],
+  "entries": [
+    {
+      "id": "whats-new-page",
+      "date": "2026-11-05",
+      "title": "What's New (Aspendora)",
+      "area": "Platform",
+      "summary": "This page. Lists features our fork adds on top of upstream CIPP, newest first. The account menu shows a dot when something was added since your last visit.",
+      "path": "/cipp/whats-new"
+    },
+    {
+      "id": "controlr-approved-scripts",
+      "date": "2026-11-03",
+      "title": "Run approved ControlR scripts from CIPP",
+      "area": "Integrations",
+      "summary": "CIPP can run scripts from the ControlR approved list on managed devices (API endpoint ExecControlRApprovedScript, Aspendora tenant only for now; no page yet)."
+    },
+    {
+      "id": "ca-plan-detection-breakglass-exclusions",
+      "date": "2026-11-03",
+      "title": "Conditional Access: plan detection and break-glass exclusion alert",
+      "area": "Security",
+      "summary": "Detects each tenant's Conditional Access licence level, alerts when a policy loses its break-glass exclusion, and reports restricted management administrative unit posture.",
+      "ref": "CIPP-54, CIPP-56"
+    },
+    {
+      "id": "audit-alerts-ticket-notes",
+      "date": "2026-11-03",
+      "title": "Our own audited changes land as ticket notes",
+      "area": "Alerts",
+      "summary": "When an audit alert matches a change we made for an open ConnectWise ticket, it is added as a note on that ticket instead of opening a new one. Role-grant alerts open at most one ticket per tenant per hour.",
+      "ref": "MSP-3"
+    },
+    {
+      "id": "entra-entitlement-true-up",
+      "date": "2026-11-02",
+      "title": "Entra ID P1/P2 true-up",
+      "area": "Identity",
+      "summary": "Report, weekly alert and test comparing Entra ID P1/P2 licences with the users who need them. Package accounts are left out; inactive accounts are flagged.",
+      "path": "/identity/reports/entra-entitlement",
+      "ref": "CIPP-47"
+    },
+    {
+      "id": "alerts-read-as-app",
+      "date": "2026-11-02",
+      "title": "Alerts read as the app when the delegated user lacks roles",
+      "area": "Alerts",
+      "summary": "Graph reads behind alerts retry with the CIPP app token when the partner user has no roles in the tenant, so alerts keep working."
+    },
+    {
+      "id": "session-timeline",
+      "date": "2026-11-01",
+      "title": "Session timeline",
+      "area": "Security",
+      "summary": "One timeline of a user's sign-ins and activity for incident review.",
+      "path": "/security/incidents/session-timeline",
+      "ref": "CIPP-12"
+    },
+    {
+      "id": "signin-explainer",
+      "date": "2026-11-01",
+      "title": "Sign-in failure explainer",
+      "area": "Identity",
+      "summary": "Explains why a sign-in failed in plain language, with the likely fix.",
+      "path": "/identity/reports/signin-explainer",
+      "ref": "CIPP-10"
+    },
+    {
+      "id": "tenant-changes",
+      "date": "2026-11-01",
+      "title": "What Changed (posture diff)",
+      "area": "Tenant",
+      "summary": "Shows what changed in a tenant's security posture between two points in time.",
+      "path": "/tenant/reports/tenant-changes",
+      "ref": "CIPP-16"
+    },
+    {
+      "id": "entra-recovery-coverage",
+      "date": "2026-11-01",
+      "title": "Entra recovery coverage",
+      "area": "Tenant",
+      "summary": "Shows which Entra objects Microsoft's Entra backup covers in each tenant.",
+      "path": "/tenant/reports/entra-recovery-coverage",
+      "ref": "CIPP-17"
+    },
+    {
+      "id": "message-center-digest",
+      "date": "2026-11-01",
+      "title": "Message Center digest",
+      "area": "Tenant",
+      "summary": "Microsoft 365 Message Center posts filtered to what matters for our tenants.",
+      "path": "/tenant/reports/message-center-digest",
+      "ref": "CIPP-37"
+    },
+    {
+      "id": "exo-provisioning",
+      "date": "2026-11-01",
+      "title": "Exchange provisioning check",
+      "area": "Email",
+      "summary": "Finds licensed users whose mailbox did not provision, and why.",
+      "path": "/email/reports/exo-provisioning",
+      "ref": "CIPP-36"
+    },
+    {
+      "id": "ooo-exposure",
+      "date": "2026-11-01",
+      "title": "Out-of-office exposure",
+      "area": "Email",
+      "summary": "Lists out-of-office replies sent to external senders and can limit one to known senders.",
+      "path": "/email/reports/ooo-exposure",
+      "ref": "CIPP-40"
+    },
+    {
+      "id": "teams-file-resolver",
+      "date": "2026-11-01",
+      "title": "Teams file resolver",
+      "area": "Teams & SharePoint",
+      "summary": "Finds where a file shared in Teams actually lives.",
+      "path": "/teams-share/teams/file-resolver",
+      "ref": "CIPP-33"
+    },
+    {
+      "id": "cloud-only-lint",
+      "date": "2026-11-01",
+      "title": "Cloud-only lint",
+      "area": "Endpoint",
+      "summary": "Flags Intune settings that assume on-premises AD in cloud-only tenants.",
+      "path": "/endpoint/MEM/cloud-only-lint",
+      "ref": "CIPP-28"
+    },
+    {
+      "id": "personal-devices",
+      "date": "2026-11-01",
+      "title": "Personal (BYOD) device enrollment",
+      "area": "Endpoint",
+      "summary": "Shows personal devices and how they are enrolled.",
+      "path": "/endpoint/reports/personal-devices",
+      "ref": "CIPP-21"
+    },
+    {
+      "id": "sms-retirement",
+      "date": "2026-11-01",
+      "title": "SMS/voice MFA readiness",
+      "area": "Identity",
+      "summary": "Finds users who still rely on SMS or voice MFA and are not ready for it to be turned off.",
+      "path": "/identity/reports/sms-mfa-readiness",
+      "ref": "CIPP-6, CIPP-46"
+    },
+    {
+      "id": "guest-inventory",
+      "date": "2026-11-01",
+      "title": "Guest inventory and Guest Access Review",
+      "area": "Identity",
+      "summary": "Every guest account with who invited it and when it was last used, plus a Guest Access Review PDF.",
+      "path": "/identity/reports/guest-inventory",
+      "ref": "CIPP-14"
+    },
+    {
+      "id": "disable-kmsi",
+      "date": "2026-11-01",
+      "title": "Standard: hide 'Stay signed in?'",
+      "area": "Tenant",
+      "summary": "New standard DisableKeepMeSignedIn turns off the 'Stay signed in?' prompt.",
+      "ref": "CIPP-18"
+    },
+    {
+      "id": "verified-backups",
+      "date": "2026-10-31",
+      "title": "Verified, diffable backups with safe restore-as-new",
+      "area": "Tenant",
+      "summary": "CIPP backups are checked after they run, can be compared, and can be restored as new objects instead of overwriting.",
+      "ref": "CIPP-23"
+    },
+    {
+      "id": "tld-exposure-mail-triage",
+      "date": "2026-10-31",
+      "title": "Abused-TLD blocking and mail delivery triage",
+      "area": "Email",
+      "summary": "Tenant allow/block templates for commonly abused top-level domains with an exposure audit, and a triage tool that explains why a message was or wasn't delivered.",
+      "path": "/email/tools/mail-triage",
+      "ref": "CIPP-30, CIPP-38"
+    },
+    {
+      "id": "intune-ops",
+      "date": "2026-10-31",
+      "title": "Intune: enrollment discovery, operational alerts, driver updates",
+      "area": "Endpoint",
+      "summary": "Autopilot enrollment status pages, Intune operational alerts, Intune hygiene and a driver update standard.",
+      "path": "/endpoint/MEM/driver-updates",
+      "ref": "CIPP-22, CIPP-24, CIPP-27"
+    },
+    {
+      "id": "defender-hardening",
+      "date": "2026-10-31",
+      "title": "Defender hardening pack and pending AIR alert",
+      "area": "Security",
+      "summary": "Defender hardening standards and an alert when automated investigation remediations are waiting for approval.",
+      "ref": "CIPP-26, CIPP-31"
+    },
+    {
+      "id": "sharing-burst-email-security",
+      "date": "2026-10-31",
+      "title": "Sharing-burst detection and email security change alerts",
+      "area": "Alerts",
+      "summary": "Alerts on sudden bursts of external sharing and on changes to email security settings.",
+      "ref": "CIPP-13, CIPP-32"
+    },
+    {
+      "id": "role-assignment-report",
+      "date": "2026-10-31",
+      "title": "Least-privilege role report",
+      "area": "Identity",
+      "summary": "Lists admin role assignments and where a smaller role would do.",
+      "path": "/identity/reports/role-assignment-report",
+      "ref": "CIPP-15"
+    },
+    {
+      "id": "ca-preflight",
+      "date": "2026-10-31",
+      "title": "Conditional Access pre-flight lockout check",
+      "area": "Security",
+      "summary": "Before a CA policy is saved, checks it would not lock out admins or break-glass accounts.",
+      "ref": "CIPP-5"
+    },
+    {
+      "id": "ca-baseline-oib-intune-effective",
+      "date": "2026-10-31",
+      "title": "CA baseline, OIB drift and effective Intune policy",
+      "area": "Endpoint",
+      "summary": "Report-only CA baseline, drift against the Open Intune Baseline, and the policies that actually apply to a device or user.",
+      "path": "/endpoint/MEM/effective-policy",
+      "ref": "CIPP-8, CIPP-19, CIPP-20"
+    },
+    {
+      "id": "oauth-grant-risk",
+      "date": "2026-10-31",
+      "title": "OAuth grant risk scoring",
+      "area": "Security",
+      "summary": "Scores app consent grants by risk and alerts on high-risk grants, with fleet-wide and per-tenant allow-lists.",
+      "ref": "CIPP-11"
+    },
+    {
+      "id": "phish-resistant-mfa",
+      "date": "2026-10-31",
+      "title": "Phishing-resistant MFA report",
+      "area": "Identity",
+      "summary": "Report and weekly alert on admins without phishing-resistant MFA.",
+      "ref": "CIPP-7"
+    },
+    {
+      "id": "break-glass",
+      "date": "2026-10-31",
+      "title": "Break-glass account registry and posture",
+      "area": "Identity",
+      "summary": "Register each tenant's break-glass accounts, get alerted when one signs in or changes, and see a weekly posture check.",
+      "path": "/identity/administration/break-glass",
+      "ref": "CIPP-3"
+    },
+    {
+      "id": "ews-status",
+      "date": "2026-10-31",
+      "title": "EWS status report and pin",
+      "area": "Email",
+      "summary": "Shows Exchange Web Services status per tenant ahead of Microsoft's shutdown, with a one-click pin and a daily alert."
+    },
+    {
+      "id": "gdap-health",
+      "date": "2026-10-31",
+      "title": "GDAP health monitor",
+      "area": "Tenant",
+      "summary": "Daily check of GDAP relationships and CIPP tokens, with run-now, one-click auto-extend and an ignore list. Alerts reach ConnectWise.",
+      "path": "/tenant/gdap-management/health",
+      "ref": "CIPP-2"
+    },
+    {
+      "id": "onedrive-sharing-digest",
+      "date": "2026-10-26",
+      "title": "Weekly OneDrive sharing digest",
+      "area": "Teams & SharePoint",
+      "summary": "Emails each user a weekly list of the links they have shared from OneDrive (Managed Clients only)."
+    },
+    {
+      "id": "password-delivery-hudu",
+      "date": "2026-10-10",
+      "title": "Reset passwords documented in Hudu",
+      "area": "Integrations",
+      "summary": "Passwords from user creation and resets are delivered through Password Pusher and saved to the client's Hudu passwords (previously IT Glue)."
+    },
+    {
+      "id": "mailbox-onedrive-copy",
+      "date": "2026-10-05",
+      "title": "Copy or move mailbox and OneDrive content",
+      "area": "Email",
+      "summary": "Copy or move mail (including the online archive) and OneDrive files from one user to another, with resume that doesn't duplicate.",
+      "path": "/email/administration/mailbox-copies"
+    },
+    {
+      "id": "compromise-sweep",
+      "date": "2026-10-01",
+      "title": "CompromiseSweep alert",
+      "area": "Alerts",
+      "summary": "Scripted alert that sweeps tenants for common account-compromise signs."
+    },
+    {
+      "id": "azure-compliance",
+      "date": "2026-10-01",
+      "title": "Azure subscription compliance",
+      "area": "Tenant",
+      "summary": "Checks client Azure subscriptions against a security baseline using a Reader grant.",
+      "path": "/dashboardv2/azure"
+    },
+    {
+      "id": "graph-mailbox-reads",
+      "date": "2026-09-28",
+      "title": "Mailbox reads through the Graph proxies",
+      "area": "Platform",
+      "summary": "ListGraphRequest/ExecGraphRequest can read mailboxes for investigations (fork exemption from the upstream blocklist)."
+    },
+    {
+      "id": "windows-365",
+      "date": "2026-09-21",
+      "title": "Windows 365 Cloud PCs",
+      "area": "Endpoint",
+      "summary": "Cloud PC inventory, provisioning policies and lifecycle actions, with guards on destructive actions.",
+      "path": "/endpoint/windows365"
+    },
+    {
+      "id": "intune-insights",
+      "date": "2026-09-17",
+      "title": "Intune insights",
+      "area": "Endpoint",
+      "summary": "Policy conflicts as Intune computed them, reverse assignment lookup, deployment outcome counts, malware detail, stale devices, update ring health and per-device feature update alerts."
+    },
+    {
+      "id": "consent-alerts",
+      "date": "2026-09-17",
+      "title": "Consent-blocked user alerts",
+      "area": "Alerts",
+      "summary": "Opens tickets for users blocked by app consent and for pending admin consent requests."
+    },
+    {
+      "id": "printers",
+      "date": "2026-09-14",
+      "title": "Printers",
+      "area": "Endpoint",
+      "summary": "Universal Print and direct-IP printer management, a printer catalogue standard, readiness report, deployment status and failure alert.",
+      "path": "/endpoint/printers"
+    },
+    {
+      "id": "teams-policies",
+      "date": "2026-09-13",
+      "title": "Teams policies and voice apps",
+      "area": "Teams & SharePoint",
+      "summary": "Browse Teams policies and voice apps, capture policies as templates and enforce them across tenants on a schedule.",
+      "path": "/teams-share/teams/policies"
+    },
+    {
+      "id": "storage-usage",
+      "date": "2026-08-16",
+      "title": "M365 storage and usage trending",
+      "area": "Tenant",
+      "summary": "Mailbox, OneDrive and SharePoint storage trends with a report and alerting for managed clients.",
+      "path": "/tenant/reports/storage-usage"
+    },
+    {
+      "id": "connectwise-tenant-groups",
+      "date": "2026-08-16",
+      "title": "Managed/unmanaged tenant groups from ConnectWise",
+      "area": "Integrations",
+      "summary": "Tenant groups follow the client's ConnectWise agreement instead of being set by hand."
+    },
+    {
+      "id": "welcome-packet",
+      "date": "2026-08-14",
+      "title": "New-hire welcome packet",
+      "area": "Identity",
+      "summary": "Printable welcome packet and welcome email for new users in cloud-only tenants."
+    },
+    {
+      "id": "defender-indicators",
+      "date": "2026-08-11",
+      "title": "Defender custom indicators",
+      "area": "Security",
+      "summary": "Manage Microsoft Defender for Endpoint custom indicators (block/allow IPs, URLs, files) across tenants."
+    },
+    {
+      "id": "fork-baseline",
+      "date": "2026-07-29",
+      "title": "Aspendora fork baseline",
+      "area": "Platform",
+      "summary": "Carried over from the original fork: Autopatch management, the report suite (Tools > Reports) with scheduled email, Pax8 and our ConnectWise integration, and the ExecGraphRequest/ExecExoRequest passthroughs used by the CIPP MCP.",
+      "path": "/endpoint/autopatch"
+    }
+  ]
+}
