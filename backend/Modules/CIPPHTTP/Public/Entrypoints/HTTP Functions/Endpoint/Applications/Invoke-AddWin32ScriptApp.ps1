@@ -37,15 +37,13 @@ function Invoke-AddWin32ScriptApp {
     # Use whichever case was provided
     $AppName = if ($Win32ScriptApp.ApplicationName) { $Win32ScriptApp.ApplicationName } else { $Win32ScriptApp.applicationName }
 
-    $AllowedTenants = Test-CIPPAccess -Request $Request -TenantList
-
-    # Resolve target tenants. Historically this only honored the multi-tenant `selectedTenants`
-    # array supplied by the CIPP UI. Callers using the standard single-tenant `TenantFilter`
-    # (the API / MCP, like every other endpoint) resolved to zero tenants and got a silent
-    # 200 { Results: null } no-op with nothing logged. Honor both inputs.
+    # Upstream's Resolve-CippBulkSelectedTenant validates the UI's selectedTenants. Aspendora fork: also
+    # honor the single-tenant TenantFilter used by the API / MCP, and fail loudly instead of the old
+    # silent 200 { Results: null } when no tenant resolves.
     if ($Request.Body.selectedTenants) {
-        $Tenants = ($Request.Body.selectedTenants | Where-Object { $AllowedTenants -contains $_.customerId -or $AllowedTenants -contains 'AllTenants' }).defaultDomainName
+        $Tenants = (Resolve-CippBulkSelectedTenant -Request $Request -SelectedTenants $Request.Body.selectedTenants).defaultDomainName
     } else {
+        $AllowedTenants = Test-CIPPAccess -Request $Request -TenantList
         $TenantFilter = $Request.Body.tenantFilter ?? $Request.Query.tenantFilter ?? $Request.Query.TenantFilter
         if ($TenantFilter) {
             $ResolvedTenant = Get-Tenants -IncludeErrors | Where-Object { $_.defaultDomainName -eq $TenantFilter -or $_.customerId -eq $TenantFilter }
@@ -55,7 +53,6 @@ function Invoke-AddWin32ScriptApp {
         }
     }
 
-    # Fail loudly instead of the previous silent 200 { Results: null } when no tenant resolved.
     if (-not $Tenants) {
         return ([HttpResponseContext]@{
                 StatusCode = [HttpStatusCode]::BadRequest

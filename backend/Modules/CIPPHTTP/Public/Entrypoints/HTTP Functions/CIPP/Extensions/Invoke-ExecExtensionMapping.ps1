@@ -43,6 +43,9 @@ Function Invoke-ExecExtensionMapping {
       'Pax8' {
         $Result = Get-Pax8Mapping -CIPPMapping $Table
       }
+      'Syncro' {
+        $Result = Get-SyncroMapping -CIPPMapping $Table
+      }
       'HaloPSAFields' {
         # Outcomes and priorities are scoped to a ticket type. The settings page sends the
         # ticket type currently selected in the form so the lists follow the dropdown; without
@@ -69,6 +72,9 @@ Function Invoke-ExecExtensionMapping {
           'Boards'     = $Fields.Boards
           'Priorities' = $Fields.Priorities
         }
+      }
+      'NinjaOneTicketFields' {
+        $Result = Get-NinjaOneTicketFields
       }
       'HaloPSARequestSources' {
         # Request sources are instance-wide rather than scoped to a ticket type, so they get their
@@ -114,6 +120,9 @@ Function Invoke-ExecExtensionMapping {
         }
         'ConnectWise' {
           $Result = Set-ConnectWiseMapping -CIPPMapping $Table -APIName $APIName -Request $Request
+        }
+        'Syncro' {
+          $Result = Set-SyncroMapping -CIPPMapping $Table -APIName $APIName -Request $Request
         }
         'NinjaOne' {
           $Result = Set-NinjaOneOrgMapping -CIPPMapping $Table -APIName $APIName -Request $Request
@@ -171,6 +180,9 @@ Function Invoke-ExecExtensionMapping {
         }
         'HaloPSA' {
           $Result = Invoke-HaloAutoMap -CIPPMapping $Table
+        }
+        'Syncro' {
+          $Result = Invoke-SyncroAutoMap -CIPPMapping $Table
         }
         'Hudu' {
           $Result = Invoke-HuduAutoMap -CIPPMapping $Table

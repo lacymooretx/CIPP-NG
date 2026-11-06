@@ -160,7 +160,7 @@ const Page = () => {
       </Card>
 
       <Grid container spacing={3}>
-        {extensions.map((extension) => {
+        {extensions.filter((extension) => !extension.hidden).map((extension) => {
           var logo = extension.logo
           if (preferredTheme === 'dark' && extension?.logoDark) {
             logo = extension.logoDark
