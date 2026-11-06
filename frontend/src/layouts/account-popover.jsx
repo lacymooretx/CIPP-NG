@@ -1,9 +1,10 @@
-import { useCallback } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { CippIcons } from "../utils/icon-registry";
 import PropTypes from "prop-types";
 import { useRouter } from "next/navigation";
 import {
   Avatar,
+  Badge,
   Box,
   CircularProgress,
   List,
@@ -28,6 +29,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { usePathname } from "next/navigation";
 import { Divider } from "@mui/material";
 import { getHelpLinks, clearCippCache } from "../utils/help-links";
+import { hasUnseenWhatsNew } from "../utils/aspendora-whats-new"; // Aspendora fork
 
 export const AccountPopover = (props) => {
   const {
@@ -45,6 +47,14 @@ export const AccountPopover = (props) => {
   const popover = usePopover();
   const queryClient = useQueryClient();
   const { openReleaseNotes } = useReleaseNotes();
+  // Aspendora fork: dot on the What's New item until the operator opens the page.
+  const [whatsNewUnseen, setWhatsNewUnseen] = useState(false);
+  useEffect(() => {
+    const update = () => setWhatsNewUnseen(hasUnseenWhatsNew());
+    update();
+    window.addEventListener("aspendora-whats-new-seen", update);
+    return () => window.removeEventListener("aspendora-whats-new-seen", update);
+  }, []);
   const orgData = ApiGetCall({
     url: "/api/me",
     queryKey: "authmecipp",
@@ -228,6 +238,17 @@ export const AccountPopover = (props) => {
                 </SvgIcon>
               </ListItemIcon>
               <ListItemText primary="View release notes" />
+            </ListItemButton>
+            {/* Aspendora fork: our own changelog (src/data/aspendora-whats-new.json) */}
+            <ListItemButton onClick={() => { popover.handleClose(); router.push("/cipp/whats-new"); }}>
+              <ListItemIcon>
+                <Badge color="success" variant="dot" invisible={!whatsNewUnseen}>
+                  <SvgIcon fontSize="small">
+                    <CippIcons.SparklesIcon />
+                  </SvgIcon>
+                </Badge>
+              </ListItemIcon>
+              <ListItemText primary="What's New (Aspendora)" />
             </ListItemButton>
             {/* Mobile home for the help SpeedDial's destinations — its FAB corner belongs
                 to page actions there (the SpeedDial hides itself at the same threshold). */}

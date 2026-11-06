@@ -1427,6 +1427,13 @@ export const nativeMenuItems = [
     ],
     items: [
       {
+        // Aspendora fork: our own changelog, see docs/aspendora-whats-new.md
+        title: "What's New (Aspendora)",
+        path: '/cipp/whats-new',
+        permissions: ['CIPP.Core.*'],
+        scope: 'global',
+      },
+      {
         title: 'Application Settings',
         path: '/cipp/settings',
         permissions: ['CIPP.AppSettings.*'],

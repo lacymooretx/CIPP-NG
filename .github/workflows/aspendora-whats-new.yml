@@ -1,0 +1,53 @@
+name: "Aspendora: What's New check"
+
+# Keeps frontend/src/data/aspendora-whats-new.json valid and reminds us to add an entry
+# when a push adds a page or HTTP entrypoint without touching it. The reminder is a
+# warning only; it never blocks the push or the container build.
+# How to add entries: docs/aspendora-whats-new.md
+
+on:
+  push:
+    branches: [aspendora]
+  pull_request:
+    branches: [aspendora]
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: yarn
+          cache-dependency-path: frontend/yarn.lock
+
+      - name: Install
+        working-directory: frontend
+        run: yarn install --frozen-lockfile
+
+      - name: Validate What's New entries and page
+        working-directory: frontend
+        run: npx vitest run --project unit tests/lint/aspendora-whats-new.test.js tests/pages/aspendora-whats-new.test.jsx
+
+      - name: Remind when a feature lands without an entry
+        env:
+          BEFORE: ${{ github.event.before || github.event.pull_request.base.sha }}
+          AFTER: ${{ github.sha }}
+        run: |
+          if [ -z "$BEFORE" ] || [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then exit 0; fi
+          # Upstream syncs bring in upstream's own pages; they don't need our entries.
+          if git log --format=%s "$BEFORE..$AFTER" | grep -qiE 'upstream|sync/'; then exit 0; fi
+          added=$(git diff --name-only --diff-filter=A "$BEFORE" "$AFTER" -- \
+            'frontend/src/pages/**' 'backend/Modules/CIPPCore/Public/Entrypoints/**' | grep -vE 'tabOptions|\.json$' || true)
+          touched=$(git diff --name-only "$BEFORE" "$AFTER" -- frontend/src/data/aspendora-whats-new.json)
+          if [ -n "$added" ] && [ -z "$touched" ]; then
+            echo "::warning title=What's New not updated::New pages/endpoints were added but frontend/src/data/aspendora-whats-new.json was not changed. Add an entry (docs/aspendora-whats-new.md)."
+            echo "$added"
+          fi
