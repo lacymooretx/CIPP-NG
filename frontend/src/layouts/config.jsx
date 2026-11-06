@@ -1451,9 +1451,11 @@ export const nativeMenuItems = [
     items: [
       {
         // Aspendora fork: our own changelog, see docs/aspendora-whats-new.md
+        // Admins only in the side nav (upstream's role tests keep sign-in-only roles to the Dashboard);
+        // everyone reaches it from the account menu.
         title: "What's New (Aspendora)",
         path: '/cipp/whats-new',
-        permissions: ['CIPP.Core.*'],
+        permissions: ['CIPP.AppSettings.*'],
         scope: 'global',
       },
       {
