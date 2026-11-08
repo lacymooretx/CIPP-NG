@@ -15,13 +15,16 @@ Function Invoke-ListUserSigninLogs {
     # Interact with query parameters or the body of the request.
     $TenantFilter = $Request.Query.tenantFilter
     $UserID = $Request.Query.UserID
-    # Aspendora fork: UserID may be a UPN. signIns has no UPN in userId, so "userId eq '<upn>'" never matches and
-    # Graph scans the whole log until it times out (seen for MikeR@ir100.com, CW #60357). Filter on the right field.
-    # No $orderby: signIns already returns newest first, and with $orderby a user with few sign-ins still timed out
-    # (live 2026-11-07: same filter returned in seconds without it).
-    $SafeUser = ([string]$UserID).Replace("'", "''")
-    $UserClause = if ([guid]::TryParse([string]$UserID, [ref][guid]::Empty)) { "userId eq '$SafeUser'" } else { "userPrincipalName eq '$SafeUser'" }
-    $URI = "https://graph.microsoft.com/beta/auditLogs/signIns?`$filter=($UserClause)&`$top=$top"
+    # Aspendora fork: UserID may be a UPN (CW #60357). signIns only indexes userId: "userId eq '<upn>'" never matches,
+    # and "userPrincipalName eq" scans the log and times out (verified live 2026-11-07). Resolve a UPN to its object
+    # id first. No $orderby: signIns is already newest first.
+    $ResolvedId = [string]$UserID
+    if (-not [guid]::TryParse($ResolvedId, [ref][guid]::Empty)) {
+        $ResolvedId = try {
+            [string](New-GraphGetRequest -uri "https://graph.microsoft.com/v1.0/users/$([uri]::EscapeDataString($ResolvedId))?`$select=id" -tenantid $TenantFilter -noPagination $true).id
+        } catch { '' }
+    }
+    $URI = "https://graph.microsoft.com/beta/auditLogs/signIns?`$filter=(userId eq '$($ResolvedId.Replace("'", "''"))')&`$top=$top"
 
     try {
         $Result = New-GraphGetRequest -uri $URI -tenantid $TenantFilter -noPagination $true -verbose
