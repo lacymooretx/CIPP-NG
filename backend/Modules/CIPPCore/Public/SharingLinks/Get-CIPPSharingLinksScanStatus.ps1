@@ -33,8 +33,8 @@ function Get-CIPPSharingLinksScanStatus {
     $ScanId = [string]$Scan.ScanId
     $Range = "PartitionKey eq '$SafeTenant' and RowKey ge '{0}' and RowKey lt '{0}~'"
     $Done = @{}
-    foreach ($Row in @(Get-CIPPAzDataTableEntity @StateTable -Filter ($Range -f 'ddone-') -Property @('RowKey', 'ScanId', 'Timestamp'))) {
-        if ([string]$Row.ScanId -eq $ScanId) { $Done[([string]$Row.RowKey).Substring('ddone-'.Length)] = $Row.Timestamp }
+    foreach ($Row in @(Get-CIPPAzDataTableEntity @StateTable -Filter ($Range -f 'ddone-') -Property @('RowKey', 'ScanId', 'Timestamp', 'ItemsSeen', 'Mode'))) {
+        if ([string]$Row.ScanId -eq $ScanId) { $Done[([string]$Row.RowKey).Substring('ddone-'.Length)] = $Row }
     }
     $Scanning = @{}
     foreach ($Row in @(Get-CIPPAzDataTableEntity @StateTable -Filter ($Range -f 'chk-') -Property @('RowKey', 'ScanId', 'StateJson'))) {
@@ -46,14 +46,17 @@ function Get-CIPPSharingLinksScanStatus {
         foreach ($Drive in @(ConvertFrom-Json -InputObject ([string]$Site.DrivesJson))) {
             $Key = "$SiteKey~$([string]$Drive.id -replace '[/\\#?]', '_' -replace '[\u0000-\u001F\u007F-\u009F]', '')"
             $Progress = $Scanning[$Key]
+            $DoneRow = $Done[$Key]
             [PSCustomObject]@{
                 site      = [string]($Site.SiteName ? $Site.SiteName : $Site.SiteUrl)
                 library   = [string]$Drive.name
                 itemCount = [int64]($Drive.itemCount ?? -1)
-                itemsSeen = [int64]($Progress.ItemsSeen ?? 0)
-                mode      = [string]$Progress.CurrentMode
+                # Finished libraries report the count/mode saved on their done marker (null on markers written before
+                # that was recorded); in-flight ones report their checkpoint.
+                itemsSeen = if ($DoneRow) { if ($null -ne $DoneRow.ItemsSeen) { [int64]$DoneRow.ItemsSeen } else { $null } } else { [int64]($Progress.ItemsSeen ?? 0) }
+                mode      = if ($DoneRow) { [string]$DoneRow.Mode } else { [string]$Progress.CurrentMode }
                 status    = if ($Done.ContainsKey($Key)) { 'done' } elseif ($Progress) { 'scanning' } else { 'queued' }
-                doneAt    = $Done[$Key]
+                doneAt    = $DoneRow.Timestamp
             }
         }
     }

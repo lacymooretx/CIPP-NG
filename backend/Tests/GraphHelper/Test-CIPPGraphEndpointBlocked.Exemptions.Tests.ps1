@@ -81,3 +81,49 @@ Describe 'Test-CIPPGraphEndpointBlocked mailbox-read exemption' {
         { Test-CIPPGraphEndpointBlocked -Uri 'users/x/messages' -Throw } | Should -Throw '*(mail-messages)*'
     }
 }
+
+Describe 'Test-CIPPGraphEndpointBlocked driveitem-permissions exemption' {
+    BeforeEach {
+        Remove-Item Env:CIPP_GRAPH_BLOCKLIST_EXEMPTIONS_DISABLED -ErrorAction SilentlyContinue
+        $script:CippGraphEndpointBlocklist = $null
+    }
+
+    It 'allows a driveItem permissions read <Uri>' -ForEach @(
+        @{ Uri = 'users/MikeR@ir100.com/drive/root:/IR50-Container-List-ALL.xlsx:/permissions' }
+        @{ Uri = 'users/x/drive/root:/Folder With Space/a.xlsx:/permissions' }
+        @{ Uri = 'drives/b!UHGoQaX9jEiT4zjwircWRUMtxXupcKNDvbq2PKlvbeBivDd9M2lDQ4-Wz9aQucLM/items/01DX3SSPALJI46ERM6I5FKX6PFVELBQOSZ/permissions' }
+        @{ Uri = 'drives/d/items/i/permissions/p1' }
+        @{ Uri = "drives('d')/items('i')/permissions" }
+        @{ Uri = 'users/x/drive/items/i/permissions' }
+        @{ Uri = 'users/x/drive/root/permissions' }
+        @{ Uri = 'me/drive/items/i/permissions' }
+        @{ Uri = 'groups/g/drive/items/i/permissions' }
+        @{ Uri = 'https://graph.microsoft.com/v1.0/drives/d/items/i/permissions?$select=id,roles,link,grantedToV2' }
+    ) {
+        Test-CIPPGraphEndpointBlocked -Uri $Uri | Should -BeFalse
+    }
+
+    It 'still blocks drive content and trees <Uri>' -ForEach @(
+        @{ Uri = 'drives/d/items/i' }
+        @{ Uri = 'drives/d/items/i/children' }
+        @{ Uri = 'users/x/drive/root:/a.xlsx:' }
+        @{ Uri = 'drives/d/items/i/permissions?$expand=driveItem' }
+        @{ Uri = 'drives/d/items/i?$expand=permissions' }
+        @{ Uri = 'drives/d/items/i/permissions/../children' }
+        @{ Uri = 'drives/d/items/i/permissions%2F..%2Fchildren' }
+        @{ Uri = 'drives/d/items/i/children/permissions' }
+        @{ Uri = 'drives/d/root/children/c/permissions' }
+        @{ Uri = 'drives/d/items/i/content' }
+        @{ Uri = 'drives/d/permissions' }
+        @{ Uri = 'users/x/chats/drive/items/i/permissions' }
+        @{ Uri = 'sites/s/drive/items/i/permissions' }
+    ) {
+        Test-CIPPGraphEndpointBlocked -Uri $Uri | Should -BeTrue
+    }
+
+    It 'kill switch restores the upstream drive block' {
+        $env:CIPP_GRAPH_BLOCKLIST_EXEMPTIONS_DISABLED = 'true'
+        $script:CippGraphEndpointBlocklist = $null
+        { Test-CIPPGraphEndpointBlocked -Uri 'drives/d/items/i/permissions' -Throw } | Should -Throw '*(drive-trees)*'
+    }
+}

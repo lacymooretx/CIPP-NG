@@ -24,6 +24,7 @@ function New-CIPPOneDriveSharingDigestHtml {
         [string]$SupportPhone = '281-941-4028',
         [string]$BrandName = 'Aspendora Technologies',
         [string]$LogoUrl = 'https://www.aspendora.com/wp-content/uploads/2022/10/aspendora-logo-148.png',
+        [string]$HelpArticleUrl = 'https://support.microsoft.com/en-us/onedrive/sharepoint/manage-sharing-and-permissions-in-onedrive-and-sharepoint',
         [int]$MaxOutsideRows = 100,
         [int]$MaxInsideRows = 50
     )
@@ -111,6 +112,15 @@ $(& $Table $Rows $Max)
 "@
     } else { '' }
 
+    # Always offer the Shared view (it lists everything at once) and to do it for them: replies to the sender land
+    # in the help desk as a ticket (CW #60357).
+    $SharedButton = if ($SharedView) {
+        "<br><a href=`"$(& $E $SharedView)`" style=`"display:inline-block; margin:10px 0 2px 0; padding:8px 16px; background:#2563eb; color:#ffffff; border-radius:6px; font-weight:700; text-decoration:none;`">Open OneDrive &rsaquo; Shared</a><br><span style=`"font-size:13px; color:#475569;`">Then choose <strong>Shared by you</strong> to see everything you share in one list.</span>"
+    } else { '' }
+    $StopSharingExtras = $SharedButton +
+    "<br><strong style=`"color:#0f172a;`">Rather we do it?</strong> Reply to this email and tell us which items to stop sharing (or &ldquo;all of them&rdquo;) and we&rsquo;ll remove them for you." +
+    "<br><a href=`"$(& $E $HelpArticleUrl)`" style=`"color:#2563eb; font-size:13px;`">Microsoft&rsquo;s guide: manage sharing in OneDrive</a>"
+
     $Total = $Outside.Count + $Inside.Count
     $Subject = if ($Outside.Count -gt 0) {
         "Your OneDrive sharing: $($Outside.Count) $(if ($Outside.Count -eq 1) { 'link reaches' } else { 'links reach' }) outside $CompanyName"
@@ -142,7 +152,7 @@ $(& $Section "Shared outside $CompanyName" 'People outside your organization can
 $(& $Section "Shared inside $CompanyName" 'Only people in your organization can open these.' $Inside $MaxInsideRows)
     <tr><td style="padding:26px 32px 0 32px;">
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#eff6ff; border-left:4px solid #2563eb; border-radius:4px;">
-        <tr><td style="padding:14px 18px; font-size:14px; line-height:1.7; color:#334155;"><strong style="color:#0f172a;">How to stop sharing something</strong><br>Click the item above to open it in OneDrive. Choose <strong>Share</strong>, then <strong>Manage access</strong>. Find the link or person and choose <strong>Remove</strong> (or <strong>Stop sharing</strong>).</td></tr>
+        <tr><td style="padding:14px 18px; font-size:14px; line-height:1.7; color:#334155;"><strong style="color:#0f172a;">How to stop sharing something</strong><br>Click the item above to open it in OneDrive. Choose <strong>Share</strong>, then <strong>Manage access</strong>. Find the link or person and choose <strong>Remove</strong> (or <strong>Stop sharing</strong>).$StopSharingExtras</td></tr>
       </table>
     </td></tr>
     <tr><td style="padding:12px 32px 0 32px;">

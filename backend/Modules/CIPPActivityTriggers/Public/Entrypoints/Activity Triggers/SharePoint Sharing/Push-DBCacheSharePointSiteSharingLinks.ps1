@@ -418,8 +418,13 @@ function Push-DBCacheSharePointSiteSharingLinks {
     }
 
     # Marks this drive's task complete; when it is the site's last one, completes the site.
+    # -ItemsSeen/-Mode are kept on the marker so scan status can still report them once the checkpoint is gone.
     function Complete-Drive {
-        if (-not (Add-ScanMarker -RowKey "ddone-$SiteKeySegment~$DriveKeySegment")) { return }
+        param([int64]$ItemsSeen = -1, [string]$Mode = '')
+        $Extra = @{}
+        if ($ItemsSeen -ge 0) { $Extra.ItemsSeen = $ItemsSeen }
+        if ($Mode) { $Extra.Mode = $Mode }
+        if (-not (Add-ScanMarker -RowKey "ddone-$SiteKeySegment~$DriveKeySegment" -Extra $Extra)) { return }
         $DrivesRow = Get-CIPPAzDataTableEntity @StateTable -Filter "PartitionKey eq '$SafeTenant' and RowKey eq 'drives-$SiteKeySegment'"
         if (-not $DrivesRow -or [string]$DrivesRow.ScanId -ne $ScanId) { return }
         $DoneDrives = @(Get-ScanMarkers -Prefix "ddone-$SiteKeySegment~").Count
@@ -614,7 +619,7 @@ function Push-DBCacheSharePointSiteSharingLinks {
         }
 
         Remove-DriveCheckpoint
-        Complete-Drive
+        Complete-Drive -ItemsSeen $ItemsSeen -Mode $Mode
         return @()
 
     } catch {

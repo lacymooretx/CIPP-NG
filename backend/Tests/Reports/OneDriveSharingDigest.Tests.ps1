@@ -74,6 +74,49 @@ Describe 'Get-CIPPOneDriveSharingDigest' {
     }
 }
 
+Describe 'Get-CIPPOneDriveSharingDigest owner-only links (CW #60357)' {
+    BeforeAll {
+        $script:CompletedUtc = [DateTimeOffset]::UtcNow.AddDays(-1).ToString('o')
+        function Get-CIPPSharingLinks {
+            param($TenantFilter)
+            @($script:OwnerOnlyLinks | ForEach-Object { [pscustomobject](@{ workload = 'OneDrive'; siteId = 's1'; siteName = 'Ann'; itemType = 'File'; roles = @('write') } + $_) })
+        }
+    }
+
+    It 'drops a specific-people link shared only with the owner, and the user with it' {
+        $script:OwnerOnlyLinks = @(
+            @{ fileName = 'own.xlsx'; classification = 'Internal'; linkScope = 'users'; sharedWith = @('ANN@contoso.com ') }
+        )
+        $Digest = Get-CIPPOneDriveSharingDigest -TenantFilter 'contoso.com'
+        @($Digest.Users).Count | Should -Be 0
+        $Digest.OwnerOnly | Should -Be 1
+    }
+
+    It 'keeps the owner''s other links when one link is owner-only' {
+        $script:OwnerOnlyLinks = @(
+            @{ fileName = 'own.xlsx'; classification = 'Internal'; linkScope = 'users'; sharedWith = @('ann@contoso.com') }
+            @{ fileName = 'team.xlsx'; classification = 'Internal'; linkScope = 'users'; sharedWith = @('ann@contoso.com', 'bob@contoso.com') }
+        )
+        $Digest = Get-CIPPOneDriveSharingDigest -TenantFilter 'contoso.com'
+        @($Digest.Users[0].Inside).Name | Should -Be @('team.xlsx')
+        $Digest.OwnerOnly | Should -Be 1
+    }
+
+    It 'keeps <Case>' -ForEach @(
+        @{ Case = 'owner + another person'; Link = @{ fileName = 'f'; classification = 'External'; linkScope = 'users'; sharedWith = @('ann@contoso.com', 'guest@other.com') } }
+        @{ Case = 'an organization-wide link'; Link = @{ fileName = 'f'; classification = 'Internal'; linkScope = 'organization'; sharedWith = @() } }
+        @{ Case = 'an anonymous link'; Link = @{ fileName = 'f'; classification = 'Anonymous'; linkScope = 'anonymous'; sharedWith = @() } }
+        @{ Case = 'an organization link that lists only the owner'; Link = @{ fileName = 'f'; classification = 'Internal'; linkScope = 'organization'; sharedWith = @('ann@contoso.com') } }
+        @{ Case = 'a specific-people link with no recipients listed'; Link = @{ fileName = 'f'; classification = 'Internal'; linkScope = 'users'; sharedWith = @() } }
+    ) {
+        $script:OwnerOnlyLinks = @($Link)
+        $Digest = Get-CIPPOneDriveSharingDigest -TenantFilter 'contoso.com'
+        @($Digest.Users).Count | Should -Be 1
+        (@($Digest.Users[0].Outside).Count + @($Digest.Users[0].Inside).Count) | Should -Be 1
+        $Digest.OwnerOnly | Should -Be 0
+    }
+}
+
 Describe 'New-CIPPOneDriveSharingDigestHtml' {
     BeforeAll {
         $script:CompletedUtc = [DateTimeOffset]::UtcNow.AddDays(-1).ToString('o')
@@ -94,6 +137,14 @@ Describe 'New-CIPPOneDriveSharingDigestHtml' {
     It 'HTML-encodes tenant-supplied text' {
         $script:Email.Html | Should -Match 'Contoso &amp; Co'
         $script:Email.Html | Should -Not -Match 'Contoso & Co'
+    }
+
+    It 'always shows the OneDrive Shared button, the reply offer and the Microsoft guide' {
+        $Html = (New-CIPPOneDriveSharingDigestHtml -User $script:Digest.Users[0] -CompanyName 'Contoso').Html
+        $Html | Should -Match 'https://contoso-my\.sharepoint\.com/my\?v=shared'
+        $Html | Should -Match 'Open OneDrive &rsaquo; Shared'
+        $Html | Should -Match 'Rather we do it\?'
+        $Html | Should -Match 'support\.microsoft\.com/en-us/onedrive/sharepoint/manage-sharing-and-permissions-in-onedrive-and-sharepoint'
     }
 
     It 'links to the OneDrive Shared view when the list is capped' {

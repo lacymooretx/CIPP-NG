@@ -3,6 +3,27 @@
   "areas": ["Identity", "Email", "Endpoint", "Teams & SharePoint", "Tenant", "Security", "Alerts", "Integrations", "Platform"],
   "entries": [
     {
+      "id": "sharing-digest-owner-only",
+      "date": "2026-11-07",
+      "title": "Sharing digest skips links shared only with yourself",
+      "area": "Teams & SharePoint",
+      "summary": "The weekly OneDrive sharing digest no longer counts a 'specific people' link whose only recipient is the OneDrive's owner, so nobody gets an email about sharing that reaches no one. The email now always links OneDrive's Shared view and offers to remove shares on request by reply."
+    },
+    {
+      "id": "sharing-scan-progress-and-item-permissions",
+      "date": "2026-11-07",
+      "title": "Sharing scan progress and item permissions",
+      "area": "Teams & SharePoint",
+      "summary": "Finished libraries in a sharing-links scan now keep their item count and scan mode in the scan status, instead of showing 0. ListGraphRequest can read the permissions of a single OneDrive or library item (drives/{id}/items/{id}/permissions) so a removed share can be confirmed live; file contents and folder listings stay blocked."
+    },
+    {
+      "id": "signin-logs-by-upn",
+      "date": "2026-11-07",
+      "title": "User sign-in logs accept an email address",
+      "area": "Identity",
+      "summary": "ListUserSigninLogs now works when given a user's sign-in name (UPN) instead of their object ID. Before, a UPN never matched and the request timed out."
+    },
+    {
       "id": "whats-new-page",
       "date": "2026-11-05",
       "title": "What's New (Aspendora)",

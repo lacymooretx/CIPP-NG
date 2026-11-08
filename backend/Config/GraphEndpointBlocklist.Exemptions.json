@@ -9,6 +9,14 @@
                 "mail-attachments"
             ],
             "pattern": "^(users[/(][^/]+|me)/(mailFolders[/(][^/]*/(childFolders[/(][^/]*/)*)?(\\$expand/)?messages([/(][^/]*)?(/(\\$expand/)?attachments([/(][^/]*)?)?$"
+        },
+        {
+            "id": "driveitem-permissions",
+            "reason": "Read the sharing permissions on ONE driveItem (who has access, link scope/type) so a revoke can be confirmed live, per Hudu 692 (OneDrive sharing digest, CW #60357). A permission object carries no @microsoft.graph.downloadUrl. Children, item GETs, $expand, /content and $value under a drive stay blocked. sites/{id}/drive... paths are not covered (they also hit list-items); use drives/{driveId}/items/{itemId}/permissions for SharePoint libraries.",
+            "exempts": [
+                "drive-trees"
+            ],
+            "pattern": "^((users[/(][^/]+|me|groups[/(][^/]+)/drive|((users|groups)[/(][^/]+/)?drives[/(][^/]+)/(items[/(][^/]+|root(:/[^:]*:)?)/permissions([/(][^/]*)?$"
         }
     ]
 }

@@ -8,6 +8,9 @@ function Get-CIPPOneDriveSharingDigest {
         The owner of each OneDrive is resolved live (sites/{id}/drive owner, then the user's mail address),
         one batched call per tenant.
 
+        A "specific people" link whose only recipients are the OneDrive's owner is not sharing (nobody else can
+        open it), so it is left out; a user left with no links is left out entirely and gets no email (CW #60357).
+
         Each user's links are split into Outside (Anyone links, links to external people, direct grants to
         external people) and Inside (everything else), riskiest first.
 
@@ -45,6 +48,7 @@ function Get-CIPPOneDriveSharingDigest {
         LastScanUtc  = $LastScanUtc
         Users        = @()
         Unresolved   = @()
+        OwnerOnly    = 0
     }
     if ($Links.Count -eq 0) { return $Result }
 
@@ -76,6 +80,16 @@ function Get-CIPPOneDriveSharingDigest {
         $Base
     }
 
+    # True when a specific-people link reaches nobody but the OneDrive's owner.
+    $IsOwnerOnly = {
+        param($Link, $OwnerNames)
+        if ([string]$Link.linkScope -ne 'users') { return $false }
+        $Recipients = @($Link.sharedWith | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | ForEach-Object { ([string]$_).Trim().ToLowerInvariant() })
+        if ($Recipients.Count -eq 0) { return $false }
+        return @($Recipients | Where-Object { $_ -notin $OwnerNames }).Count -eq 0
+    }
+    $OwnerOnlyCount = 0
+
     $Users = [System.Collections.Generic.List[object]]::new()
     $Unresolved = [System.Collections.Generic.List[object]]::new()
     foreach ($Group in @($Links | Group-Object -Property siteId)) {
@@ -86,7 +100,12 @@ function Get-CIPPOneDriveSharingDigest {
             continue
         }
 
-        $Rows = foreach ($Link in @($Group.Group | Sort-Object -Property @{ Expression = { & $Rank $_ } }, @{ Expression = { [string]$_.fileName } })) {
+        $OwnerNames = @(@($User.userPrincipalName, $User.mail) | Where-Object { $_ } | ForEach-Object { ([string]$_).ToLowerInvariant() })
+        $Shared = @($Group.Group | Where-Object { -not (& $IsOwnerOnly $_ $OwnerNames) })
+        $OwnerOnlyCount += $Group.Count - $Shared.Count
+        if ($Shared.Count -eq 0) { continue }
+
+        $Rows = foreach ($Link in @($Shared | Sort-Object -Property @{ Expression = { & $Rank $_ } }, @{ Expression = { [string]$_.fileName } })) {
             $Recipients = @($Link.sharedWith | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
             [PSCustomObject]@{
                 Name        = [string]$Link.fileName
@@ -118,5 +137,6 @@ function Get-CIPPOneDriveSharingDigest {
 
     $Result.Users = @($Users | Sort-Object -Property DisplayName)
     $Result.Unresolved = @($Unresolved)
+    $Result.OwnerOnly = $OwnerOnlyCount
     return $Result
 }
