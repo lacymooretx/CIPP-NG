@@ -88,7 +88,7 @@ function Get-CIPPVendorAccessSnapshot {
             SignInUnknown       = @($ThirdParty | Where-Object SignInActivity -EQ 'Unknown').Count
             New                 = @($Current | Where-Object IsNew).Count
             Removed             = @($Items | Where-Object Removed).Count
-            TenantsWithErrors   = @($Tenants | Where-Object { $_.LastError -or @($_.Errors).Count -gt 0 }).Count
+            TenantsWithErrors   = @($Tenants | Where-Object { $_.LastError -or @($_.Errors | Where-Object { $_ }).Count -gt 0 }).Count
         }
     }
 }

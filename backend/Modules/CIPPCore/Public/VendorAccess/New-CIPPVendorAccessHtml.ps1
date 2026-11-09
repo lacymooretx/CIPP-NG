@@ -14,7 +14,9 @@ function New-CIPPVendorAccessHtml {
     param(
         [Parameter(Mandatory)]$Snapshot,
         [string]$ReportUrl = 'https://cipp.aspendora.com/tenant/reports/vendor-access',
-        [int]$StaleDays = 45
+        [int]$StaleDays = 45,
+        # Rows shown in the cross-tenant high-risk and stale lists; the per-tenant sections always list everything.
+        [int]$MaxListRows = 40
     )
 
     $Zone = try { [TimeZoneInfo]::FindSystemTimeZoneById('America/Chicago') } catch { [TimeZoneInfo]::FindSystemTimeZoneById('Central Standard Time') }
@@ -91,6 +93,11 @@ function New-CIPPVendorAccessHtml {
         "<td style=`"padding:4px`" valign=`"top`"><div style=`"border:1px solid #e5e7eb;border-radius:8px;padding:10px 12px;min-width:110px`"><div style=`"font-size:24px;font-weight:700;color:$Colour`">$Value</div><div style=`"font-size:12px;color:#6b7280`">$Label</div></div></td>"
     }
     $Section = { param($Title, $Body) "<h2 style=`"font-size:16px;margin:22px 0 6px 0;color:#111827`">$Title</h2>$Body" }
+    $Capped = {
+        param($Rows)
+        if ($Rows.Count -le $MaxListRows) { return (& $Table $Rows -WithTenant) }
+        (& $Table @($Rows | Select-Object -First $MaxListRows) -WithTenant) + "<div style=`"font-size:12px;color:#6b7280`">Showing the top $MaxListRows of $($Rows.Count). The rest are in the tenant sections below and in <a href=`"$ReportUrl`" style=`"color:#B71A28`">the report</a>.</div>"
+    }
 
     $Html = [System.Text.StringBuilder]::new()
     [void]$Html.Append('<div style="font-family:Segoe UI,Helvetica,Arial,sans-serif;color:#111827;max-width:1100px">')
@@ -106,15 +113,16 @@ function New-CIPPVendorAccessHtml {
     [void]$Html.Append('</tr></table>')
     [void]$Html.Append("<div style=`"font-size:12px;color:#6b7280`">$($S.Apps) apps ($($S.AppsWithPermissions) with API permissions) &middot; $($S.ForeignRoleHolders) outside admin groups/accounts (other partners' GDAP/DAP) &middot; $($S.GuestRoleHolders) guest admins &middot; $($S.ServiceProviders) service-provider partners &middot; $($S.Removed) removed since last week. Aspendora's own CIPP partner tenant is not counted.</div>")
 
-    $Failed = @($Snapshot.Tenants | Where-Object { $_.LastError -or @($_.Errors).Count -gt 0 })
+    # Errors can arrive as $null or an empty string after a JSON round trip; count only real messages.
+    $Failed = @($Snapshot.Tenants | Where-Object { $_.LastError -or @($_.Errors | Where-Object { $_ }).Count -gt 0 })
     if ($Failed.Count -gt 0) {
         $List = ($Failed | ForEach-Object { "<li><strong>$(& $E $_.TenantName)</strong>: $(& $E ((@($_.LastError) + @($_.Errors) | Where-Object { $_ }) -join '; '))</li>" }) -join ''
         [void]$Html.Append((& $Section 'Could not be fully checked' "<ul style=`"font-size:13px;color:#b45309;margin:0`">$List</ul>"))
     }
     [void]$Html.Append((& $Section "New since last week ($($New.Count))" $(if ($New.Count) { & $Table $New -WithTenant } else { '<div style="font-size:13px;color:#6b7280">Nothing new.</div>' })))
     if ($Gone.Count) { [void]$Html.Append((& $Section "Removed since last week ($($Gone.Count))" (& $Table $Gone -WithTenant))) }
-    [void]$Html.Append((& $Section "High or critical risk ($($High.Count))" $(if ($High.Count) { & $Table $High -WithTenant } else { '<div style="font-size:13px;color:#6b7280">None.</div>' })))
-    [void]$Html.Append((& $Section "Stale: no sign-in for $StaleDays+ days ($($Stale.Count))" $(if ($Stale.Count) { (& $Table $Stale -WithTenant) + '<div style="font-size:12px;color:#6b7280">Stale access is a candidate for removal: a vendor that no longer signs in does not need standing access.</div>' } else { '<div style="font-size:13px;color:#6b7280">None.</div>' })))
+    [void]$Html.Append((& $Section "High or critical risk ($($High.Count))" $(if ($High.Count) { & $Capped $High } else { '<div style="font-size:13px;color:#6b7280">None.</div>' })))
+    [void]$Html.Append((& $Section "Stale: no sign-in for $StaleDays+ days ($($Stale.Count))" $(if ($Stale.Count) { (& $Capped $Stale) + '<div style="font-size:12px;color:#6b7280">Stale access is a candidate for removal: a vendor that no longer signs in does not need standing access.</div>' } else { '<div style="font-size:13px;color:#6b7280">None.</div>' })))
 
     foreach ($T in @($Snapshot.Tenants | Sort-Object TenantName)) {
         $Rows = & $Sort @($Current | Where-Object Tenant -EQ $T.Tenant)

@@ -294,6 +294,13 @@ Describe 'Vendor access email' {
         $Html | Should -Match 'app sign-in data unavailable'
     }
 
+    It 'caps the cross-tenant lists but keeps every row in the tenant section' {
+        $Html = New-CIPPVendorAccessHtml -Snapshot (Update-CIPPVendorAccessSnapshot -TenantFilter 'contoso.com') -MaxListRows 1
+        $Html | Should -Match 'Showing the top 1 of 3'
+        $Html | Should -Match 'Showing the top 1 of 2'
+        ([regex]::Matches($Html, '<strong>Survey tool</strong>')).Count | Should -Be 1
+    }
+
     It 'shows times in US Central with the right abbreviation' {
         $Snap = Update-CIPPVendorAccessSnapshot -TenantFilter 'contoso.com'
         $Snap.GeneratedAt = (U '2026-11-09T13:00:00')
