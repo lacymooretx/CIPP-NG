@@ -45,6 +45,7 @@ BeforeAll {
                 [pscustomobject]@{ id = 'sp-vendor'; appId = 'a-vendor'; displayName = 'BackupCo Backup'; appOwnerOrganizationId = $script:VendorId; accountEnabled = $true; createdDateTime = '2025-01-01T00:00:00Z' }
                 [pscustomobject]@{ id = 'sp-third'; appId = 'a-third'; displayName = 'Survey tool'; appOwnerOrganizationId = $script:UnknownId; accountEnabled = $true }
                 [pscustomobject]@{ id = 'sp-idle'; appId = 'a-idle'; displayName = 'Old tool'; appOwnerOrganizationId = $script:UnknownId; accountEnabled = $false }
+                [pscustomobject]@{ id = 'sp-legacy'; appId = 'f569b9c7-be15-4e87-86f7-87d30d02090b'; displayName = 'O365 LinkedIn Connection'; accountEnabled = $true }
                 [pscustomobject]@{ id = 'sp-graph'; appId = '00000003-0000-0000-c000-000000000000'; displayName = 'Microsoft Graph'; appOwnerOrganizationId = $script:MsId; appRoles = @([pscustomobject]@{ id = 'r1'; value = 'User.Read.All' }) }
             }
             'AppRoleAssignments' { [pscustomobject]@{ principalId = 'sp-third'; resourceId = 'sp-graph'; appRoleId = 'r1' } }
@@ -119,7 +120,7 @@ BeforeAll {
 Describe 'Get-CIPPVendorAccessReport' {
     BeforeEach { $script:NoP1 = $false; $script:Tables = @{} }
 
-    It 'lists foreign apps only: not Microsoft, not this tenant, not managed identities' {
+    It 'lists foreign apps only: not Microsoft, not this tenant, not managed identities, not ownerless apps with no grants' {
         $R = Get-CIPPVendorAccessReport -TenantFilter 'contoso.com'
         $Apps = @($R.Items | Where-Object Kind -EQ 'App')
         @($Apps.Name) | Should -Be @('BackupCo Backup', 'Old tool', 'Survey tool') -Because 'sorted by risk then name; Critical first'

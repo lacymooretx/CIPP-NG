@@ -148,6 +148,9 @@ function Get-CIPPVendorAccessReport {
         $Id = [string]$Sp.id
         $Exp = $ExposureById[$Id]
         $Perms = if ($PermsBySp.ContainsKey($Id)) { $PermsBySp[$Id] } else { @() }
+        # No owner organisation and nothing granted: Microsoft's legacy first-party apps (O365 LinkedIn Connection,
+        # Azure Media Service, YammerOnOls), seen in every tenant on 2026-11-09. Noise, not access.
+        if (-not $Owner -and @($Perms).Count -eq 0 -and -not $Exp) { continue }
         if ($Exp -and $Exp.Permissions) { $AccessText = [string]$Exp.Permissions } else { $AccessText = (@($Perms) -join '; ') }
         $Last = if ($null -ne $Activities) { $Activities[[string]$Sp.appId] } else { $null }
         $SignIn = & $SignInState ($null -ne $Activities) $Last

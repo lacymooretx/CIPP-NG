@@ -47363,7 +47363,7 @@
         "tags": [
           "Tenant > Reports"
         ],
-        "description": "Action Preview returns the email HTML for the saved snapshot. Action Send rebuilds the snapshot for all tenants\nand emails it now (to Recipient, or the saved recipient). Action Settings saves Recipient and Enabled for the\nweekly Monday 07:00 US Central email. Action GetSettings returns them with the last weekly sends.\nAspendora fork addition (Vendor Access).",
+        "description": "Action Preview returns the email HTML for the saved snapshot. Action Send rebuilds the snapshot for all tenants\nand emails it now (to Recipient, or the saved recipient). Action Settings saves Recipient and Enabled for the\nweekly Monday 07:00 US Central email. Action GetSettings returns them with the last weekly sends. Action Reset\nclears the saved snapshot (not the settings or send history), so the next build is a fresh baseline with\nnothing reported as new or removed: use it after a change to what the report lists.\nAspendora fork addition (Vendor Access).",
         "requestBody": {
           "required": false,
           "content": {
@@ -47373,7 +47373,7 @@
                 "properties": {
                   "Action": {
                     "type": "string",
-                    "description": "Preview, Send, Settings or GetSettings."
+                    "description": "Preview, Send, Settings, GetSettings or Reset."
                   },
                   "Enabled": {
                     "type": "string",
@@ -47396,7 +47396,7 @@
           {
             "name": "Action",
             "in": "query",
-            "description": "Preview, Send, Settings or GetSettings.",
+            "description": "Preview, Send, Settings, GetSettings or Reset.",
             "required": false,
             "schema": {
               "type": "string"

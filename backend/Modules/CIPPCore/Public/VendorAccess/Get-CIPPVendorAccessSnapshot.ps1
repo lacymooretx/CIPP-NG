@@ -30,21 +30,22 @@ function Get-CIPPVendorAccessSnapshot {
     $Runs = @($Rows | Where-Object { $_.PartitionKey -eq 'Run' -and (-not $Want -or $_.RowKey -in $Want) })
     $RunByPk = @{}
     foreach ($R in $Runs) { $RunByPk[[string]$R.RowKey] = $R }
-    $ToUtc = { param($V) if ($V) { ([datetimeoffset]$V).UtcDateTime } else { $null } }
+    # ISO 8601 strings: a [datetime] serialises to an object of its parts in the HTTP response.
+    $ToUtc = { param($V) if ($V) { ([datetimeoffset]$V).UtcDateTime.ToString('o') } else { $null } }
 
     $Items = [System.Collections.Generic.List[object]]::new()
     foreach ($Row in $Rows) {
         if ($Row.PartitionKey -in @('Run', 'Settings', 'Weekly') -or ($Want -and $Row.PartitionKey -notin $Want)) { continue }
         $Removed = [bool]$Row.Removed
         $RemovedAt = & $ToUtc $Row.RemovedAt
-        if ($Removed -and (-not $RemovedAt -or $RemovedAt -lt $Now.AddDays(-$RecentDays))) { continue }
+        if ($Removed -and (-not $RemovedAt -or ([datetimeoffset]$RemovedAt).UtcDateTime -lt $Now.AddDays(-$RecentDays))) { continue }
         $Item = try { [string]$Row.Data | ConvertFrom-Json -ErrorAction Stop } catch { continue }
         $FirstSeen = & $ToUtc $Row.FirstSeen
         $Run = $RunByPk[[string]$Row.PartitionKey]
         $Item | Add-Member -NotePropertyName Tenant -NotePropertyValue ([string]$Row.PartitionKey) -Force
         $Item | Add-Member -NotePropertyName TenantName -NotePropertyValue ([string]$Run.TenantName) -Force
         $Item | Add-Member -NotePropertyName FirstSeen -NotePropertyValue $FirstSeen -Force
-        $Item | Add-Member -NotePropertyName IsNew -NotePropertyValue ((-not $Removed) -and (-not [bool]$Row.Baseline) -and $FirstSeen -and $FirstSeen -ge $Now.AddDays(-$RecentDays)) -Force
+        $Item | Add-Member -NotePropertyName IsNew -NotePropertyValue ((-not $Removed) -and (-not [bool]$Row.Baseline) -and $FirstSeen -and ([datetimeoffset]$FirstSeen).UtcDateTime -ge $Now.AddDays(-$RecentDays)) -Force
         $Item | Add-Member -NotePropertyName Removed -NotePropertyValue $Removed -Force
         $Item | Add-Member -NotePropertyName RemovedAt -NotePropertyValue $RemovedAt -Force
         $Item | Add-Member -NotePropertyName IsThirdParty -NotePropertyValue ($Item.OrganisationType -ne 'Partner tenant') -Force
