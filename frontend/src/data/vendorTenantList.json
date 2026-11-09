@@ -176,6 +176,17 @@
         "removeOnOffboarding": true
     },
     {
+        "vendorName": "MSP Process",
+        "vendorTenantId": "9679582f-6ef4-4ace-ba93-c5cda47115c9",
+        "companyName": "MSP Process",
+        "website": "https://mspprocess.com",
+        "description": "Process automation and service-delivery platform for MSPs, integrated with ConnectWise PSA. Tenant ID verified 2026-11-08 from Entra's tenant lookup of mspprocess.com (Aspendora fork).",
+        "category": "Service Desk & PSA",
+        "tags": ["Process automation", "Service delivery", "ConnectWise integration"],
+        "vendorType": "MSP",
+        "removeOnOffboarding": true
+    },
+    {
         "vendorName": "Carbonite",
         "vendorTenantId": "4f0566c5-7c80-40a4-b3e8-7cfcb6c423ff",
         "companyName": "Carbonite (OpenText)",

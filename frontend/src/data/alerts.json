@@ -1248,6 +1248,73 @@
     "description": "Daily live scan of every app's OAuth grants (ListOAuthGrantRisk). Raises apps scored Critical (app-only mailbox, file or directory access with no user signed in) or High (tenant-wide risky delegated consent, unverified publisher), and any AI connector with mail, files or sites scopes, unless allow-listed. Each app notifies once per scope set and resolves when the grant is removed. Includes blast radius and a suggested action (disable the service principal first: it keeps the config)."
   },
   {
+    "name": "RiskyAppPermissions",
+    "label": "Alert on apps holding over-privileged API permissions (App Permission Exposure)",
+    "recommendedRunInterval": "1d",
+    "requiresInput": true,
+    "multipleInput": true,
+    "inputs": [
+      {
+        "inputType": "autoComplete",
+        "inputLabel": "Minimum level to alert on (default: High)",
+        "inputName": "MinimumRisk",
+        "creatable": false,
+        "multiple": false,
+        "options": [
+          { "label": "Critical", "value": "Critical" },
+          { "label": "High", "value": "High" },
+          { "label": "Medium", "value": "Medium" },
+          { "label": "Low", "value": "Low" }
+        ]
+      },
+      {
+        "inputType": "autoComplete",
+        "inputLabel": "What the minimum level applies to (default: Risk, the app's context-aware rating)",
+        "inputName": "RateBy",
+        "creatable": false,
+        "multiple": false,
+        "options": [
+          {
+            "label": "Risk (app rating, reports every permission it holds)",
+            "value": "Risk"
+          },
+          {
+            "label": "Impact (damage if the app is compromised, per permission)",
+            "value": "Impact"
+          },
+          {
+            "label": "Suspicion (how unusual the permission is, per permission)",
+            "value": "Suspicion"
+          }
+        ]
+      },
+      {
+        "inputType": "autoComplete",
+        "inputLabel": "Permission categories (default: all)",
+        "inputName": "Categories",
+        "creatable": false,
+        "multiple": true,
+        "options": [
+          { "label": "Privilege escalation", "value": "PrivilegeEscalation" },
+          { "label": "Data access", "value": "DataAccess" },
+          { "label": "Integrity", "value": "Integrity" },
+          { "label": "Availability", "value": "Availability" }
+        ]
+      },
+      {
+        "inputType": "switch",
+        "inputLabel": "Skip delegated grants (application permissions and roles only)",
+        "inputName": "ExcludeDelegated"
+      },
+      {
+        "inputType": "switch",
+        "inputLabel": "Include Microsoft first-party apps",
+        "inputName": "IncludeMicrosoftApps"
+      }
+    ],
+    "description": "Daily check of the App Permission Exposure report (CIPP's risky-permissions catalogue, from the reporting database): one alert row per app at or above the chosen level, with its permissions, owner and vendor. CIPP's own app is always skipped. Tenants whose app data has not been cached yet are skipped. Report only."
+  },
+  {
     "name": "OIBDrift",
     "label": "Alert on outdated or retired OpenIntuneBaseline (OIB) policies",
     "recommendedRunInterval": "7d",

@@ -121,6 +121,15 @@
     "IsSystem": true
   },
   {
+    "Id": "8e3d25dc-1de5-47af-af9d-2482efe21daa",
+    "Command": "Start-VendorAccessReportTimer",
+    "Description": "Hourly check that sends the weekly Vendor Access email on Mondays at 07:00 US Central (Aspendora fork)",
+    "Cron": "0 5 * * * *",
+    "Priority": 9,
+    "RunOnProcessor": true,
+    "IsSystem": true
+  },
+  {
     "Id": "ebe981b6-4417-406e-a1a5-7b8279058841",
     "Command": "Start-CIPPGraphSubscriptionRenewalTimer",
     "Description": "Orchestrator to renew Graph subscriptions",

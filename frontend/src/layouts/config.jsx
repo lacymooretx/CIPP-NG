@@ -317,6 +317,12 @@ export const nativeMenuItems = [
             path: '/tenant/reports/application-consent',
             permissions: ['Tenant.Application.*'],
           },
+          // Aspendora fork addition: every outside party with standing access, all tenants, weekly email.
+          {
+            title: 'Vendor Access',
+            path: '/tenant/reports/vendor-access',
+            permissions: ['Tenant.Application.*'],
+          },
           {
             title: 'Graph / Office Reports',
             path: '/tenant/reports/graph-office-reports',

@@ -3,6 +3,21 @@
   "areas": ["Identity", "Email", "Endpoint", "Teams & SharePoint", "Tenant", "Security", "Alerts", "Integrations", "Platform"],
   "entries": [
     {
+      "id": "vendor-access-report",
+      "date": "2026-11-09",
+      "title": "Vendor Access report and weekly email",
+      "area": "Security",
+      "summary": "Tenant > Reports > Vendor Access lists every outside party with standing access across all tenants: apps from other organisations (permissions, risk, new credentials, last sign-in), other partners' GDAP/DAP groups holding directory roles, guests holding roles and cross-tenant service providers, with stale (45+ days) and new-this-week flags. A summary is emailed every Monday at 07:00 Central.",
+      "path": "/tenant/reports/vendor-access"
+    },
+    {
+      "id": "risky-app-permissions-alert",
+      "date": "2026-11-09",
+      "title": "Risky app permissions alert can be set up",
+      "area": "Alerts",
+      "summary": "The 'Alert on apps holding over-privileged API permissions' alert (App Permission Exposure) now appears in the alert list, with minimum level, categories, delegated and Microsoft-app options. MSP Process was added to the known vendor list."
+    },
+    {
       "id": "sharing-digest-owner-only",
       "date": "2026-11-07",
       "title": "Sharing digest skips links shared only with yourself",

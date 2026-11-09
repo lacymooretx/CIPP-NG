@@ -47356,6 +47356,128 @@
         "x-cipp-any-tenant": true
       }
     },
+    "/api/ExecVendorAccessReport": {
+      "post": {
+        "summary": "Vendor Access weekly email: preview, send now, and settings",
+        "operationId": "ExecVendorAccessReport",
+        "tags": [
+          "Tenant > Reports"
+        ],
+        "description": "Action Preview returns the email HTML for the saved snapshot. Action Send rebuilds the snapshot for all tenants\nand emails it now (to Recipient, or the saved recipient). Action Settings saves Recipient and Enabled for the\nweekly Monday 07:00 US Central email. Action GetSettings returns them with the last weekly sends.\nAspendora fork addition (Vendor Access).",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "Action": {
+                    "type": "string",
+                    "description": "Preview, Send, Settings or GetSettings."
+                  },
+                  "Enabled": {
+                    "type": "string",
+                    "description": "Settings only: whether the weekly email is sent."
+                  },
+                  "Recipient": {
+                    "type": "string",
+                    "description": "Email address for Send or Settings."
+                  },
+                  "SkipRefresh": {
+                    "type": "boolean",
+                    "description": "Send only: mail the saved snapshot instead of rebuilding it first."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "Action",
+            "in": "query",
+            "description": "Preview, Send, Settings or GetSettings.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Recipient",
+            "in": "query",
+            "description": "Email address for Send or Settings.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "description": "Derived from the fields written into the storage table it reads. Fields taken from the storage writers may be omitted by this endpoint, and the response may carry computed fields not listed here.",
+                  "properties": {
+                    "Enabled": {
+                      "x-cipp-field-source": "storage"
+                    },
+                    "Errors": {
+                      "x-cipp-field-source": "storage"
+                    },
+                    "ETag": {
+                      "type": "string",
+                      "x-cipp-field-source": "storage"
+                    },
+                    "GeneratedAt": {
+                      "x-cipp-field-source": "storage"
+                    },
+                    "LastError": {
+                      "type": "string",
+                      "x-cipp-field-source": "storage"
+                    },
+                    "LastErrorAt": {
+                      "x-cipp-field-source": "storage"
+                    },
+                    "PartitionKey": {
+                      "x-cipp-field-source": "storage"
+                    },
+                    "Recipient": {
+                      "x-cipp-field-source": "storage"
+                    },
+                    "RowKey": {
+                      "x-cipp-field-source": "storage"
+                    },
+                    "TenantName": {
+                      "type": "string",
+                      "x-cipp-field-source": "storage"
+                    },
+                    "Timestamp": {
+                      "type": "string",
+                      "x-cipp-field-source": "storage"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cipp-role": "Tenant.Application.ReadWrite"
+      }
+    },
     "/api/ExecWebhookSubscriptions": {
       "post": {
         "summary": "ExecWebhookSubscriptions",
@@ -80523,317 +80645,7 @@
                   "type": "array",
                   "items": {
                     "type": "object",
-                    "description": "Derived from the Microsoft Graph entity it queries. This endpoint returns the Graph response as-is without selecting fields, so these are the properties the entity CAN carry (x-cipp-field-source: graph-entity) rather than a proven projection - Graph returns a default subset unless asked otherwise.",
-                    "properties": {
-                      "agent": {
-                        "type": "object",
-                        "x-cipp-field-source": "graph-entity"
-                      },
-                      "appDisplayName": {
-                        "type": "string",
-                        "x-cipp-field-source": "graph-entity"
-                      },
-                      "appId": {
-                        "type": "string",
-                        "x-cipp-field-source": "graph-entity"
-                      },
-                      "appliedConditionalAccessPolicies": {
-                        "type": "array",
-                        "x-cipp-field-source": "graph-entity"
-                      },
-                      "appliedEventListeners": {
-                        "type": "array",
-                        "x-cipp-field-source": "graph-entity"
-                      },
-                      "appOwnerTenantId": {
-                        "type": "string",
-                        "x-cipp-field-source": "graph-entity"
-                      },
-                      "appTokenProtectionStatus": {
-                        "type": "object",
-                        "x-cipp-field-source": "graph-entity"
-                      },
-                      "authenticationAppDeviceDetails": {
-                        "type": "object",
-                        "x-cipp-field-source": "graph-entity"
-                      },
-                      "authenticationAppPolicyEvaluationDetails": {
-                        "type": "array",
-                        "x-cipp-field-source": "graph-entity"
-                      },
-                      "authenticationContextClassReferences": {
-                        "type": "array",
-                        "x-cipp-field-source": "graph-entity"
-                      },
-                      "authenticationDetails": {
-                        "type": "array",
-                        "x-cipp-field-source": "graph-entity"
-                      },
-                      "authenticationMethodsUsed": {
-                        "type": "array",
-                        "x-cipp-field-source": "graph-entity"
-                      },
-                      "authenticationProcessingDetails": {
-                        "type": "array",
-                        "x-cipp-field-source": "graph-entity"
-                      },
-                      "authenticationProtocol": {
-                        "type": "object",
-                        "x-cipp-field-source": "graph-entity"
-                      },
-                      "authenticationRequirement": {
-                        "type": "string",
-                        "x-cipp-field-source": "graph-entity"
-                      },
-                      "authenticationRequirementPolicies": {
-                        "type": "array",
-                        "x-cipp-field-source": "graph-entity"
-                      },
-                      "autonomousSystemNumber": {
-                        "type": "integer",
-                        "x-cipp-field-source": "graph-entity"
-                      },
-                      "azureResourceId": {
-                        "type": "string",
-                        "x-cipp-field-source": "graph-entity"
-                      },
-                      "clientAppUsed": {
-                        "type": "string",
-                        "x-cipp-field-source": "graph-entity"
-                      },
-                      "clientCredentialType": {
-                        "type": "object",
-                        "x-cipp-field-source": "graph-entity"
-                      },
-                      "clientSessionId": {
-                        "type": "string",
-                        "x-cipp-field-source": "graph-entity"
-                      },
-                      "conditionalAccessAudiences": {
-                        "type": "array",
-                        "x-cipp-field-source": "graph-entity"
-                      },
-                      "conditionalAccessStatus": {
-                        "type": "object",
-                        "x-cipp-field-source": "graph-entity"
-                      },
-                      "correlationId": {
-                        "type": "string",
-                        "x-cipp-field-source": "graph-entity"
-                      },
-                      "createdDateTime": {
-                        "type": "string",
-                        "x-cipp-field-source": "graph-entity"
-                      },
-                      "crossTenantAccessType": {
-                        "type": "object",
-                        "x-cipp-field-source": "graph-entity"
-                      },
-                      "deviceDetail": {
-                        "type": "object",
-                        "x-cipp-field-source": "graph-entity"
-                      },
-                      "federatedCredentialId": {
-                        "type": "string",
-                        "x-cipp-field-source": "graph-entity"
-                      },
-                      "flaggedForReview": {
-                        "type": "boolean",
-                        "x-cipp-field-source": "graph-entity"
-                      },
-                      "globalSecureAccessIpAddress": {
-                        "type": "string",
-                        "x-cipp-field-source": "graph-entity"
-                      },
-                      "homeTenantId": {
-                        "type": "string",
-                        "x-cipp-field-source": "graph-entity"
-                      },
-                      "homeTenantName": {
-                        "type": "string",
-                        "x-cipp-field-source": "graph-entity"
-                      },
-                      "id": {
-                        "type": "string",
-                        "x-cipp-field-source": "graph-entity"
-                      },
-                      "incomingTokenType": {
-                        "type": "object",
-                        "x-cipp-field-source": "graph-entity"
-                      },
-                      "ipAddress": {
-                        "type": "string",
-                        "x-cipp-field-source": "graph-entity"
-                      },
-                      "ipAddressFromResourceProvider": {
-                        "type": "string",
-                        "x-cipp-field-source": "graph-entity"
-                      },
-                      "isInteractive": {
-                        "type": "boolean",
-                        "x-cipp-field-source": "graph-entity"
-                      },
-                      "isTenantRestricted": {
-                        "type": "boolean",
-                        "x-cipp-field-source": "graph-entity"
-                      },
-                      "isThroughGlobalSecureAccess": {
-                        "type": "boolean",
-                        "x-cipp-field-source": "graph-entity"
-                      },
-                      "location": {
-                        "type": "object",
-                        "x-cipp-field-source": "graph-entity"
-                      },
-                      "managedServiceIdentity": {
-                        "type": "object",
-                        "x-cipp-field-source": "graph-entity"
-                      },
-                      "mfaDetail": {
-                        "type": "object",
-                        "x-cipp-field-source": "graph-entity"
-                      },
-                      "networkLocationDetails": {
-                        "type": "array",
-                        "x-cipp-field-source": "graph-entity"
-                      },
-                      "originalRequestId": {
-                        "type": "string",
-                        "x-cipp-field-source": "graph-entity"
-                      },
-                      "originalTransferMethod": {
-                        "type": "object",
-                        "x-cipp-field-source": "graph-entity"
-                      },
-                      "privateLinkDetails": {
-                        "type": "object",
-                        "x-cipp-field-source": "graph-entity"
-                      },
-                      "processingTimeInMilliseconds": {
-                        "type": "integer",
-                        "x-cipp-field-source": "graph-entity"
-                      },
-                      "resourceDisplayName": {
-                        "type": "string",
-                        "x-cipp-field-source": "graph-entity"
-                      },
-                      "resourceId": {
-                        "type": "string",
-                        "x-cipp-field-source": "graph-entity"
-                      },
-                      "resourceOwnerTenantId": {
-                        "type": "string",
-                        "x-cipp-field-source": "graph-entity"
-                      },
-                      "resourceServicePrincipalId": {
-                        "type": "string",
-                        "x-cipp-field-source": "graph-entity"
-                      },
-                      "resourceTenantId": {
-                        "type": "string",
-                        "x-cipp-field-source": "graph-entity"
-                      },
-                      "riskDetail": {
-                        "type": "object",
-                        "x-cipp-field-source": "graph-entity"
-                      },
-                      "riskEventTypes_v2": {
-                        "type": "array",
-                        "x-cipp-field-source": "graph-entity"
-                      },
-                      "riskLevelAggregated": {
-                        "type": "object",
-                        "x-cipp-field-source": "graph-entity"
-                      },
-                      "riskLevelDuringSignIn": {
-                        "type": "object",
-                        "x-cipp-field-source": "graph-entity"
-                      },
-                      "riskState": {
-                        "type": "object",
-                        "x-cipp-field-source": "graph-entity"
-                      },
-                      "servicePrincipalCredentialKeyId": {
-                        "type": "string",
-                        "x-cipp-field-source": "graph-entity"
-                      },
-                      "servicePrincipalCredentialThumbprint": {
-                        "type": "string",
-                        "x-cipp-field-source": "graph-entity"
-                      },
-                      "servicePrincipalId": {
-                        "type": "string",
-                        "x-cipp-field-source": "graph-entity"
-                      },
-                      "servicePrincipalName": {
-                        "type": "string",
-                        "x-cipp-field-source": "graph-entity"
-                      },
-                      "sessionId": {
-                        "type": "string",
-                        "x-cipp-field-source": "graph-entity"
-                      },
-                      "sessionLifetimePolicies": {
-                        "type": "array",
-                        "x-cipp-field-source": "graph-entity"
-                      },
-                      "signInEventTypes": {
-                        "type": "array",
-                        "x-cipp-field-source": "graph-entity"
-                      },
-                      "signInIdentifier": {
-                        "type": "string",
-                        "x-cipp-field-source": "graph-entity"
-                      },
-                      "signInIdentifierType": {
-                        "type": "object",
-                        "x-cipp-field-source": "graph-entity"
-                      },
-                      "signInTokenProtectionStatus": {
-                        "type": "object",
-                        "x-cipp-field-source": "graph-entity"
-                      },
-                      "status": {
-                        "type": "object",
-                        "x-cipp-field-source": "graph-entity"
-                      },
-                      "tokenIssuerName": {
-                        "type": "string",
-                        "x-cipp-field-source": "graph-entity"
-                      },
-                      "tokenIssuerType": {
-                        "type": "object",
-                        "x-cipp-field-source": "graph-entity"
-                      },
-                      "tokenProtectionStatusDetails": {
-                        "type": "object",
-                        "x-cipp-field-source": "graph-entity"
-                      },
-                      "uniqueTokenIdentifier": {
-                        "type": "string",
-                        "x-cipp-field-source": "graph-entity"
-                      },
-                      "userAgent": {
-                        "type": "string",
-                        "x-cipp-field-source": "graph-entity"
-                      },
-                      "userDisplayName": {
-                        "type": "string",
-                        "x-cipp-field-source": "graph-entity"
-                      },
-                      "userId": {
-                        "type": "string",
-                        "x-cipp-field-source": "graph-entity"
-                      },
-                      "userPrincipalName": {
-                        "type": "string",
-                        "x-cipp-field-source": "graph-entity"
-                      },
-                      "userType": {
-                        "type": "object",
-                        "x-cipp-field-source": "graph-entity"
-                      }
-                    }
+                    "description": "Not described statically: this endpoint returns the upstream response as-is, so its fields are determined by the upstream API rather than by CIPP. Call the endpoint to see the actual shape, or add a response schema in backend/Config/openapi-overrides."
                   }
                 }
               }
@@ -80917,6 +80729,58 @@
           }
         ],
         "x-cipp-role": "Exchange.Mailbox.Read"
+      }
+    },
+    "/api/ListVendorAccess": {
+      "get": {
+        "summary": "Vendor Access report: every outside party with standing access, per tenant or across all tenants",
+        "operationId": "ListVendorAccess",
+        "tags": [
+          "Tenant > Reports"
+        ],
+        "description": "Lists foreign apps (with permissions, risk, new credentials and last sign-in), groups and accounts from other\norganisations holding directory roles (other partners' GDAP/DAP), guests holding directory roles and\ncross-tenant service-provider partners. Returns { GeneratedAt, Summary, Tenants, Items }. Reads the saved\nsnapshot (rebuilt weekly, and whenever Refresh is set); a tenant with no snapshot yet is built on the spot.\nItems include those removed in the last 7 days (Removed = true). Aspendora fork addition (Vendor Access).",
+        "parameters": [
+          {
+            "name": "Refresh",
+            "in": "query",
+            "description": "Rebuild the snapshot before returning it. Across all tenants this takes a minute or two.",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/tenantFilter"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "description": "Not described statically: this endpoint returns the upstream response as-is, so its fields are determined by the upstream API rather than by CIPP. Call the endpoint to see the actual shape, or add a response schema in backend/Config/openapi-overrides."
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing bearer token"
+          },
+          "403": {
+            "description": "Forbidden - caller lacks the required RBAC role"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-cipp-role": "Tenant.Application.Read"
       }
     },
     "/api/ListWebhookAlert": {
