@@ -61,6 +61,8 @@ function Get-CIPPAdminInventory {
     }
     # Our own GDAP groups live in the partner tenant: resolve their names there.
     $Partner = ([string]$env:TenantID).ToLower()
+    $KnownOrgs = @{}
+    foreach ($K in @(Get-Tenants -IncludeAll)) { if ($K.customerId) { $KnownOrgs[([string]$K.customerId).ToLower()] = $K.displayName } }
     $PartnerIds = @($Ids | Where-Object { -not $Principals[$_] -and $OrgOf[$_] -eq $Partner })
     if ($PartnerIds.Count -and $Partner) {
         try {
@@ -77,7 +79,8 @@ function Get-CIPPAdminInventory {
         $Foreign = -not $P -and $OrgOf[$Id] -and $OrgOf[$Id] -ne $TenantId
         $Type = if ($P) { ([string]$P.'@odata.type' -replace '#microsoft.graph.', '') }
         elseif ($Foreign -and $OrgOf[$Id] -eq $Partner) { 'GDAP group (Aspendora)' }
-        elseif ($Foreign) { "GDAP group (other organisation $($OrgOf[$Id]))" }
+        elseif ($Foreign -and $KnownOrgs[$OrgOf[$Id]]) { "GDAP group ($($KnownOrgs[$OrgOf[$Id]]))" }
+        elseif ($Foreign) { "GDAP group (unknown organisation $($OrgOf[$Id]))" }
         else { 'Deleted or unknown' }
         $Mine = @($Rows | Where-Object PrincipalId -EQ $Id)
         $Methods = $null
@@ -95,7 +98,8 @@ function Get-CIPPAdminInventory {
         if ($Type -eq 'user' -and $Mfa -eq $false) { $Flags.Add('NoMFA') }
         if ($Type -eq 'user' -and $Mfa -eq $true -and $Phish -eq $false) { $Flags.Add('NotPhishResistant') }
         if (-not $P -and -not $Foreign) { $Flags.Add('DeletedPrincipal') }
-        if ($Foreign -and $OrgOf[$Id] -ne $Partner) { $Flags.Add('ForeignPartner') }
+        # An organisation CIPP manages (e.g. Aspendora's own tenant) is ours; anything else is someone else's standing access.
+        if ($Foreign -and $OrgOf[$Id] -ne $Partner -and -not $KnownOrgs[$OrgOf[$Id]]) { $Flags.Add('ForeignPartner') }
         $Out.Add([pscustomobject]@{
                 Name = $P.displayName ?? $PartnerNames[$Id] ?? $Id; UserPrincipalName = $P.userPrincipalName; Type = $Type; Enabled = $P.accountEnabled
                 BreakGlass = $IsBG
