@@ -3,6 +3,14 @@
   "areas": ["Identity", "Email", "Endpoint", "Teams & SharePoint", "Tenant", "Security", "Alerts", "Integrations", "Platform"],
   "entries": [
     {
+      "id": "break-glass-provisioning",
+      "date": "2026-11-12",
+      "title": "Break-glass accounts planned for every Managed Client, plus a Hudu admin inventory",
+      "area": "Identity",
+      "summary": "A daily check finds Managed Client tenants with fewer than two registered break-glass accounts and sends a ready plan (exact accounts and Conditional Access policies) for approval. Nothing is created until it is approved with /api/ExecBreakGlassProvision. On approval CIPP creates the accounts, excludes them from every CA policy (with snapshots), registers them, and hands the password to ControlR/Keeper. Every Monday a 'Microsoft 365 admins' article listing each tenant's privileged role holders and their MFA is written to that client's Hudu company.",
+      "ref": "Onboarding Phase 3"
+    },
+    {
       "id": "vendor-access-report",
       "date": "2026-11-09",
       "title": "Vendor Access report and weekly email",

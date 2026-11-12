@@ -338,5 +338,14 @@
     "Priority": 0,
     "RunOnProcessor": true,
     "IsSystem": true
+  },
+  {
+    "Id": "047be741-3e9d-4eb6-bacd-2a8e26d521b4",
+    "Command": "Start-BreakGlassProvisionTimer",
+    "Description": "Daily break-glass detector (plans for approval, creates nothing) and Monday admin inventory to Hudu (Aspendora fork)",
+    "Cron": "0 0 13 * * *",
+    "Priority": 8,
+    "RunOnProcessor": true,
+    "IsSystem": true
   }
 ]
