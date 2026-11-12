@@ -16,7 +16,9 @@ function Invoke-CippControlRIntegrationRequest {
         [string]$Method,
         [Parameter(Mandatory = $true)]
         [string]$Path,
-        $Body
+        $Body,
+        # Break-glass rotate is synchronous (Hudu, Keeper, Graph, verify): ControlR asks for 90 s.
+        [int]$TimeoutSec = 60
     )
 
     $Token = Get-ExtensionAPIKey -Extension 'ControlRIntegration'
@@ -29,7 +31,7 @@ function Invoke-CippControlRIntegrationRequest {
         Method             = $Method
         Headers            = @{ 'x-personal-token' = $Token }
         ContentType        = 'application/json'
-        TimeoutSec         = 60
+        TimeoutSec         = $TimeoutSec
         SkipHttpErrorCheck = $true
         StatusCodeVariable = 'StatusCode'
     }
@@ -44,5 +46,7 @@ function Invoke-CippControlRIntegrationRequest {
     if ([int]$StatusCode -ge 200 -and [int]$StatusCode -lt 300) {
         return [pscustomobject]@{ Status = [int]$StatusCode; Data = $Response; Message = $null }
     }
-    return [pscustomobject]@{ Status = [int]$StatusCode; Data = $null; Message = "ControlR returned HTTP $([int]$StatusCode)." }
+    # ControlR answers errors as ProblemDetails; 'detail' is plain English and safe to show (never a secret).
+    $Detail = try { [string]$Response.detail } catch { $null }
+    return [pscustomobject]@{ Status = [int]$StatusCode; Data = $null; Message = "ControlR returned HTTP $([int]$StatusCode)$(if ($Detail) { ": $Detail" } else { '.' })" }
 }

@@ -157,8 +157,10 @@ function Invoke-CIPPBreakGlassProvision {
     # 6. ControlR sets the real password and writes Keeper. CIPP sees only the record pointer.
     $Keeper = [System.Collections.Generic.List[object]]::new()
     foreach ($A in $Created) {
-        $Hand = Invoke-CippControlRIntegrationRequest -Method POST -Path 'break-glass/rotate' -Body @{ tenantId = $Fresh.TenantId; tenantDomain = $Tenant; entraObjectId = $A.Id; userPrincipalName = $A.UserPrincipalName }
-        $Uid = [string]$Hand.Data.keeperRecordUid
+        # Contract: ControlR f46de0ba8 (Hudu 841). Synchronous; the NPM proxy drops at ~90 s, so on a timeout check the
+        # account in ControlR before calling again (a re-call rotates again, which is harmless).
+        $Hand = Invoke-CippControlRIntegrationRequest -Method POST -Path 'break-glass/rotate' -TimeoutSec 90 -Body @{ entraTenantId = $Fresh.TenantId; entraObjectId = $A.Id; upn = $A.UserPrincipalName }
+        $Uid = if ($Hand.Data.status -eq 'Success') { [string]$Hand.Data.keeperRecordUid } else { $null }
         $Keeper.Add([pscustomobject]@{ UserPrincipalName = $A.UserPrincipalName; Status = $(if ($Uid) { 'Rotated' } else { "Keeper pending: $($Hand.Message)" }); KeeperRecordUid = $Uid; HuduPasswordId = $Hand.Data.huduPasswordId; RotatedAt = $Hand.Data.rotatedAt })
         if ($Uid) {
             $Row = Get-CIPPAzDataTableEntity @Registry -Filter "PartitionKey eq '$($Fresh.TenantId)' and RowKey eq '$($A.Id)'"
