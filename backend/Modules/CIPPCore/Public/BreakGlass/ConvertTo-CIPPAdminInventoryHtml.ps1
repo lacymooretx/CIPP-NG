@@ -26,7 +26,7 @@ function ConvertTo-CIPPAdminInventoryHtml {
     $Rows = foreach ($A in $Admins) {
         $Flags = (@($A.Flags) | ForEach-Object { switch ($_) {
                     'PermanentGA' { 'Permanent Global Admin (not break-glass)' } 'ServicePrincipalGA' { 'App holds Global Admin' } 'Synced' { 'Synced from on-premises AD' }
-                    'NoMFA' { 'No MFA method' } 'NotPhishResistant' { 'No phishing-resistant method' } 'DeletedPrincipal' { 'Principal deleted' } default { $_ } } }) -join '; '
+                    'NoMFA' { 'No MFA method' } 'NotPhishResistant' { 'No phishing-resistant method' } 'DeletedPrincipal' { 'Principal deleted' } 'ForeignPartner' { 'Another organisation has standing access' } default { $_ } } }) -join '; '
         "<tr><td>$(& $Enc $A.Name)<br><small>$(& $Enc $A.UserPrincipalName)</small></td><td>$(& $Enc $A.Type)$(if ($A.BreakGlass) { '<br><b>break-glass</b>' })$(if ($A.Enabled -eq $false) { '<br>disabled' })</td><td>$(& $Enc $A.Roles)</td><td>$(& $YesNo $A.MFA)</td><td>$(& $YesNo $A.PhishResistant)</td><td><small>$(& $Enc $A.Methods)</small></td><td>$(& $Enc $Flags)</td></tr>"
     }
     $NotesHtml = if (@($Inventory.Notes).Count) { "<p><i>$((@($Inventory.Notes) | ForEach-Object { & $Enc $_ }) -join ' ')</i></p>" } else { '' }

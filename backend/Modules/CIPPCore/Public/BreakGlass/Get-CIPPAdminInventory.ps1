@@ -34,7 +34,12 @@ function Get-CIPPAdminInventory {
     $Privileged = @($Defs | Where-Object { $_.isPrivileged -eq $true -or $_.id -in $AlwaysInclude } | ForEach-Object { [string]$_.id })
 
     $Rows = [System.Collections.Generic.List[object]]::new()
-    foreach ($A in @(New-GraphGetRequest -uri 'https://graph.microsoft.com/v1.0/roleManagement/directory/roleAssignments?$select=id,principalId,roleDefinitionId,directoryScopeId' -tenantid $TenantFilter)) {
+    # principalOrganizationId (beta) tells GDAP groups of a partner apart from deleted principals: a partner's group
+    # is not a directory object in this tenant, so getByIds never returns it.
+    $TenantId = ([string](Get-Tenants -TenantFilter $TenantFilter | Select-Object -First 1).customerId).ToLower()
+    $OrgOf = @{}
+    foreach ($A in @(New-GraphGetRequest -uri 'https://graph.microsoft.com/beta/roleManagement/directory/roleAssignments?$select=id,principalId,roleDefinitionId,directoryScopeId,principalOrganizationId' -tenantid $TenantFilter)) {
+        if ($A.principalOrganizationId) { $OrgOf[[string]$A.principalId] = ([string]$A.principalOrganizationId).ToLower() }
         if ([string]$A.roleDefinitionId -in $Privileged) { $Rows.Add([pscustomobject]@{ PrincipalId = [string]$A.principalId; RoleId = [string]$A.roleDefinitionId; Assignment = 'Active'; Scope = $A.directoryScopeId }) }
     }
     $EligibleKnown = $true
@@ -46,10 +51,22 @@ function Get-CIPPAdminInventory {
 
     $Ids = @($Rows.PrincipalId | Select-Object -Unique)
     $Principals = @{}
+    $PartnerNames = @{}
     for ($i = 0; $i -lt $Ids.Count; $i += 1000) {
         $Chunk = $Ids[$i..([math]::Min($i + 999, $Ids.Count - 1))]
         $Body = @{ ids = @($Chunk); types = @('user', 'servicePrincipal', 'group') } | ConvertTo-Json -Compress
-        foreach ($O in @(New-GraphPOSTRequest -uri 'https://graph.microsoft.com/v1.0/directoryObjects/getByIds?$select=id,displayName,userPrincipalName,accountEnabled,onPremisesSyncEnabled,appId' -tenantid $TenantFilter -type POST -body $Body)) { $Principals[[string]$O.id] = $O }
+        # getByIds answers { value: [...] }; New-GraphPOSTRequest does not unwrap it.
+        $Resp = New-GraphPOSTRequest -uri 'https://graph.microsoft.com/v1.0/directoryObjects/getByIds?$select=id,displayName,userPrincipalName,accountEnabled,onPremisesSyncEnabled,appId' -tenantid $TenantFilter -type POST -body $Body
+        foreach ($O in @($Resp.value ?? $Resp)) { if ($O.id) { $Principals[[string]$O.id] = $O } }
+    }
+    # Our own GDAP groups live in the partner tenant: resolve their names there.
+    $Partner = ([string]$env:TenantID).ToLower()
+    $PartnerIds = @($Ids | Where-Object { -not $Principals[$_] -and $OrgOf[$_] -eq $Partner })
+    if ($PartnerIds.Count -and $Partner) {
+        try {
+            $Resp = New-GraphPOSTRequest -uri 'https://graph.microsoft.com/v1.0/directoryObjects/getByIds?$select=id,displayName' -tenantid $Partner -type POST -body (@{ ids = @($PartnerIds); types = @('group') } | ConvertTo-Json -Compress)
+            foreach ($O in @($Resp.value ?? $Resp)) { if ($O.id) { $PartnerNames[[string]$O.id] = $O.displayName } }
+        } catch { $Notes.Add('Could not resolve the names of Aspendora GDAP groups in the partner tenant.') }
     }
 
     $BreakGlass = @(Get-CIPPBreakGlassAccounts -TenantFilter $TenantFilter | ForEach-Object { [string]$_.RowKey })
@@ -57,7 +74,11 @@ function Get-CIPPAdminInventory {
     $Out = [System.Collections.Generic.List[object]]::new()
     foreach ($Id in $Ids) {
         $P = $Principals[$Id]
-        $Type = if (-not $P) { 'Deleted or unknown' } else { ([string]$P.'@odata.type' -replace '#microsoft.graph.', '') }
+        $Foreign = -not $P -and $OrgOf[$Id] -and $OrgOf[$Id] -ne $TenantId
+        $Type = if ($P) { ([string]$P.'@odata.type' -replace '#microsoft.graph.', '') }
+        elseif ($Foreign -and $OrgOf[$Id] -eq $Partner) { 'GDAP group (Aspendora)' }
+        elseif ($Foreign) { "GDAP group (other organisation $($OrgOf[$Id]))" }
+        else { 'Deleted or unknown' }
         $Mine = @($Rows | Where-Object PrincipalId -EQ $Id)
         $Methods = $null
         if ($Type -eq 'user') {
@@ -73,9 +94,10 @@ function Get-CIPPAdminInventory {
         if ($P.onPremisesSyncEnabled -eq $true) { $Flags.Add('Synced') }
         if ($Type -eq 'user' -and $Mfa -eq $false) { $Flags.Add('NoMFA') }
         if ($Type -eq 'user' -and $Mfa -eq $true -and $Phish -eq $false) { $Flags.Add('NotPhishResistant') }
-        if (-not $P) { $Flags.Add('DeletedPrincipal') }
+        if (-not $P -and -not $Foreign) { $Flags.Add('DeletedPrincipal') }
+        if ($Foreign -and $OrgOf[$Id] -ne $Partner) { $Flags.Add('ForeignPartner') }
         $Out.Add([pscustomobject]@{
-                Name = $P.displayName ?? $Id; UserPrincipalName = $P.userPrincipalName; Type = $Type; Enabled = $P.accountEnabled
+                Name = $P.displayName ?? $PartnerNames[$Id] ?? $Id; UserPrincipalName = $P.userPrincipalName; Type = $Type; Enabled = $P.accountEnabled
                 BreakGlass = $IsBG
                 Roles = (($Mine | ForEach-Object { "$($Names[$_.RoleId] ?? $_.RoleId)$(if ($_.Assignment -eq 'Eligible') { ' (eligible)' })$(if ($_.Scope -and $_.Scope -ne '/') { ' (scoped)' })" } | Sort-Object -Unique) -join ', ')
                 MFA = $Mfa; PhishResistant = $Phish; Methods = $(if ($null -eq $Methods) { 'unreadable' } else { ($Methods | Sort-Object -Unique) -join ', ' })
