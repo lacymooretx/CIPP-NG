@@ -347,5 +347,14 @@
     "Priority": 8,
     "RunOnProcessor": true,
     "IsSystem": true
+  },
+  {
+    "Id": "cc88256d-9c08-4f0b-b9a9-e93e65ce7829",
+    "Command": "Start-BreakGlassApprovalPollTimer",
+    "Description": "Every 10 minutes: run break-glass plans approved in ControlR's Change Requests queue (Aspendora fork, ONB-13)",
+    "Cron": "0 */10 * * * *",
+    "Priority": 8,
+    "RunOnProcessor": true,
+    "IsSystem": true
   }
 ]

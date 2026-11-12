@@ -9,12 +9,14 @@ function Invoke-ExecBreakGlassProvision {
     .DESCRIPTION
         Action=List      (default) every stored plan (Pending/Blocked/Approved/Done/Failed) and the settings.
         Action=Plan      builds (or refreshes) the plan for tenantFilter and alerts if it is new. Changes nothing.
-        Action=Approve   approves the stored Pending plan for tenantFilter and runs it now: 2 cloud-only
+        Action=Approve   (only when Settings ApprovalSource=CIPP; the default is ControlR's Change Requests queue, ONB-13)
+                         approves the stored Pending plan for tenantFilter and runs it now: 2 cloud-only
                          *.onmicrosoft.com permanent Global Admins, the role-assignable exclusion group, the group
                          excluded from every CA policy (snapshotted), registry, ControlR/Keeper hand-off, alert + CW ticket.
         Action=Status    the stored plan and runs for tenantFilter.
         Action=Handoff   retries the ControlR/Keeper hand-off for accounts still "Keeper pending" (tenantFilter or all).
-        Action=Settings  reads the kill switch; with Enabled=true/false sets it.
+        Action=Settings  reads the settings; Enabled=true/false is the kill switch, ApprovalSource=ControlR|CIPP.
+        Action=Poll      runs the ControlR approval poll now (normally every 10 minutes).
         Plans come from the daily detector (Start-BreakGlassProvisionTimer) or Action=Plan. Only Managed Client
         tenants, never the partner tenant or a tenant on CIPP's exclusion list. Aspendora fork addition
         (onboarding Phase 3, 2026-11-12).
@@ -35,8 +37,11 @@ function Invoke-ExecBreakGlassProvision {
         switch ($Action) {
             'List' {
                 $Rows = @(Get-CIPPAzDataTableEntity @Table -Filter "PartitionKey eq 'Plan'")
-                $Plans = @($Rows | ForEach-Object { [pscustomobject]@{ TenantId = $_.RowKey; Tenant = $_.Tenant; Status = $_.Status; ApprovedBy = $_.ApprovedBy; UpdatedUtc = $_.UpdatedUtc; LastRunId = $_.LastRunId; Plan = (& $Parse $_) } })
+                $Plans = @($Rows | ForEach-Object { [pscustomobject]@{ TenantId = $_.RowKey; Tenant = $_.Tenant; Status = $_.Status; ApprovedBy = $_.ApprovedBy; UpdatedUtc = $_.UpdatedUtc; LastRunId = $_.LastRunId; ChangeRequestUrl = $_.ChangeRequestUrl; ChangeRequestError = $_.ChangeRequestError; PlanHash = $_.PlanHash; Plan = (& $Parse $_) } })
                 return (& $Respond ([HttpStatusCode]::OK) @{ Results = $Plans; Settings = (Get-CIPPBreakGlassProvisionSettings) })
+            }
+            'Poll' {
+                return (& $Respond ([HttpStatusCode]::OK) @{ Results = @(Invoke-CIPPBreakGlassApprovalPoll) })
             }
             'Handoff' {
                 $Res = if ($TenantFilter -and $TenantFilter -ne 'AllTenants') { Invoke-CIPPBreakGlassKeeperHandoff -TenantFilter $TenantFilter } else { Invoke-CIPPBreakGlassKeeperHandoff }
@@ -44,10 +49,14 @@ function Invoke-ExecBreakGlassProvision {
             }
             'Settings' {
                 $Enabled = $Request.Body.Enabled ?? $Request.Query.Enabled
-                if ($null -ne $Enabled) {
-                    $Value = [bool](ConvertTo-CIPPBoolean $Enabled)
-                    Add-CIPPAzDataTableEntity @Table -Entity @{ PartitionKey = 'Settings'; RowKey = 'Settings'; Enabled = $Value; UpdatedBy = $Actor; UpdatedUtc = (Get-Date).ToUniversalTime().ToString('o') } -Force
-                    Write-LogMessage -headers $Headers -API 'BreakGlassProvision' -tenant 'Global' -message "Break-glass provisioning switched $(if ($Value) { 'ON' } else { 'OFF' }) by $Actor" -Sev 'Warning'
+                $Source = [string]($Request.Body.ApprovalSource ?? $Request.Query.ApprovalSource)
+                if ($Source -and $Source -notin 'ControlR', 'CIPP') { return (& $Respond ([HttpStatusCode]::BadRequest) @{ Results = 'ApprovalSource must be ControlR or CIPP.' }) }
+                if ($null -ne $Enabled -or $Source) {
+                    $Current = Get-CIPPBreakGlassProvisionSettings
+                    $Value = if ($null -ne $Enabled) { [bool](ConvertTo-CIPPBoolean $Enabled) } else { $Current.Enabled }
+                    $NewSource = if ($Source) { $Source } else { $Current.ApprovalSource }
+                    Add-CIPPAzDataTableEntity @Table -Entity @{ PartitionKey = 'Settings'; RowKey = 'Settings'; Enabled = $Value; ApprovalSource = $NewSource; UpdatedBy = $Actor; UpdatedUtc = (Get-Date).ToUniversalTime().ToString('o') } -Force
+                    Write-LogMessage -headers $Headers -API 'BreakGlassProvision' -tenant 'Global' -message "Break-glass provisioning settings changed by ${Actor}: Enabled=$Value, ApprovalSource=$NewSource" -Sev 'Warning'
                 }
                 return (& $Respond ([HttpStatusCode]::OK) @{ Results = (Get-CIPPBreakGlassProvisionSettings) })
             }
@@ -72,7 +81,10 @@ function Invoke-ExecBreakGlassProvision {
             }
             'Approve' {
                 if (-not $Row -or $Row.Status -ne 'Pending') { return (& $Respond ([HttpStatusCode]::Conflict) @{ Results = "No Pending plan for $($Tenant.defaultDomainName) (status: $($Row.Status ?? 'none')). Run Action=Plan first and review it." }) }
-                if (-not (Get-CIPPBreakGlassProvisionSettings).Enabled) { return (& $Respond ([HttpStatusCode]::Conflict) @{ Results = 'Break-glass provisioning is switched off (Action=Settings).' }) }
+                $Settings = Get-CIPPBreakGlassProvisionSettings
+                if (-not $Settings.Enabled) { return (& $Respond ([HttpStatusCode]::Conflict) @{ Results = 'Break-glass provisioning is switched off (Action=Settings).' }) }
+                # ONB-13: approval belongs to ControlR's queue (Break-Glass Approver, interactive sign-in only).
+                if ($Settings.ApprovalSource -eq 'ControlR') { return (& $Respond ([HttpStatusCode]::Conflict) @{ Results = "Approvals happen in ControlR's Change Requests queue: $($Row.ChangeRequestUrl ?? 'no request posted yet; run Action=Plan'). Direct approval in CIPP is off (Settings ApprovalSource=ControlR)." }) }
                 $Approved = & $Parse $Row
                 $Row.Status = 'Running'
                 $Row | Add-Member -NotePropertyName ApprovedBy -NotePropertyValue $Actor -Force
@@ -87,7 +99,7 @@ function Invoke-ExecBreakGlassProvision {
                 }
                 return (& $Respond ([HttpStatusCode]::OK) @{ Results = $Run })
             }
-            default { return (& $Respond ([HttpStatusCode]::BadRequest) @{ Results = "Unknown Action '$Action'. Use List, Plan, Approve, Status, Handoff or Settings." }) }
+            default { return (& $Respond ([HttpStatusCode]::BadRequest) @{ Results = "Unknown Action '$Action'. Use List, Plan, Approve, Status, Handoff, Poll or Settings." }) }
         }
     } catch {
         $Err = Get-CippException -Exception $_

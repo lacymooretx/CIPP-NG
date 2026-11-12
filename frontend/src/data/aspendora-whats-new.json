@@ -3,6 +3,14 @@
   "areas": ["Identity", "Email", "Endpoint", "Teams & SharePoint", "Tenant", "Security", "Alerts", "Integrations", "Platform"],
   "entries": [
     {
+      "id": "break-glass-controlr-approval",
+      "date": "2026-11-12",
+      "title": "Break-glass plans are approved in ControlR's Change Requests queue",
+      "area": "Identity",
+      "summary": "Each break-glass plan is now posted to ControlR as a change request. Only a Break-Glass Approver can approve it, and only through an interactive sign-in. CIPP checks every approval against its own stored plan (same hash, same tenant), runs it within about 10 minutes, and writes the result back to the request. Approving directly in CIPP is off by default.",
+      "ref": "ONB-13"
+    },
+    {
       "id": "break-glass-provisioning",
       "date": "2026-11-12",
       "title": "Break-glass accounts planned for every Managed Client, plus a Hudu admin inventory",

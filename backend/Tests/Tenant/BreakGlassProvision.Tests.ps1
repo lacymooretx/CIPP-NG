@@ -202,3 +202,81 @@ Describe 'Invoke-CIPPBreakGlassKeeperHandoff' {
         $script:Saved[0].HandoffProblem | Should -Match 'Keeper is not enabled'
     }
 }
+
+Describe 'Get-CIPPBreakGlassPlanHash' {
+    BeforeAll { . (Join-Path $BG 'Get-CIPPBreakGlassPlanHash.ps1') }
+    It 'is stable across ordering and case, and changes with what the plan does' {
+        $A = [pscustomobject]@{ TenantId = 'T1'; AccountsToCreate = @('bg-b@x.onmicrosoft.com', 'bg-a@x.onmicrosoft.com'); GroupAction = 'Create'; GroupId = $null; PolicyEdits = @([pscustomobject]@{ Id = 'P2' }, [pscustomobject]@{ Id = 'p1' }) }
+        $B = [pscustomobject]@{ TenantId = 't1'; AccountsToCreate = @('BG-A@x.onmicrosoft.com', 'bg-b@x.onmicrosoft.com'); GroupAction = 'Create'; GroupId = $null; PolicyEdits = @([pscustomobject]@{ Id = 'p1' }, [pscustomobject]@{ Id = 'p2' }) }
+        $H = Get-CIPPBreakGlassPlanHash -Plan $A
+        $H | Should -Match '^[0-9a-f]{64}$'
+        Get-CIPPBreakGlassPlanHash -Plan $B | Should -Be $H
+        $B.PolicyEdits += [pscustomobject]@{ Id = 'p3' }
+        Get-CIPPBreakGlassPlanHash -Plan $B | Should -Not -Be $H
+    }
+}
+
+Describe 'Invoke-CIPPBreakGlassApprovalPoll' {
+    BeforeAll {
+        . (Join-Path $BG 'Get-CIPPBreakGlassPlanHash.ps1')
+        . (Join-Path $BG 'Invoke-CIPPBreakGlassApprovalPoll.ps1')
+        function Get-CIPPBreakGlassProvisionSettings { [pscustomobject]@{ Enabled = $true; ApprovalSource = 'ControlR' } }
+        function Get-CIPPAzDataTableEntity { param($Filter) }
+        function Invoke-CIPPBreakGlassProvision { param($TenantFilter, $ApprovedPlan, $ApprovedBy) }
+        function Get-NormalizedError { param($Message) $Message }
+        function Invoke-CippControlRIntegrationRequest { param($Method, $Path, $Body, $TimeoutSec) }
+        function Get-CIPPTable { param($tablename) @{} }
+        function Add-CIPPAzDataTableEntity { param($Entity, [switch]$Force) }
+        function Write-LogMessage { param($API, $tenant, $message, $Sev) }
+        $script:TID = 'b4ac57c1-4d52-4803-873b-d371ee603a74'
+        $script:Plan = [pscustomobject]@{ TenantId = $script:TID; Tenant = 'contoso.com'; AccountsToCreate = @('bg-a@contoso.onmicrosoft.com'); GroupAction = 'Create'; GroupId = $null; PolicyEdits = @() }
+        $script:Hash = Get-CIPPBreakGlassPlanHash -Plan $script:Plan
+    }
+    BeforeEach {
+        $script:Posts = @()
+        $script:CR = [pscustomobject]@{ changeRequestId = '42'; planId = $script:TID; planHash = $script:Hash; entraTenantId = $script:TID; approverHeldRole = $true; approvedBy = [pscustomobject]@{ upn = 'lacy@aspendora.com' }; approvedAt = 'x' }
+        Mock Get-CIPPAzDataTableEntity { [pscustomobject]@{ Status = 'Pending'; ChangeRequestId = '42'; PlanHash = $script:Hash; PlanJson = ($script:Plan | ConvertTo-Json -Depth 5) } }
+        Mock Invoke-CippControlRIntegrationRequest {
+            if ($Method -eq 'GET') { return [pscustomobject]@{ Status = 200; Data = @($script:CR) } }
+            $script:Posts += , $Body.status
+            [pscustomobject]@{ Status = 200; Data = [pscustomobject]@{} }
+        }
+        Mock Invoke-CIPPBreakGlassProvision { [pscustomobject]@{ RunId = 'r1'; Status = 'Succeeded'; Accounts = @([pscustomobject]@{ UserPrincipalName = 'bg-a@contoso.onmicrosoft.com' }); Steps = @([pscustomobject]@{ Step = 's'; Ok = $true; Detail = 'd' }) } }
+    }
+    It 'claims, runs CIPP''s own stored plan and reports Succeeded' {
+        $R = Invoke-CIPPBreakGlassApprovalPoll
+        $R[0].Result | Should -Be 'Succeeded'
+        $script:Posts | Should -Be @('Running', 'Succeeded')
+        Should -Invoke Invoke-CIPPBreakGlassProvision -Times 1 -ParameterFilter { $ApprovedBy -match 'lacy@aspendora.com via ControlR change request 42' -and $ApprovedPlan.AccountsToCreate[0] -eq 'bg-a@contoso.onmicrosoft.com' }
+    }
+    It 'refuses a request whose hash does not match the stored plan' {
+        $script:CR.planHash = 'f' * 64
+        (Invoke-CIPPBreakGlassApprovalPoll)[0].Result | Should -Be 'Refused'
+        $script:Posts | Should -Be @('Refused')
+        Should -Invoke Invoke-CIPPBreakGlassProvision -Times 0
+    }
+    It 'refuses when the approver did not hold the role or is the CIPP service user' {
+        $script:CR.approverHeldRole = $false
+        (Invoke-CIPPBreakGlassApprovalPoll)[0].Reason | Should -Match 'Break-Glass Approver'
+        $script:CR.approverHeldRole = $true; $script:CR.approvedBy.upn = 'svc-cipp-integration@controlr.invalid'
+        (Invoke-CIPPBreakGlassApprovalPoll)[0].Result | Should -Be 'Refused'
+        Should -Invoke Invoke-CIPPBreakGlassProvision -Times 0
+    }
+    It 'refuses a request that is not the one CIPP posted for the current plan' {
+        $script:CR.changeRequestId = '41'
+        (Invoke-CIPPBreakGlassApprovalPoll)[0].Reason | Should -Match 'not the change request'
+    }
+    It 'skips without running when the claim is refused (another worker has it)' {
+        Mock Invoke-CippControlRIntegrationRequest {
+            if ($Method -eq 'GET') { return [pscustomobject]@{ Status = 200; Data = @($script:CR) } }
+            [pscustomobject]@{ Status = 409; Data = $null; Message = 'Already claimed by run x' }
+        }
+        (Invoke-CIPPBreakGlassApprovalPoll)[0].Result | Should -Be 'NotClaimed'
+        Should -Invoke Invoke-CIPPBreakGlassProvision -Times 0
+    }
+    It 'reports Refused when the run created nothing (re-plan drift)' {
+        Mock Invoke-CIPPBreakGlassProvision { [pscustomobject]@{ RunId = 'r2'; Status = 'Failed'; Accounts = @(); Steps = @([pscustomobject]@{ Step = 'Re-plan'; Ok = $false; Detail = 'changed' }) } }
+        (Invoke-CIPPBreakGlassApprovalPoll)[0].Result | Should -Be 'Refused'
+        $script:Posts | Should -Be @('Running', 'Refused')
+    }
+}

@@ -34,7 +34,7 @@ function Invoke-ExecBreakGlassAccounts {
             $Names = @{}
             foreach ($T in @(Get-Tenants -IncludeAll)) { $Names[[string]$T.customerId] = $T.defaultDomainName }
             $Results = @($Rows | ForEach-Object {
-                    [pscustomobject]@{ Tenant = $Names[[string]$_.PartitionKey] ?? $_.PartitionKey; TenantId = $_.PartitionKey; UserId = $_.RowKey; UserPrincipalName = $_.UserPrincipalName; DisplayName = $_.DisplayName; Note = $_.Note; AddedBy = $_.AddedBy; AddedUtc = $_.AddedUtc }
+                    [pscustomobject]@{ Tenant = $Names[[string]$_.PartitionKey] ?? $_.PartitionKey; TenantId = $_.PartitionKey; UserId = $_.RowKey; UserPrincipalName = $_.UserPrincipalName; DisplayName = $_.DisplayName; Note = $_.Note; AddedBy = $_.AddedBy; AddedUtc = $_.AddedUtc; KeeperRecordUid = $_.KeeperRecordUid; KeysPending = $_.KeysPending }
                 })
             return (& $Respond ([HttpStatusCode]::OK) @{ Results = $Results })
         }

@@ -35,7 +35,7 @@ function Invoke-CippControlRIntegrationRequest {
         SkipHttpErrorCheck = $true
         StatusCodeVariable = 'StatusCode'
     }
-    if ($null -ne $Body) { $Params.Body = ($Body | ConvertTo-Json -Depth 5 -Compress) }
+    if ($null -ne $Body) { $Params.Body = ($Body | ConvertTo-Json -Depth 8 -Compress) }
 
     try {
         $Response = Invoke-RestMethod @Params
@@ -47,6 +47,8 @@ function Invoke-CippControlRIntegrationRequest {
         return [pscustomobject]@{ Status = [int]$StatusCode; Data = $Response; Message = $null }
     }
     # ControlR answers errors as ProblemDetails; 'detail' is plain English and safe to show (never a secret).
-    $Detail = try { [string]$Response.detail } catch { $null }
+    # 403s for role or allow-list problems come back as plain text, not JSON: show that text instead (truncated).
+    $Detail = if ($Response -is [string]) { $Response.Trim() } else { try { [string]$Response.detail } catch { $null } }
+    if ($Detail -and $Detail.Length -gt 400) { $Detail = $Detail.Substring(0, 400) + '…' }
     return [pscustomobject]@{ Status = [int]$StatusCode; Data = $null; Message = "ControlR returned HTTP $([int]$StatusCode)$(if ($Detail) { ": $Detail" } else { '.' })" }
 }

@@ -17,7 +17,8 @@ function Invoke-CIPPBreakGlassDetector {
     param([string]$TenantFilter)
 
     $APIName = 'BreakGlassProvision'
-    if (-not (Get-CIPPBreakGlassProvisionSettings).Enabled) { Write-Information 'Break-glass detector: switched off.'; return @() }
+    $Settings = Get-CIPPBreakGlassProvisionSettings
+    if (-not $Settings.Enabled) { Write-Information 'Break-glass detector: switched off.'; return @() }
     $Table = Get-CIPPTable -tablename 'BreakGlassProvision'
     $Tenants = if ($TenantFilter) { @(Get-Tenants -TenantFilter $TenantFilter) } else { @(Get-Tenants) }
     $Out = [System.Collections.Generic.List[object]]::new()
@@ -37,13 +38,28 @@ function Invoke-CIPPBreakGlassDetector {
         $Shape = '{0}|{1}|{2}|{3}' -f $Plan.Status, $Plan.AccountsToCreate.Count, $Plan.GroupAction, ((@($Plan.PolicyEdits.Id) | Sort-Object) -join ',')
         $Unchanged = $Existing -and $Existing.Status -eq 'Pending' -and $Existing.Shape -eq $Shape
         # Keep the stored plan (and its account names) so what Lacy reviewed is exactly what an approval runs.
-        if ($Unchanged) { $Out.Add(($Existing.PlanJson | ConvertFrom-Json)); continue }
+        # A Pending plan that has no ControlR change request yet (made before ONB-13, or a failed post) still gets one.
+        $NeedsRequest = $Settings.ApprovalSource -eq 'ControlR' -and $Existing.Status -eq 'Pending' -and -not $Existing.ChangeRequestId
+        if ($Unchanged -and -not $NeedsRequest) { $Out.Add(($Existing.PlanJson | ConvertFrom-Json)); continue }
 
-        Add-CIPPAzDataTableEntity @Table -Entity @{
-            PartitionKey = 'Plan'; RowKey = $Id; Tenant = $Plan.Tenant; Status = $(if ($Plan.Status -eq 'Ready') { 'Pending' } else { $Plan.Status })
-            Shape = $Shape; PlanJson = (ConvertTo-Json -InputObject $Plan -Depth 6 -Compress); UpdatedUtc = (Get-Date).ToUniversalTime().ToString('o')
-        } -Force
+        if (-not $Unchanged) {
+            Add-CIPPAzDataTableEntity @Table -Entity @{
+                PartitionKey = 'Plan'; RowKey = $Id; Tenant = $Plan.Tenant; Status = $(if ($Plan.Status -eq 'Ready') { 'Pending' } else { $Plan.Status })
+                Shape = $Shape; PlanJson = (ConvertTo-Json -InputObject $Plan -Depth 6 -Compress); UpdatedUtc = (Get-Date).ToUniversalTime().ToString('o')
+            } -Force
+        } else { $Plan = $Existing.PlanJson | ConvertFrom-Json }
         $Out.Add($Plan)
+
+        # ONB-13: the approval happens in ControlR's Change Requests queue.
+        $Request = $null
+        if ($Settings.ApprovalSource -eq 'ControlR' -and $Plan.Status -eq 'Ready') {
+            $Row = Get-CIPPAzDataTableEntity @Table -Filter "PartitionKey eq 'Plan' and RowKey eq '$Id'"
+            $Request = Publish-CIPPBreakGlassChangeRequest -PlanRow $Row
+            if ($Request.Error) {
+                $Row | Add-Member -NotePropertyName ChangeRequestError -NotePropertyValue ([string]$Request.Error) -Force
+                Add-CIPPAzDataTableEntity @Table -Entity $Row -Force
+            }
+        }
 
         $Title = if ($Plan.Status -eq 'Ready') { "Break-glass plan ready for approval: $($Plan.DisplayName)" } else { "Break-glass needed but blocked: $($Plan.DisplayName)" }
         $Enc = { param($S) [System.Net.WebUtility]::HtmlEncode([string]$S) }
@@ -55,7 +71,7 @@ function Invoke-CIPPBreakGlassDetector {
 <p><b>Conditional Access policies to edit</b> (break-glass group added to excludeGroups, snapshotted first):</p>
 $(if (@($Plan.PolicyEdits).Count) { $Plan.PolicyEdits | Select-Object DisplayName, State | ConvertTo-Html -Fragment | Out-String } else { '<p>None.</p>' })
 $(if ($Plan.Warnings.Count) { "<p><b>Warnings:</b> $(($Plan.Warnings | ForEach-Object { & $Enc $_ }) -join ' ')</p>" })
-<p>Nothing has been changed. To approve: POST /api/ExecBreakGlassProvision {"tenantFilter":"$(& $Enc $Plan.Tenant)","Action":"Approve"}. The password goes to Keeper through ControlR; FIDO2 keys are registered afterwards by a tech.</p>
+<p>Nothing has been changed. $(if ($Request.Url) { "<b>Approve or deny it in ControlR:</b> <a href=`"$(& $Enc $Request.Url)`">$(& $Enc $Request.Url)</a> (Break-Glass Approver, interactive sign-in). CIPP runs within about 10 minutes of approval, only if the plan is unchanged." } elseif ($Request.Error) { "<b>The ControlR change request could not be created:</b> $(& $Enc $Request.Error). The detector retries on its next run." } else { "To approve: POST /api/ExecBreakGlassProvision {`"tenantFilter`":`"$(& $Enc $Plan.Tenant)`",`"Action`":`"Approve`"}." }) The password goes to Keeper through ControlR; FIDO2 keys are registered afterwards by a tech.</p>
 "@
         foreach ($Channel in 'email', 'psa') {
             try { $null = Send-CIPPAlert -Type $Channel -Title $Title -HTMLContent $Html -TenantFilter $Plan.Tenant -APIName $APIName }
