@@ -154,22 +154,13 @@ function Invoke-CIPPBreakGlassProvision {
     $Reg = @(Get-CIPPBreakGlassAccounts -TenantFilter $Fresh.TenantId | ForEach-Object RowKey)
     & $Step 'Registry' (@($Created | Where-Object { $_.Id -notin $Reg }).Count -eq 0) "$($Reg.Count) registered"
 
-    # 6. ControlR sets the real password and writes Keeper. CIPP sees only the record pointer.
-    $Keeper = [System.Collections.Generic.List[object]]::new()
-    foreach ($A in $Created) {
-        # Contract: ControlR f46de0ba8 (Hudu 841). Synchronous; the NPM proxy drops at ~90 s, so on a timeout check the
-        # account in ControlR before calling again (a re-call rotates again, which is harmless).
-        $Hand = Invoke-CippControlRIntegrationRequest -Method POST -Path 'break-glass/rotate' -TimeoutSec 90 -Body @{ entraTenantId = $Fresh.TenantId; entraObjectId = $A.Id; upn = $A.UserPrincipalName }
-        $Uid = if ($Hand.Data.status -eq 'Success') { [string]$Hand.Data.keeperRecordUid } else { $null }
-        $Keeper.Add([pscustomobject]@{ UserPrincipalName = $A.UserPrincipalName; Status = $(if ($Uid) { 'Rotated' } else { "Keeper pending: $($Hand.Message)" }); KeeperRecordUid = $Uid; HuduPasswordId = $Hand.Data.huduPasswordId; RotatedAt = $Hand.Data.rotatedAt })
-        if ($Uid) {
-            $Row = Get-CIPPAzDataTableEntity @Registry -Filter "PartitionKey eq '$($Fresh.TenantId)' and RowKey eq '$($A.Id)'"
-            $Row | Add-Member -NotePropertyName KeeperRecordUid -NotePropertyValue $Uid -Force
-            Add-CIPPAzDataTableEntity @Registry -Entity $Row -Force
-        }
-    }
-    $Result.Keeper = @($Keeper)
-    & $Step 'Keeper (ControlR)' (@($Keeper | Where-Object { -not $_.KeeperRecordUid }).Count -eq 0) (($Keeper | ForEach-Object { "$($_.UserPrincipalName): $($_.Status)" }) -join '; ')
+    # 6. ControlR sets the real password and writes Keeper. CIPP sees only the record pointer. One attempt here: a
+    #    "not an active Global Administrator" 409 right after the assignment is role-read lag, and Action=Handoff or
+    #    the daily timer retries it, which keeps this HTTP request inside the gateway timeout.
+    $Keeper = @(Invoke-CIPPBreakGlassKeeperHandoff -TenantFilter $Fresh.TenantId -NoAlert | Where-Object { $_.UserPrincipalName -in @($Created.UserPrincipalName) })
+    $Result.Keeper = $Keeper
+    # Retrying (role-read lag, ControlR busy) is not a failure: Action=Handoff and the daily timer finish it.
+    & $Step 'Keeper (ControlR)' (@($Keeper | Where-Object { $_.Status -eq 'NeedsAttention' }).Count -eq 0 -and $Keeper.Count -eq $Created.Count) (($Keeper | ForEach-Object { "$($_.UserPrincipalName): $($_.Status)$(if ($_.Status -ne 'Rotated' -and $_.Message) { " ($($_.Message))" })" }) -join '; ')
 
     # 7. Posture, for the record. "No FIDO2" stays open until the keys are registered.
     try {

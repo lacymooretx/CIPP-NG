@@ -164,3 +164,41 @@ Describe 'ConvertTo-CIPPAdminInventoryHtml' {
         $H | Should -Match '<b>1</b> registered break-glass'
     }
 }
+
+Describe 'Invoke-CIPPBreakGlassKeeperHandoff' {
+    BeforeAll {
+        . (Join-Path $BG 'Invoke-CIPPBreakGlassKeeperHandoff.ps1')
+        function Get-CIPPTable { param($tablename) @{} }
+        function Add-CIPPAzDataTableEntity { param($Entity, [switch]$Force) $script:Saved += , $Entity }
+        function Invoke-CippControlRIntegrationRequest { param($Method, $Path, $Body, $TimeoutSec) }
+        function Write-LogMessage { param($API, $tenant, $message, $Sev) }
+        function Send-CIPPAlert { param($Type, $Title, $HTMLContent, $TenantFilter, $APIName) $script:Alerts += , $Title }
+    }
+    BeforeEach {
+        $script:Saved = @(); $script:Alerts = @()
+        Mock Get-Tenants { [pscustomobject]@{ defaultDomainName = 'contoso.com' } }
+        Mock Get-CIPPBreakGlassAccounts { @(
+                [pscustomobject]@{ PartitionKey = 't1'; RowKey = 'u1'; UserPrincipalName = 'bg-a@contoso.onmicrosoft.com'; ProvisionRunId = 'r1'; KeeperRecordUid = $null; HandoffProblem = $null },
+                [pscustomobject]@{ PartitionKey = 't1'; RowKey = 'u0'; UserPrincipalName = 'old@contoso.com'; ProvisionRunId = $null; KeeperRecordUid = $null }) }
+    }
+    It 'stores the Keeper pointer on success and only touches CIPP-provisioned accounts' {
+        Mock Invoke-CippControlRIntegrationRequest { [pscustomobject]@{ Status = 200; Data = [pscustomobject]@{ status = 'Success'; keeperRecordUid = 'KUID'; huduPasswordId = 5; rotatedAt = 'x' } } }
+        $R = Invoke-CIPPBreakGlassKeeperHandoff
+        $R.Count | Should -Be 1
+        $R[0].Status | Should -Be 'Rotated'
+        $script:Saved[0].KeeperRecordUid | Should -Be 'KUID'
+        Should -Invoke Invoke-CippControlRIntegrationRequest -Times 1 -ParameterFilter { $Body.entraTenantId -eq 't1' -and $Body.entraObjectId -eq 'u1' -and $TimeoutSec -eq 90 }
+    }
+    It 'treats the Global Admin lag 409 as retryable, with no alert and no save' {
+        Mock Invoke-CippControlRIntegrationRequest { [pscustomobject]@{ Status = 409; Data = $null; Message = 'ControlR returned HTTP 409: bg-a is not an active Global Administrator' } }
+        (Invoke-CIPPBreakGlassKeeperHandoff)[0].Status | Should -Match '^Retrying'
+        $script:Alerts.Count | Should -Be 0
+        $script:Saved.Count | Should -Be 0
+    }
+    It 'alerts once for a real refusal' {
+        Mock Invoke-CippControlRIntegrationRequest { [pscustomobject]@{ Status = 409; Data = $null; Message = 'ControlR returned HTTP 409: Keeper is not enabled for this client' } }
+        (Invoke-CIPPBreakGlassKeeperHandoff)[0].Status | Should -Be 'NeedsAttention'
+        $script:Alerts.Count | Should -Be 2
+        $script:Saved[0].HandoffProblem | Should -Match 'Keeper is not enabled'
+    }
+}

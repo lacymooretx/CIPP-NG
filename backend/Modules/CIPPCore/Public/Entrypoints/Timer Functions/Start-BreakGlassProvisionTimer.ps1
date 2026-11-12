@@ -16,6 +16,12 @@ function Start-BreakGlassProvisionTimer {
         } catch {
             Write-LogMessage -API 'BreakGlassProvision' -tenant 'Global' -message "Break-glass detector failed: $($_.Exception.Message)" -Sev 'Error' -LogData (Get-CippException -Exception $_)
         }
+        try {
+            $Pending = @(Invoke-CIPPBreakGlassKeeperHandoff)
+            if ($Pending.Count) { Write-Information "Break-glass hand-off: $(($Pending | Group-Object Status | ForEach-Object { "$($_.Count) $($_.Name)" }) -join ', ')" }
+        } catch {
+            Write-LogMessage -API 'BreakGlassProvision' -tenant 'Global' -message "Break-glass Keeper hand-off retry failed: $($_.Exception.Message)" -Sev 'Error' -LogData (Get-CippException -Exception $_)
+        }
         $Tz = try { [TimeZoneInfo]::FindSystemTimeZoneById('America/Chicago') } catch { [TimeZoneInfo]::FindSystemTimeZoneById('Central Standard Time') }
         if ([TimeZoneInfo]::ConvertTimeFromUtc((Get-Date).ToUniversalTime(), $Tz).DayOfWeek -eq 'Monday') {
             try { $null = Invoke-CIPPAdminInventorySync }

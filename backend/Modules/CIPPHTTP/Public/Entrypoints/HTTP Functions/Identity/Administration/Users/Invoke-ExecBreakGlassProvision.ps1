@@ -13,6 +13,7 @@ function Invoke-ExecBreakGlassProvision {
                          *.onmicrosoft.com permanent Global Admins, the role-assignable exclusion group, the group
                          excluded from every CA policy (snapshotted), registry, ControlR/Keeper hand-off, alert + CW ticket.
         Action=Status    the stored plan and runs for tenantFilter.
+        Action=Handoff   retries the ControlR/Keeper hand-off for accounts still "Keeper pending" (tenantFilter or all).
         Action=Settings  reads the kill switch; with Enabled=true/false sets it.
         Plans come from the daily detector (Start-BreakGlassProvisionTimer) or Action=Plan. Only Managed Client
         tenants, never the partner tenant or a tenant on CIPP's exclusion list. Aspendora fork addition
@@ -36,6 +37,10 @@ function Invoke-ExecBreakGlassProvision {
                 $Rows = @(Get-CIPPAzDataTableEntity @Table -Filter "PartitionKey eq 'Plan'")
                 $Plans = @($Rows | ForEach-Object { [pscustomobject]@{ TenantId = $_.RowKey; Tenant = $_.Tenant; Status = $_.Status; ApprovedBy = $_.ApprovedBy; UpdatedUtc = $_.UpdatedUtc; LastRunId = $_.LastRunId; Plan = (& $Parse $_) } })
                 return (& $Respond ([HttpStatusCode]::OK) @{ Results = $Plans; Settings = (Get-CIPPBreakGlassProvisionSettings) })
+            }
+            'Handoff' {
+                $Res = if ($TenantFilter -and $TenantFilter -ne 'AllTenants') { Invoke-CIPPBreakGlassKeeperHandoff -TenantFilter $TenantFilter } else { Invoke-CIPPBreakGlassKeeperHandoff }
+                return (& $Respond ([HttpStatusCode]::OK) @{ Results = @($Res) })
             }
             'Settings' {
                 $Enabled = $Request.Body.Enabled ?? $Request.Query.Enabled
@@ -82,7 +87,7 @@ function Invoke-ExecBreakGlassProvision {
                 }
                 return (& $Respond ([HttpStatusCode]::OK) @{ Results = $Run })
             }
-            default { return (& $Respond ([HttpStatusCode]::BadRequest) @{ Results = "Unknown Action '$Action'. Use List, Plan, Approve, Status or Settings." }) }
+            default { return (& $Respond ([HttpStatusCode]::BadRequest) @{ Results = "Unknown Action '$Action'. Use List, Plan, Approve, Status, Handoff or Settings." }) }
         }
     } catch {
         $Err = Get-CippException -Exception $_
