@@ -29,12 +29,14 @@ function Invoke-CIPPBreakGlassProvision {
         # The approved plan (from table BreakGlassProvision, PartitionKey 'Plan').
         [Parameter(Mandatory)]$ApprovedPlan,
         [string]$ApprovedBy = 'unknown',
-        $Headers
+        $Headers,
+        # The ControlR approval poll passes the run id it claimed the change request with, so both sides share one id.
+        [string]$RunId
     )
 
     $APIName = 'BreakGlassProvision'
     $GA = '62e90394-69f5-4237-9190-012177145e10'
-    $RunId = (New-Guid).Guid
+    if (-not $RunId) { $RunId = (New-Guid).Guid }
     $Steps = [System.Collections.Generic.List[object]]::new()
     $Step = { param($Name, $Ok, $Detail) $Steps.Add([pscustomobject]@{ Step = $Name; Ok = [bool]$Ok; Detail = [string]$Detail }) }
     $Result = [ordered]@{ RunId = $RunId; Tenant = $TenantFilter; Status = 'Failed'; ApprovedBy = $ApprovedBy; Accounts = @(); GroupId = $null; PolicyResults = @(); Keeper = @(); Posture = $null; Steps = $Steps }

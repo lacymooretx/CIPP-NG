@@ -70,9 +70,9 @@ function Invoke-CIPPBreakGlassApprovalPoll {
         Write-LogMessage -API $APIName -tenant $Plan.Tenant -message "Break-glass plan approved by $Approver; run starting." -Sev 'Warning'
 
         try {
-            $Run = Invoke-CIPPBreakGlassProvision -TenantFilter $Plan.Tenant -ApprovedPlan $Plan -ApprovedBy $Approver
+            $Run = Invoke-CIPPBreakGlassProvision -TenantFilter $Plan.Tenant -ApprovedPlan $Plan -ApprovedBy $Approver -RunId $RunId
         } catch {
-            $Run = [pscustomobject]@{ RunId = $null; Status = 'Failed'; Accounts = @(); Steps = @([pscustomobject]@{ Step = 'Run'; Ok = $false; Detail = (Get-NormalizedError -Message $_.Exception.Message) }) }
+            $Run = [pscustomobject]@{ RunId = $RunId; Status = 'Failed'; Accounts = @(); Steps = @([pscustomobject]@{ Step = 'Run'; Ok = $false; Detail = (Get-NormalizedError -Message $_.Exception.Message) }) }
         }
         $Created = @($Run.Accounts).Count
         $Final = if ($Run.Status -eq 'Succeeded') { 'Succeeded' } elseif ($Created -eq 0) { 'Refused' } else { 'Failed' }

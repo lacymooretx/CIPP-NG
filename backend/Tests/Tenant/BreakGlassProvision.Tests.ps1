@@ -222,7 +222,7 @@ Describe 'Invoke-CIPPBreakGlassApprovalPoll' {
         . (Join-Path $BG 'Invoke-CIPPBreakGlassApprovalPoll.ps1')
         function Get-CIPPBreakGlassProvisionSettings { [pscustomobject]@{ Enabled = $true; ApprovalSource = 'ControlR' } }
         function Get-CIPPAzDataTableEntity { param($Filter) }
-        function Invoke-CIPPBreakGlassProvision { param($TenantFilter, $ApprovedPlan, $ApprovedBy) }
+        function Invoke-CIPPBreakGlassProvision { param($TenantFilter, $ApprovedPlan, $ApprovedBy, $RunId) }
         function Get-NormalizedError { param($Message) $Message }
         function Invoke-CippControlRIntegrationRequest { param($Method, $Path, $Body, $TimeoutSec) }
         function Get-CIPPTable { param($tablename) @{} }
