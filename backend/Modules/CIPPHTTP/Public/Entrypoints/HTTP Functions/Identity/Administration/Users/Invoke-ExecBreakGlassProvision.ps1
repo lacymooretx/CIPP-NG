@@ -73,7 +73,7 @@ function Invoke-ExecBreakGlassProvision {
                 $Row | Add-Member -NotePropertyName ApprovedBy -NotePropertyValue $Actor -Force
                 $Row | Add-Member -NotePropertyName ApprovedUtc -NotePropertyValue ((Get-Date).ToUniversalTime().ToString('o')) -Force
                 Add-CIPPAzDataTableEntity @Table -Entity $Row -Force
-                Write-LogMessage -headers $Headers -API 'BreakGlassProvision' -tenant $Tenant.defaultDomainName -message "Break-glass plan approved by $Actor: $(@($Approved.AccountsToCreate) -join ', ')" -Sev 'Warning'
+                Write-LogMessage -headers $Headers -API 'BreakGlassProvision' -tenant $Tenant.defaultDomainName -message "Break-glass plan approved by ${Actor}: $(@($Approved.AccountsToCreate) -join ', ')" -Sev 'Warning'
                 $Run = Invoke-CIPPBreakGlassProvision -TenantFilter $Tenant.defaultDomainName -ApprovedPlan $Approved -ApprovedBy $Actor -Headers $Headers
                 # A run stopped by the re-plan or kill switch creates nothing; put the plan back so it can be re-planned.
                 if (@($Run.Accounts).Count -eq 0) {
