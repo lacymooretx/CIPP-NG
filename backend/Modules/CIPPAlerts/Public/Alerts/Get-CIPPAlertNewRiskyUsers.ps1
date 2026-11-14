@@ -11,6 +11,8 @@ function Get-CIPPAlertNewRiskyUsers {
         $InputValue,
         $TenantFilter
     )
+    # Aspendora fork (CIPP-8): upstream returns here without Entra ID P2. The fork keeps alerting from riskDetections
+    # for non-P2 tenants instead (see the capability check below), so the P2 gate is not applied.
     $ContainHighRiskUsers = ($InputValue -eq $true -or [string]$InputValue -eq 'true')
     $Deltatable = Get-CIPPTable -Table DeltaCompare
     try {
@@ -53,7 +55,8 @@ function Get-CIPPAlertNewRiskyUsers {
         }
 
         $Filter = "PartitionKey eq 'RiskyUsersDelta' and RowKey eq '{0}'" -f $TenantFilter
-        $RiskyUsersDelta = (Get-CIPPAzDataTableEntity @Deltatable -Filter $Filter).delta | ConvertFrom-Json -ErrorAction SilentlyContinue
+        $Entity = Get-CIPPAzDataTableEntity @Deltatable -Filter $Filter
+        $RiskyUsersDelta = $Entity.delta | ConvertFrom-Json -ErrorAction SilentlyContinue
 
         # Get current risky users with more detailed information
         $NewDelta = (New-CIPPGraphReadWithAppFallback -uri 'https://graph.microsoft.com/v1.0/identityProtection/riskyUsers?`$top=500' -tenantid $TenantFilter) | Select-Object userPrincipalName, riskLevel, riskState, riskDetail, riskLastUpdatedDateTime, isProcessing, history
@@ -66,8 +69,15 @@ function Get-CIPPAlertNewRiskyUsers {
         }
         Add-CIPPAzDataTableEntity @DeltaTable -Entity $DeltaEntity -Force
 
-        if ($RiskyUsersDelta) {
-            $AlertData = $NewDelta | Where-Object { $_.userPrincipalName -notin $RiskyUsersDelta.userPrincipalName } | ForEach-Object {
+        # Test the row, not the parsed value: a baseline with no risky users parses to $null.
+        if ($Entity) {
+            # riskyUsers keeps dismissed and remediated users, so a user who turns risky again is already in the baseline.
+            $ActiveStates = 'atRisk', 'confirmedCompromised'
+            $PreviousActive = @($RiskyUsersDelta | Where-Object { $_.riskState -in $ActiveStates }).userPrincipalName
+            $AlertData = $NewDelta | Where-Object {
+                $_.userPrincipalName -notin $RiskyUsersDelta.userPrincipalName -or
+                ($_.riskState -in $ActiveStates -and $_.userPrincipalName -notin $PreviousActive)
+            } | ForEach-Object {
                 $RiskHistory = if ($_.history) {
                     $latestHistory = $_.history | Sort-Object -Property riskLastUpdatedDateTime -Descending | Select-Object -First 1
                     "Previous Risk Level: $($latestHistory.riskLevel), Last Updated: $($latestHistory.riskLastUpdatedDateTime)"

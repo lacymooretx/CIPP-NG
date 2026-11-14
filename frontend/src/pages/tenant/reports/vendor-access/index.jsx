@@ -283,6 +283,7 @@ const Page = () => {
           <Stack
             direction="row"
             spacing={2}
+            useFlexGap
             alignItems="center"
             flexWrap="wrap"
           >

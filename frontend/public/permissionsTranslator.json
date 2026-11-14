@@ -18716,5 +18716,77 @@
     "id": "68067c9d-a1be-4603-b095-3eaf54a42510",
     "origin": "Application (ProjectWorkManagement)",
     "value": "OrgSettings-Planner.ReadWrite.All"
+  },
+  {
+    "description": "Read and write all on-premises directory synchronization information",
+    "displayName": "Read and write all on-premises directory synchronization information",
+    "id": "c2d95988-7604-4ba1-aaed-38a5f82a51c7",
+    "Origin": "Delegated",
+    "userConsentDescription": "Access Microsoft Teams and Skype for Business data as the signed in user",
+    "userConsentDisplayName": "Access Microsoft Teams and Skype for Business data based on the user's role membership",
+    "value": "OnPremDirectorySynchronization.ReadWrite.All"
+  },
+  {
+    "description": "Read all on-premises directory synchronization information",
+    "displayName": "Read all on-premises directory synchronization information",
+    "id": "f6609722-4100-44eb-b747-e6ca0536989d",
+    "Origin": "Delegated",
+    "userConsentDescription": "Allows the app to read all on-premises directory synchronization information for your organization, on your behalf.",
+    "userConsentDisplayName": "Read all on-premises directory synchronization information",
+    "value": "OnPremDirectorySynchronization.Read.All"
+  },
+  {
+    "description": "Read and Modify Tenant-Acquired Telephone Number Details",
+    "displayName": "Read and Modify Tenant-Acquired Telephone Number Details",
+    "id": "424b07a8-1209-4d17-9fe4-9018a93a1024",
+    "Origin": "Delegated",
+    "userConsentDescription": "Allows the app to read and modify your tenant's acquired telephone number details on behalf of the signed-in admin user. Acquired telephone numbers may include attributes related to assigned object, emergency location, network site, etc.",
+    "userConsentDisplayName": "Allows the app to read and modify your tenant's acquired telephone number details on behalf of the signed-in admin user. Acquired telephone numbers may include attributes related to assigned object, emergency location, network site, etc.",
+    "value": "TeamsTelephoneNumber.ReadWrite.All"
+  },
+  {
+    "description": "Read Teams user configurations",
+    "displayName": "Read Teams user configurations",
+    "id": "5c469ce4-dab5-4afd-b9de-14f1ba4004a7",
+    "Origin": "Delegated",
+    "userConsentDescription": "Allows the app to read your tenant's user configurations on behalf of the signed-in admin user. User configuration may include attributes related to user, such as telephone number, assigned policies, etc.",
+    "userConsentDisplayName": "Read Teams user configurations",
+    "value": "TeamsUserConfiguration.Read.All"
+  },
+  {
+    "description": "Read and Modify Tenant-Acquired Telephone Number Details",
+    "displayName": "Read and Modify Tenant-Acquired Telephone Number Details",
+    "id": "0a42382f-155c-4eb1-9bdc-21548ccaa387",
+    "Origin": "Application",
+    "userConsentDescription": "Allows the app to read your tenant's acquired telephone number details, without a signed-in user. Acquired telephone numbers may include attributes related to assigned object, emergency location, network site, etc.",
+    "userConsentDisplayName": "Allows the app to read your tenant's acquired telephone number details, without a signed-in user. Acquired telephone numbers may include attributes related to assigned object, emergency location, network site, etc.",
+    "value": "TeamsTelephoneNumber.ReadWrite.All"
+  },
+  {
+    "description": "Read Teams user configurations",
+    "displayName": "Read Teams user configurations",
+    "id": "a91eadaf-2c3c-4362-908b-fb172d208fc6",
+    "Origin": "Application",
+    "userConsentDescription": "Allows the app to read your tenant's user configurations, without a signed-in user. User configuration may include attributes related to user, such as telephone number, assigned policies, etc.",
+    "userConsentDisplayName": "Read Teams user configurations",
+    "value": "TeamsUserConfiguration.Read.All"
+  },
+  {
+    "description": "Allows the app to read and write Copilot policy settings for the organization, on behalf of the signed-in user.",
+    "displayName": "Read and write Copilot policy settings",
+    "id": "e2edbde8-4448-4e49-8ebb-d53ba72df0f3",
+    "Origin": "Delegated",
+    "userConsentDescription": "Allows the app to read and write Copilot policy settings for the organization, on your behalf.",
+    "userConsentDisplayName": "Read and write Copilot policy settings",
+    "value": "CopilotPolicySettings.ReadWrite"
+  },
+  {
+    "description": "Allows the app to read and write Copilot policy settings for the organization, without a signed-in user.",
+    "displayName": "Read and write Copilot policy settings",
+    "id": "cc147c17-b8e8-4d3f-9f94-aa9e279a079a",
+    "Origin": "Application",
+    "userConsentDescription": "Allows the app to read and write Copilot policy settings for the organization, without a signed-in user.",
+    "userConsentDisplayName": "Read and write Copilot policy settings",
+    "value": "CopilotPolicySettings.ReadWrite"
   }
 ]

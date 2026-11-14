@@ -5,229 +5,188 @@ function Invoke-ListIntuneDeploymentStatus {
     .ROLE
         Endpoint.MEM.Read
     .DESCRIPTION
-        Returns deployment outcome counts for Intune remediation scripts and device configuration
-        profiles, in one bulk call per type, so a list view can show "is this actually working"
-        instead of only "does this exist".
-
-        Type=Scripts   - remediation (deviceHealthScripts) run summaries: how many devices had an
-                         issue detected, how many were remediated, and how many failed either the
-                         detection or the remediation script. CIPP could already list health
-                         scripts but never their results.
-        Type=Policies  - deviceConfiguration deviceStatusOverview: success / error / conflict /
-                         pending / not-applicable counts per profile.
-        Type=FeatureUpdates - per-device alerts against each Windows Feature Update profile, via the
-                         Intune reports surface. The obvious endpoint,
-                         windowsFeatureUpdateProfiles/{id}/deviceUpdateStates, DOES NOT EXIST - the
-                         $expand form says so outright ("Could not find a property named
-                         'deviceUpdateStates' on type 'microsoft.graph.windowsFeatureUpdateProfile'").
-                         getWindowsUpdateAlertsPerPolicyPerDeviceReport is the real route: a POST,
-                         requiring a PolicyId restriction filter, returning a Schema/Values table
-                         rather than objects. Reporting ALERTS rather than raw state is also the more
-                         useful answer - it names the devices a profile is failing on.
-
-        COVERAGE LIMIT, verified live 2026-09-17 rather than assumed: deviceStatusOverview exists on
-        deviceConfigurations but NOT on configurationPolicies - a settings-catalog policy returns
-        "Resource not found for the segment 'deviceStatusOverview'". Settings-catalog deployment
-        status comes from the Intune reports surface (getConfigurationPolicyReport), which is a
-        different and heavier integration. This endpoint therefore covers legacy configuration
-        profiles only, and says so rather than silently returning a short list.
+        Lists the per-device and per-user deployment status of one Intune app, policy or script, like the Device status and User status pages in Intune. Devices or Users is null when Intune has no status for that side of the object type.
     #>
     [CmdletBinding()]
     param($Request, $TriggerMetadata)
 
-    $APIName = $Request.Params.CIPPEndpoint
-    $Headers = $Request.Headers
-    $TenantFilter = $Request.Query.TenantFilter ?? $Request.Body.TenantFilter
-    $Type = ($Request.Query.Type ?? $Request.Body.Type ?? 'Scripts').ToString()
+    $TenantFilter = $Request.Query.tenantFilter
+    # Id of the app, policy or script
+    $Id = $Request.Query.ID
+    # Graph collection of the object: mobileApps, configurationPolicies, deviceCompliancePolicies, deviceManagementScripts, an app protection type, ...
+    $Type = $Request.Query.Type
 
-    if (-not $TenantFilter) {
-        return ([HttpResponseContext]@{ StatusCode = [HttpStatusCode]::BadRequest; Body = @{ Results = 'TenantFilter is required.' } })
+    # The id goes into OData filters and URLs, so only id characters are accepted (app protection ids look like T_<guid>)
+    if ([string]::IsNullOrWhiteSpace($Type) -or "$Id" -notmatch '^[A-Za-z0-9_-]+$') {
+        return ([HttpResponseContext]@{
+                StatusCode = [HttpStatusCode]::BadRequest
+                Body       = @{ Results = 'A valid ID and Type are required.' }
+            })
     }
-    if ($Type -notin @('Scripts', 'Policies', 'FeatureUpdates')) {
-        return ([HttpResponseContext]@{ StatusCode = [HttpStatusCode]::BadRequest; Body = @{ Results = "Invalid Type '$Type'. Allowed: Scripts, Policies, FeatureUpdates." } })
+
+    $MamTypes = @{
+        androidManagedAppProtection           = 'androidManagedAppProtections'
+        iosManagedAppProtection               = 'iosManagedAppProtections'
+        windowsManagedAppProtection           = 'windowsManagedAppProtections'
+        mdmWindowsInformationProtectionPolicy = 'mdmWindowsInformationProtectionPolicies'
+        windowsInformationProtectionPolicy    = 'windowsInformationProtectionPolicies'
+        targetedManagedAppConfiguration       = 'targetedManagedAppConfigurations'
     }
 
-    $GraphBeta = 'https://graph.microsoft.com/beta'
+    $StatusTypes = @('mobileApps', 'deviceConfigurations', 'deviceCompliancePolicies', 'mobileAppConfigurations', 'configurationPolicies', 'groupPolicyConfigurations', 'intents', 'deviceManagementScripts', 'deviceShellScripts', 'deviceHealthScripts')
+    # List pages send URLName in mixed casing (DeviceConfigurations); use the Graph segment's own casing
+    $Type = @($StatusTypes + $MamTypes.Keys + $MamTypes.Values | Where-Object { $_ -eq $Type })[0] ?? $Type
+    $IsMam = $MamTypes.ContainsKey($Type) -or $MamTypes.ContainsValue($Type)
 
+    # nonCompliant -> Non compliant
+    $Friendly = {
+        param($Value)
+        if ([string]::IsNullOrWhiteSpace("$Value")) { return 'Unknown' }
+        $Text = ("$Value" -creplace '(?<!^)([A-Z])', ' $1').ToLower()
+        $Text.Substring(0, 1).ToUpper() + $Text.Substring(1)
+    }
+
+    $DeviceRow = {
+        param($DeviceName, $UserPrincipalName, $Status, $StatusDetail, $Platform, $LastReported)
+        [PSCustomObject]@{
+            DeviceName        = $DeviceName
+            UserPrincipalName = $UserPrincipalName
+            Status            = $Status
+            StatusDetail      = $StatusDetail
+            Platform          = $Platform
+            # Intune reports 0001-01-01 for devices that never checked in
+            LastReported      = if (($LastReported -as [datetime]).Year -eq 1) { $null } else { $LastReported }
+        }
+    }
+
+    $UserRow = {
+        param($UserPrincipalName, $UserName, $Status, $StatusDetail, $DeviceCount, $LastReported)
+        [PSCustomObject]@{
+            UserPrincipalName = $UserPrincipalName
+            UserName          = $UserName
+            Status            = $Status
+            StatusDetail      = $StatusDetail
+            DeviceCount       = $DeviceCount
+            LastReported      = $LastReported
+        }
+    }
+
+    # Types without a user report get one row per user from the device rows, carrying that user's worst status
+    $StatusRank = @('Error', 'Failed', 'Fail', 'Script error', 'Conflict', 'Non compliant', 'Pending', 'In progress', 'Succeeded', 'Success', 'Compliant', 'Not applicable')
+    $UsersFromDevices = {
+        param($Devices)
+        foreach ($Group in @($Devices | Group-Object -Property UserPrincipalName)) {
+            $Worst = $Group.Group | Sort-Object { $Rank = $StatusRank.IndexOf("$($_.Status)"); if ($Rank -lt 0) { 99 } else { $Rank } } | Select-Object -First 1
+            $Latest = ($Group.Group | Sort-Object LastReported -Descending | Select-Object -First 1).LastReported
+            & $UserRow ($Group.Name ? $Group.Name : $null) ($Group.Name ? $null : 'No user') $Worst.Status $null $Group.Count $Latest
+        }
+    }
+
+    $Devices = $null
+    $Users = $null
     try {
-        $Notes = [System.Collections.Generic.List[string]]::new()
-
-        if ($Type -eq 'FeatureUpdates') {
-            $Profiles = @(New-GraphGetRequest -uri "$GraphBeta/deviceManagement/windowsFeatureUpdateProfiles?`$select=id,displayName" -tenantid $TenantFilter)
-            if ($Profiles.Count -eq 0) {
-                return ([HttpResponseContext]@{ StatusCode = [HttpStatusCode]::OK; Body = @{ Results = @(); Metadata = @{ Type = $Type; Count = 0; Notes = @('No Windows Feature Update profiles exist in this tenant.') } } })
-            }
-
-            $Results = [System.Collections.Generic.List[object]]::new()
-            $Unavailable = 0
-
-            foreach ($UpdateProfile in $Profiles) {
-                $Name = [string]$UpdateProfile.displayName
-                try {
-                    # POST, and the PolicyId restriction filter is mandatory - without it the
-                    # service answers "One or more required filters are not set".
-                    $ReportBody = @{ filter = "(PolicyId eq '$($UpdateProfile.id)')"; top = 500 } | ConvertTo-Json -Compress
-                    $Report = New-GraphPOSTRequest -uri "$GraphBeta/deviceManagement/reports/getWindowsUpdateAlertsPerPolicyPerDeviceReport" -tenantid $TenantFilter -type 'POST' -body $ReportBody
-                } catch {
-                    # Unknown, never zero - zero would read as "no devices are failing".
-                    $Unavailable++
-                    $Results.Add([PSCustomObject]@{ Id = [string]$UpdateProfile.id; Name = $Name; StatusAvailable = $false })
-                    continue
+        switch ($Type) {
+            'mobileApps' {
+                $Devices = foreach ($Row in (Get-CIPPIntuneReportRows -TenantFilter $TenantFilter -Uri 'https://graph.microsoft.com/beta/deviceManagement/reports/retrieveDeviceAppInstallationStatusReport' -Filter "(ApplicationId eq '$Id')" -OrderBy @())) {
+                    $Detail = @($Row.AppInstallStateDetails_loc, $Row.HexErrorCode) | Where-Object { $_ }
+                    & $DeviceRow $Row.DeviceName $Row.UserPrincipalName ($Row.AppInstallState_loc ?? (& $Friendly $Row.AppInstallState)) ($Detail -join ' ') $Row.Platform $Row.LastModifiedDateTime
                 }
-
-                # Schema/Values is a table: column definitions plus rows as positional arrays.
-                $Columns = @($Report.Schema.Column)
-                $Devices = [System.Collections.Generic.List[object]]::new()
-                # Indexed, NOT `foreach ($Row in @($Report.Values))`. Values is an array of arrays,
-                # and wrapping that in @() flattens a single row into its individual cells - the row
-                # then reads as N one-cell rows and every field comes out empty.
-                $RowCount = if ($null -ne $Report.Values) { @($Report.Values).Count } else { 0 }
-                if ($null -ne $Report.Values -and $Report.Values.Count) { $RowCount = $Report.Values.Count }
-                for ($rw = 0; $rw -lt $RowCount; $rw++) {
-                    $Row = $Report.Values[$rw]
-                    $Cells = $Row
-                    $Item = @{}
-                    for ($i = 0; $i -lt $Columns.Count -and $i -lt $Cells.Count; $i++) { $Item[$Columns[$i]] = $Cells[$i] }
-                    $Devices.Add([PSCustomObject]@{
-                            DeviceName = [string]$Item['DeviceName']
-                            UPN        = [string]$Item['UPN']
-                            # The _loc columns carry human-readable text; the bare ones are ids.
-                            Alert      = [string]($Item['AlertMessage_loc'] ?? $Item['AlertMessage'])
-                            Detail     = [string]($Item['AlertMessageDescription_loc'] ?? $Item['AlertMessageDescription'])
-                        })
+                $Users = foreach ($Row in (Get-CIPPIntuneReportRows -TenantFilter $TenantFilter -Uri 'https://graph.microsoft.com/beta/deviceManagement/reports/getUserInstallStatusReport' -Filter "(ApplicationId eq '$Id')" -OrderBy @())) {
+                    $Status = if ($Row.FailedCount) { 'Failed' } elseif ($Row.PendingInstallCount) { 'Install pending' } elseif ($Row.NotInstalledCount) { 'Not installed' } elseif ($Row.InstalledCount) { 'Installed' } else { 'Not applicable' }
+                    $DeviceCount = $Row.InstalledCount + $Row.FailedCount + $Row.PendingInstallCount + $Row.NotInstalledCount + $Row.NotApplicableCount
+                    & $UserRow $Row.UserPrincipalName $Row.UserName $Status "$($Row.InstalledCount) installed, $($Row.FailedCount) failed, $($Row.PendingInstallCount) pending, $($Row.NotInstalledCount) not installed, $($Row.NotApplicableCount) not applicable" $DeviceCount $null
                 }
-
-                $Results.Add([PSCustomObject]@{
-                        Id              = [string]$UpdateProfile.id
-                        Name            = $Name
-                        StatusAvailable = $true
-                        AlertCount      = [int]$Report.TotalRowCount
-                        # Counted with an explicit loop: member enumeration over a generic List
-                        # does not behave like it does over an array, and silently yields nothing.
-                        DevicesAffected = $(
-                            $Seen = [System.Collections.Generic.HashSet[string]]::new()
-                            for ($d = 0; $d -lt $Devices.Count; $d++) {
-                                $Dn = [string]$Devices[$d].DeviceName
-                                if ($Dn) { $null = $Seen.Add($Dn) }
-                            }
-                            $Seen.Count
-                        )
-                        Devices         = $Devices
-                        LastUpdated     = [string]$Report.LastUpdatedTime
-                        Unhealthy       = ([int]$Report.TotalRowCount -gt 0)
-                    })
             }
-
-            $FuNotes = [System.Collections.Generic.List[string]]::new()
-            if ($Unavailable -gt 0) { $FuNotes.Add("$Unavailable profile(s) did not return a report and are reported as unknown, not zero.") }
-
-            return ([HttpResponseContext]@{
-                    StatusCode = [HttpStatusCode]::OK
-                    Body       = @{
-                        Results  = @($Results | Sort-Object @{ Expression = { -not $_.Unhealthy } }, Name)
-                        Metadata = @{
-                            Type           = $Type
-                            Count          = $Results.Count
-                            UnhealthyCount = @($Results | Where-Object { $_.Unhealthy }).Count
-                            Unavailable    = $Unavailable
-                            Notes          = @($FuNotes)
-                        }
+            { $_ -in @('deviceConfigurations', 'deviceCompliancePolicies', 'mobileAppConfigurations') } {
+                $Base = if ($Type -eq 'mobileAppConfigurations') { 'deviceAppManagement' } else { 'deviceManagement' }
+                # The Intune portal calls a compliant configuration profile Succeeded, compliance policies keep Compliant
+                $StatusText = { param($Value) if ($Value -eq 'compliant' -and $Type -ne 'deviceCompliancePolicies') { 'Succeeded' } else { & $Friendly $Value } }
+                $Devices = foreach ($Row in (New-GraphGetRequest -uri "https://graph.microsoft.com/beta/$Base/$Type('$Id')/deviceStatuses" -tenantid $TenantFilter)) {
+                    & $DeviceRow $Row.deviceDisplayName $Row.userPrincipalName (& $StatusText $Row.status) $null $Row.deviceModel $Row.lastReportedDateTime
+                }
+                $Users = foreach ($Row in (New-GraphGetRequest -uri "https://graph.microsoft.com/beta/$Base/$Type('$Id')/userStatuses" -tenantid $TenantFilter)) {
+                    # The row without a user is Intune's system account (device-targeted check-ins)
+                    & $UserRow ($Row.userPrincipalName ? $Row.userPrincipalName : $null) ($Row.userDisplayName ? $Row.userDisplayName : 'System account') (& $StatusText $Row.status) $null $Row.devicesCount $Row.lastReportedDateTime
+                }
+            }
+            { $_ -in @('configurationPolicies', 'groupPolicyConfigurations', 'intents') } {
+                $PolicyTypes = @(
+                    'Microsoft.Management.Services.Api.DeviceConfiguration'
+                    'DeviceManagementConfigurationPolicy'
+                    'DeviceConfigurationAdmxPolicy'
+                    'Microsoft.Management.Services.Api.DeviceManagementIntent'
+                )
+                $TypeFilter = ($PolicyTypes | ForEach-Object { "(PolicyBaseTypeName eq '$_')" }) -join ' or '
+                $Devices = foreach ($Row in (Get-CIPPIntuneReportRows -TenantFilter $TenantFilter -Uri 'https://graph.microsoft.com/beta/deviceManagement/reports/getConfigurationPolicyDevicesReport' -Filter "($TypeFilter) and (PolicyId eq '$Id')" -OrderBy @())) {
+                    & $DeviceRow $Row.DeviceName $Row.UPN ($Row.ReportStatus_loc ?? $Row.ReportStatus) $null $Row.UnifiedPolicyPlatformType_loc $Row.PspdpuLastModifiedTimeUtc
+                }
+                $Users = @(& $UsersFromDevices $Devices)
+            }
+            { $_ -in @('deviceManagementScripts', 'deviceShellScripts', 'deviceHealthScripts') } {
+                $Uri = "https://graph.microsoft.com/beta/deviceManagement/$Type('$Id')/deviceRunStates?`$expand=managedDevice(`$select=deviceName,userPrincipalName,operatingSystem)"
+                $Devices = foreach ($Row in (New-GraphGetRequest -uri $Uri -tenantid $TenantFilter)) {
+                    if ($Type -eq 'deviceHealthScripts') {
+                        # Remediations report detection and remediation separately
+                        $Status = & $Friendly $Row.detectionState
+                        $Detail = "Remediation: $(& $Friendly $Row.remediationState)"
+                    } else {
+                        $Status = & $Friendly $Row.runState
+                        $Detail = $Row.errorDescription
                     }
-                })
-        }
-
-        if ($Type -eq 'Scripts') {
-            $Parents = @(New-GraphGetRequest -uri "$GraphBeta/deviceManagement/deviceHealthScripts?`$select=id,displayName,publisher" -tenantid $TenantFilter)
-            $SubPath = 'runSummary'
-            $Collection = 'deviceHealthScripts'
-        } else {
-            $Parents = @(New-GraphGetRequest -uri "$GraphBeta/deviceManagement/deviceConfigurations?`$select=id,displayName&`$top=999" -tenantid $TenantFilter)
-            $SubPath = 'deviceStatusOverview'
-            $Collection = 'deviceConfigurations'
-            $Notes.Add('Settings-catalog policies (configurationPolicies) are not included: Graph does not expose deviceStatusOverview on that type.')
-        }
-
-        if ($Parents.Count -eq 0) {
-            return ([HttpResponseContext]@{ StatusCode = [HttpStatusCode]::OK; Body = @{ Results = @(); Metadata = @{ Type = $Type; Count = 0; Notes = @($Notes) } } })
-        }
-
-        # One request per parent, batched. Sequential calls would be one round trip per policy.
-        $BulkRequests = [System.Collections.Generic.List[object]]::new()
-        foreach ($Parent in $Parents) {
-            $BulkRequests.Add([PSCustomObject]@{ id = [string]$Parent.id; method = 'GET'; url = "/deviceManagement/$Collection/$($Parent.id)/$SubPath" })
-        }
-        $BulkResults = New-GraphBulkRequest -Requests @($BulkRequests) -tenantid $TenantFilter
-
-        $Results = [System.Collections.Generic.List[object]]::new()
-        $Unavailable = 0
-
-        foreach ($Parent in $Parents) {
-            $Result = $BulkResults | Where-Object { $_.id -eq [string]$Parent.id } | Select-Object -First 1
-            $Ok = $Result -and ($null -eq $Result.status -or ($Result.status -ge 200 -and $Result.status -lt 300))
-            $Name = [string]($Parent.displayName ?? $Parent.name)
-
-            if (-not $Ok) {
-                # A parent whose status cannot be read is reported as unknown rather than zero.
-                # Zero would read as "deployed everywhere successfully", which is the opposite.
-                $Unavailable++
-                $Results.Add([PSCustomObject]@{ Id = [string]$Parent.id; Name = $Name; StatusAvailable = $false })
-                continue
+                    & $DeviceRow $Row.managedDevice.deviceName $Row.managedDevice.userPrincipalName $Status $Detail $Row.managedDevice.operatingSystem $Row.lastStateUpdateDateTime
+                }
+                if ($Type -eq 'deviceHealthScripts') {
+                    $Users = @(& $UsersFromDevices $Devices)
+                } else {
+                    $Users = foreach ($Row in (New-GraphGetRequest -uri "https://graph.microsoft.com/beta/deviceManagement/$Type('$Id')/userRunStates" -tenantid $TenantFilter)) {
+                        $Status = if ($Row.errorDeviceCount) { 'Error' } else { 'Success' }
+                        & $UserRow $Row.userPrincipalName $null $Status "$($Row.successDeviceCount) succeeded, $($Row.errorDeviceCount) failed" ($Row.successDeviceCount + $Row.errorDeviceCount) $null
+                    }
+                }
             }
-
-            $S = $Result.body
-            if ($Type -eq 'Scripts') {
-                $Failed = [int]$S.detectionScriptErrorDeviceCount + [int]$S.remediationScriptErrorDeviceCount
-                $Results.Add([PSCustomObject]@{
-                        Id                  = [string]$Parent.id
-                        Name                = $Name
-                        Publisher           = [string]$Parent.publisher
-                        StatusAvailable     = $true
-                        NoIssueDetected     = [int]$S.noIssueDetectedDeviceCount
-                        IssueDetected       = [int]$S.issueDetectedDeviceCount
-                        IssueRemediated     = [int]$S.issueRemediatedDeviceCount
-                        IssueReoccurred     = [int]$S.issueReoccurredDeviceCount
-                        DetectionFailed     = [int]$S.detectionScriptErrorDeviceCount
-                        RemediationFailed   = [int]$S.remediationScriptErrorDeviceCount
-                        ScriptErrors        = $Failed
-                        # Unhealthy = the script itself is broken, which is different from the
-                        # script correctly finding an issue on a device.
-                        Unhealthy           = ($Failed -gt 0)
-                    })
-            } else {
-                $Results.Add([PSCustomObject]@{
-                        Id              = [string]$Parent.id
-                        Name            = $Name
-                        StatusAvailable = $true
-                        Success         = [int]$S.successCount
-                        Error           = [int]$S.errorCount
-                        Conflict        = [int]$S.conflictCount
-                        Pending         = [int]$S.pendingCount
-                        NotApplicable   = [int]$S.notApplicableCount
-                        Failing         = ([int]$S.errorCount + [int]$S.conflictCount)
-                        Unhealthy       = (([int]$S.errorCount + [int]$S.conflictCount) -gt 0)
-                    })
+            { $IsMam } {
+                # App protection has no device install state; its user status is the app registrations the policy applies to
+                $Registrations = @(New-GraphGetRequest -uri "https://graph.microsoft.com/beta/deviceAppManagement/managedAppRegistrations?`$expand=appliedPolicies(`$select=id)" -tenantid $TenantFilter) |
+                    Where-Object { @($_.appliedPolicies.id) -contains $Id }
+                $UserIds = @($Registrations.userId | Where-Object { $_ } | Sort-Object -Unique)
+                $UserLookup = @{}
+                if ($UserIds.Count -gt 0) {
+                    $UserRequests = foreach ($UserId in $UserIds) {
+                        @{ id = $UserId; method = 'GET'; url = "/users/$($UserId)?`$select=id,userPrincipalName,displayName" }
+                    }
+                    foreach ($Result in @(New-GraphBulkRequest -Requests @($UserRequests) -tenantid $TenantFilter)) {
+                        if ($Result.body.id) { $UserLookup[$Result.id] = $Result.body }
+                    }
+                }
+                $Users = foreach ($Row in $Registrations) {
+                    $Flags = @($Row.flaggedReasons | Where-Object { $_ -and $_ -ne 'none' })
+                    $Status = if ($Flags.Count -gt 0) { & $Friendly $Flags[0] } else { 'Checked in' }
+                    $App = $Row.appIdentifier.bundleId ?? $Row.appIdentifier.packageId ?? $Row.appIdentifier.windowsAppId
+                    $User = $UserLookup[$Row.userId]
+                    & $UserRow ($User.userPrincipalName ?? $Row.userId) $User.displayName $Status "$App on $($Row.deviceName) ($($Row.deviceType))" $null $Row.lastSyncDateTime
+                }
+            }
+            default {
+                # Known Intune types without a per-object status source (update profiles, hardware configurations, ...)
             }
         }
-
-        if ($Unavailable -gt 0) { $Notes.Add("$Unavailable item(s) did not return a status and are reported as unknown, not zero.") }
-
-        $Body = @{
-            Results  = @($Results | Sort-Object @{ Expression = { -not $_.Unhealthy } }, Name)
-            Metadata = @{
-                Type           = $Type
-                Count          = $Results.Count
-                UnhealthyCount = @($Results | Where-Object { $_.Unhealthy }).Count
-                Unavailable    = $Unavailable
-                Notes          = @($Notes)
-            }
-        }
-        $StatusCode = [HttpStatusCode]::OK
     } catch {
         $ErrorMessage = Get-CippException -Exception $_
-        Write-LogMessage -headers $Headers -API $APIName -tenant $TenantFilter -message "Intune deployment status lookup failed: $($ErrorMessage.NormalizedError)" -Sev 'Error' -LogData $ErrorMessage
-        $Body = @{ Results = "Failed to read deployment status: $($ErrorMessage.NormalizedError)" }
-        $StatusCode = [HttpStatusCode]::InternalServerError
+        return ([HttpResponseContext]@{
+                StatusCode = [HttpStatusCode]::InternalServerError
+                Body       = @{ Results = "Failed to load deployment status for $Type $($Id): $($ErrorMessage.NormalizedError)" }
+            })
     }
 
-    return ([HttpResponseContext]@{ StatusCode = $StatusCode; Body = $Body })
+    $Supported = $Type -in $StatusTypes
+    return ([HttpResponseContext]@{
+            StatusCode = [HttpStatusCode]::OK
+            Body       = @{
+                Results = [ordered]@{
+                    # The leading comma stops the if-expression unrolling 0 or 1 rows into null or a lone object
+                    Devices = if ($Supported) { , @($Devices) } else { $null }
+                    Users   = if ($Supported -or $IsMam) { , @($Users) } else { $null }
+                }
+            }
+        })
 }

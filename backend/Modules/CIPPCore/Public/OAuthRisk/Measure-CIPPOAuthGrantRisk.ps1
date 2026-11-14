@@ -70,7 +70,7 @@ function Measure-CIPPOAuthGrantRisk {
         'Directory.AccessAsUser.All'         = @('act on the directory as any user', 'do anything in the directory that {who} can do')
     }
     $ConsumerTenant = '9188040d-6c67-4c5b-b112-36a304b66dad'
-    # RiskyPermissions.json: Critical becomes high-risk, High and Medium become medium. Keyed "Type|Name".
+    # RiskyPermissions.json (by suspicion): Critical becomes high-risk, High and Medium become medium. Keyed "Type|Name".
     $Catalog = @{}
     foreach ($P in @($RiskyPermissions)) {
         if (-not $P.name -or -not $P.type) { continue }
@@ -82,8 +82,12 @@ function Measure-CIPPOAuthGrantRisk {
         param([string]$Name, [string]$Type)
         if ($HighRisk.ContainsKey($Name)) { return 'High' }
         $Entry = $Catalog["$Type|$Name"]
-        if ($Entry -and $Entry.risk -eq 'Critical') { return 'High' }
-        if ($Entry -and $Entry.risk -in @('High', 'Medium')) { return 'Medium' }
+        # The catalog rates each entry on suspicion (how likely the grant is abuse) and impact; the single 'risk'
+        # field it had when this was written is gone, which silently scored every catalog entry Normal.
+        # Suspicion is the like-for-like rating: impact would make e.g. DeviceManagementConfiguration.ReadWrite.All Critical.
+        $Rating = if ($Entry) { $Entry.risk ?? $Entry.suspicion }
+        if ($Rating -eq 'Critical') { return 'High' }
+        if ($Rating -in @('High', 'Medium')) { return 'Medium' }
         return 'Normal'
     }
     $Phrase = {

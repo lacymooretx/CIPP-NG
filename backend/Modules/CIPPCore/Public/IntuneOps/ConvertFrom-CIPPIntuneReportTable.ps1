@@ -6,7 +6,7 @@ function ConvertFrom-CIPPIntuneReportTable {
         Pure function. deviceManagement/reports/* answer with a column list (Schema[].Column) and rows as positional
         arrays (Values[][]). Rows are walked by index, never with foreach over @($Report.Values): wrapping an array of
         arrays in @() flattens a single-row result into its cells, and every field then comes out empty (the trap
-        documented in Invoke-ListIntuneDeploymentStatus).
+        documented in Invoke-ListIntuneDeploymentOutcomes).
         Aspendora fork addition (Vikunja CIPP-27).
     .FUNCTIONALITY
         Internal

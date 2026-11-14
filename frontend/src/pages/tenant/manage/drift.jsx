@@ -2466,6 +2466,6 @@ const ManageDriftPage = () => {
   );
 }
 
-ManageDriftPage.getLayout = (page) => <DashboardLayout>{page}</DashboardLayout>
+ManageDriftPage.getLayout = (page) => <DashboardLayout usesTenant={false}>{page}</DashboardLayout>
 
 export default ManageDriftPage

@@ -63,7 +63,8 @@
   },
   {
     "name": "AdminPassword",
-    "label": "Alert on changed admin Passwords",
+    "label": "Alert on changed Global Admin passwords",
+    "description": "Alerts when a Global Administrator's password was changed in the last 24 hours. Newly created accounts are not reported.",
     "recommendedRunInterval": "30m"
   },
   {
@@ -233,6 +234,25 @@
     "minimumRunInterval": "1d"
   },
   {
+    "name": "StorageQuota",
+    "label": "Alert on mailbox storage quota (managed clients only, with repeat suppression)",
+    "requiresInput": true,
+    "multipleInput": true,
+    "inputs": [
+      {
+        "inputType": "textField",
+        "inputLabel": "Percentage of the send/receive quota that counts as at risk (default: 85). Judged on the hard quota, not issueWarningQuota, which is not always rescaled when a mailbox moves to a larger plan.",
+        "inputName": "StorageQuotaPercent"
+      },
+      {
+        "inputType": "textField",
+        "inputLabel": "Days before an unchanged finding is raised again (default: 14). A finding that crosses a band (85/90/95%) is raised immediately regardless.",
+        "inputName": "StorageReNotifyDays"
+      }
+    ],
+    "recommendedRunInterval": "1d"
+  },
+  {
     "name": "SharePointQuota",
     "label": "Alert on % SharePoint quota used",
     "requiresInput": true,
@@ -331,8 +351,17 @@
   },
   {
     "name": "NewAppApproval",
-    "label": "Alert on new apps in the application approval list",
-    "recommendedRunInterval": "30m"
+    "label": "Alert on app consent requests awaiting admin approval",
+    "recommendedRunInterval": "30m",
+    "requiresInput": true,
+    "multipleInput": true,
+    "inputs": [
+      {
+        "inputType": "textField",
+        "inputLabel": "Maximum new pending requests to raise per run (default: 10). The excess is recorded as seen and will not re-surface; suppression is logged as a warning.",
+        "inputName": "AppApprovalMaxPerCycle"
+      }
+    ]
   },
   {
     "name": "SecDefaultsUpsell",
@@ -399,6 +428,28 @@
         ]
       }
     ]
+  },
+  {
+    "name": "DefenderPendingRemediation",
+    "label": "Alert on Defender automated remediations waiting for approval",
+    "recommendedRunInterval": "4h",
+    "requiresInput": true,
+    "inputType": "number",
+    "inputLabel": "Alert once a remediation has been pending this many hours (default: 24)",
+    "inputName": "PendingRemediationHours",
+    "validators": {
+      "min": {
+        "value": 1,
+        "message": "Must be at least 1 hour"
+      }
+    },
+    "description": "Raises each Defender alert (email/MDO or device/MDE) whose automated investigation has sat in Action Center 'Pending approval' for longer than the threshold, measured from the alert's creation. Each alert notifies once and resolves when the action is approved or rejected. Pending email actions mean MDO automation is not soft-deleting similar messages on its own; that setting is portal-only. Report only; see ListDefenderPendingRemediation."
+  },
+  {
+    "name": "AsrReadiness",
+    "label": "Alert on ASR rules ready to move from Audit to Block",
+    "recommendedRunInterval": "30d",
+    "description": "Monthly ASR readiness check (ListAsrReadiness, 14-day window). Raises rules in Audit with no audit hits over the whole window (Info), rules whose assigned policies conflict (Warning), and one row when Audit rules have no evidence source (advanced hunting device tables missing and no ControlR collector data). No evidence is never treated as no hits. Report only: no policy is changed."
   },
   {
     "name": "Vulnerabilities",
@@ -507,6 +558,12 @@
     "label": "Alert on new Apple Business Manager terms",
     "recommendedRunInterval": "30d",
     "minimumRunInterval": "1d"
+  },
+  {
+    "name": "PostureSnapshot",
+    "label": "Store a monthly security posture snapshot (for the Security Posture Change report)",
+    "recommendedRunInterval": "30d",
+    "description": "Never sends an alert. Stores the tenant's current CIPP test results and Secure Score as a posture snapshot so the Security Posture Change report (Tools > Reports) can show month-over-month changes even when the report is only run on demand. Reads CIPP's own tables only."
   },
   {
     "name": "AppCertificateExpiry",
@@ -767,9 +824,9 @@
   },
   {
     "name": "NewRiskyUsers",
-    "label": "Alert on new risky users (P2 License Required)",
+    "label": "Alert on new risky users (risk detections on non-P2 tenants)",
     "recommendedRunInterval": "30m",
-    "description": "Monitors for new risky users in the tenant. Risky users are defined as users who have performed actions that are considered risky, such as password resets, MFA failures, or suspicious activity. Optionally runs the default BEC containment (set under CIPP Settings > BEC Remediation Defaults; out of the box: reset password, block sign-in, revoke sessions, remove MFA methods, disable inbox rules, block legacy mailbox protocols) automatically for users that newly appear at <b>high</b> risk - this locks the user out without a human in the loop, so enable it only where that is the agreed response.",
+    "description": "Monitors for new risky users in the tenant. Risky users are defined as users who have performed actions that are considered risky, such as password resets, MFA failures, or suspicious activity. Tenants without Entra ID P2 cannot read risky users, so for them the alert reports new medium/high (or licence-hidden) risk detections from the last 7 days instead, once per detection; auto-containment applies only to P2 tenants. Optionally runs the default BEC containment (set under CIPP Settings > BEC Remediation Defaults; out of the box: reset password, block sign-in, revoke sessions, remove MFA methods, disable inbox rules, block legacy mailbox protocols) automatically for users that newly appear at <b>high</b> risk - this locks the user out without a human in the loop, so enable it only where that is the agreed response.",
     "requiresInput": true,
     "inputType": "switch",
     "inputLabel": "Automatically contain users that newly appear at high risk (default BEC containment)",
@@ -812,6 +869,12 @@
     "label": "Alert on quarantine release requests",
     "recommendedRunInterval": "1h",
     "description": "Monitors for user requests to release quarantined messages and provides a CIPP-native alternative to the external email forwarding method. This helps MSPs maintain secure configurations while getting timely notifications about quarantine activity. Links to the tenant's quarantine page are provided in alerts."
+  },
+  {
+    "name": "LicenseRequests",
+    "label": "Alert on pending license requests from users",
+    "recommendedRunInterval": "4h",
+    "description": "Monitors for license requests that users send with the 'Ask for a license' button in Microsoft 365 apps. Microsoft shows these requests only under Billing > License requests in the admin center, so they are easy to miss. Each request alerts once, with the user, the product, the reason and a link to the License requests page."
   },
   {
     "name": "StaleEntraDevices",
@@ -929,5 +992,554 @@
       }
     ],
     "description": "Alerts when a user, group or service principal gains a permanent active admin role assignment (no end date) that is not in the approved list. On Entra ID P2 tenants time-bound and PIM-activated assignments are ignored; elsewhere every assignment counts as permanent. The first run only records the current state."
+  },
+  {
+    "name": "PrinterDeployFailure",
+    "label": "Alert on printers failing to install on devices",
+    "recommendedRunInterval": "1d",
+    "requiresInput": true,
+    "multipleInput": true,
+    "inputs": [
+      {
+        "inputType": "textField",
+        "inputLabel": "Only alert once the failure has stood for this many hours (default: 24). Intune retries on the next check-in, so a lower value will raise tickets for failures that fix themselves.",
+        "inputName": "PrinterDeployFailureHours"
+      }
+    ]
+  },
+  {
+    "name": "AppConsentBlocked",
+    "label": "Alert when users are blocked from an app because admin consent is required",
+    "recommendedRunInterval": "4h",
+    "requiresInput": true,
+    "multipleInput": true,
+    "inputs": [
+      {
+        "inputType": "textField",
+        "inputLabel": "How many hours of sign-in history to sweep each run (default: 24). The alert only reports applications never seen blocked before, so a short window loses nothing and keeps the query cheap - a 30-day window times out on busy tenants.",
+        "inputName": "AppConsentBlockedLookbackHours"
+      },
+      {
+        "inputType": "textField",
+        "inputLabel": "Maximum newly blocked applications to raise per run (default: 10). The excess is recorded as seen and will not re-surface; suppression is logged as a warning.",
+        "inputName": "AppConsentBlockedMaxPerCycle"
+      }
+    ]
+  },
+  {
+    "name": "NewRole",
+    "label": "Alert on changes to directory role membership",
+    "recommendedRunInterval": "1d"
+  },
+  {
+    "name": "CompromiseSweep",
+    "label": "Alert on tenant-wide compromise patterns (device-code sign-ins, password spray, distributed brute force, MFA registered on dormant accounts)",
+    "recommendedRunInterval": "4h",
+    "requiresInput": true,
+    "multipleInput": true,
+    "inputs": [
+      {
+        "inputType": "textField",
+        "inputLabel": "Hours of sign-in history to sweep each run (default: 24). Detections are de-duplicated, so a short window loses nothing; the device-code query times out on long windows.",
+        "inputName": "CompromiseSweepLookbackHours"
+      },
+      {
+        "inputType": "textField",
+        "inputLabel": "Password spray: distinct accounts failing from one IP before alerting (default: 5).",
+        "inputName": "CompromiseSweepSprayUsersPerIp"
+      },
+      {
+        "inputType": "textField",
+        "inputLabel": "Brute force: distinct IPs failing against one account before alerting (default: 3).",
+        "inputName": "CompromiseSweepBruteForceIpsPerUser"
+      },
+      {
+        "inputType": "textField",
+        "inputLabel": "Dormant MFA: days without a successful sign-in before an MFA registration is suspicious (default: 30).",
+        "inputName": "CompromiseSweepDormantDays"
+      },
+      {
+        "inputType": "textField",
+        "inputLabel": "Device code allow-list: UPNs or application IDs that legitimately use the device code flow (Teams Rooms, az CLI), comma separated.",
+        "inputName": "CompromiseSweepDeviceCodeAllowList"
+      },
+      {
+        "inputType": "textField",
+        "inputLabel": "Minimum severity to raise: High (only detections with a successful sign-in, device-code sign-ins and dormant-account MFA) or Medium (also blocked spray/brute-force campaigns). Default: Medium.",
+        "inputName": "CompromiseSweepMinSeverity"
+      },
+      {
+        "inputType": "textField",
+        "inputLabel": "Maximum new detections to raise per run (default: 10). High severity first; the excess is recorded and logged as a warning.",
+        "inputName": "CompromiseSweepMaxPerCycle"
+      }
+    ]
+  },
+  {
+    "name": "SharingBurst",
+    "label": "Alert on lateral OneDrive/SharePoint phishing and mass external sharing from one account",
+    "recommendedRunInterval": "1h",
+    "requiresInput": true,
+    "multipleInput": true,
+    "inputs": [
+      {
+        "inputType": "textField",
+        "inputLabel": "Hours of sharing activity to analyse each run (default: 24, max 168). Findings are de-duplicated, so overlap loses nothing and catches SharePoint audit events that arrive late.",
+        "inputName": "SharingBurstLookbackHours"
+      },
+      {
+        "inputType": "textField",
+        "inputLabel": "Burst: distinct external recipients one account shares with inside the window before alerting (default: 25).",
+        "inputName": "SharingBurstRecipients"
+      },
+      {
+        "inputType": "textField",
+        "inputLabel": "Burst window in minutes (default: 60).",
+        "inputName": "SharingBurstWindowMinutes"
+      },
+      {
+        "inputType": "textField",
+        "inputLabel": "File spread: distinct external recipients one file reaches over the whole lookback, however spaced out (default: 25).",
+        "inputName": "SharingBurstFileRecipients"
+      },
+      {
+        "inputType": "textField",
+        "inputLabel": "Send spread: new external mail recipients in 24 h (against the account's previous 7 days) that mark a mail blast after link creation (default: 25).",
+        "inputName": "SharingBurstSendSpread"
+      },
+      {
+        "inputType": "textField",
+        "inputLabel": "Allow-list: UPNs that share externally in bulk on purpose (e.g. marketing), comma separated.",
+        "inputName": "SharingBurstAllowList"
+      },
+      {
+        "inputType": "textField",
+        "inputLabel": "Maximum new findings to raise per run (default: 10). High severity first; the rest are recorded and logged.",
+        "inputName": "SharingBurstMaxPerCycle"
+      }
+    ],
+    "description": "Watches the unified audit log for one account sharing a file with many external recipients within an hour, one file reaching many outsiders over a day, and sharing links followed by a spike in new external mail recipients. Each finding includes any risky or unfamiliar sign-in in the 24 h before and ready parameters for ExecRemoveSharingLink, ExecBulkRemoveSharingLinks and ExecSetOneDriveSharing. Detection only; see ListSharingBurst."
+  },
+  {
+    "name": "BreakGlassActivity",
+    "label": "Alert on any sign-in by, or change to, a registered break-glass account",
+    "recommendedRunInterval": "30m",
+    "requiresInput": true,
+    "multipleInput": true,
+    "inputs": [
+      {
+        "inputType": "textField",
+        "inputLabel": "Hours of sign-in and audit history to scan each run (default: 2). Events are de-duplicated, so overlap loses nothing and catches events that reach the logs late.",
+        "inputName": "BreakGlassLookbackHours"
+      }
+    ],
+    "description": "Raises a High alert for every sign-in (success or failure) by a registered break-glass account, every directory change to or by it, and if it is disabled or deleted. Register accounts per tenant with ExecBreakGlassAccounts (Action=Add)."
+  },
+  {
+    "name": "BreakGlassPosture",
+    "label": "Alert on weak break-glass (emergency access) setup",
+    "recommendedRunInterval": "7d",
+    "description": "Weekly check of the registered break-glass accounts: at least two, cloud-only on *.onmicrosoft.com, permanent Global Administrator, excluded from every enabled Conditional Access policy, non-expiring password, FIDO2 and no person-bound MFA, tested in the last 90 days. Also flags other accounts excluded from many All-users CA policies, Conditional Access plans it cannot evaluate, exclusion-group members that are not registered, and restricted management AU issues. Report only."
+  },
+  {
+    "name": "BreakGlassExclusionChange",
+    "label": "Alert when a Conditional Access policy loses the break-glass exclusion, or the exclusion group gains a member",
+    "recommendedRunInterval": "30m",
+    "requiresInput": true,
+    "multipleInput": true,
+    "inputs": [
+      {
+        "inputType": "textField",
+        "inputLabel": "Hours of audit history to scan each run (default: 2). Events are de-duplicated, so overlap loses nothing and catches events that reach the logs late.",
+        "inputName": "BreakGlassLookbackHours"
+      }
+    ],
+    "description": "Raises a High alert, naming the actor, when a Conditional Access policy update removes a registered break-glass account or a group holding one from its exclusions, or when anything but a registered account joins an exclusion group. Each audit event alerts once. Report only."
+  },
+  {
+    "name": "ConditionalAccessPlans",
+    "label": "Alert when a Conditional Access policy plan appears",
+    "recommendedRunInterval": "1d",
+    "description": "CIPP does not evaluate plan rules, so posture, gap analysis, drift and backups all miss them. Each plan alerts once when first seen and resolves when deleted. Report only."
+  },
+  {
+    "name": "EwsEnabled",
+    "label": "Alert when EWS is off or unset while apps still use it",
+    "recommendedRunInterval": "1d",
+    "description": "Microsoft's EWS shutdown flips an unset EwsEnabled to False and EWS stops within about an hour. This alerts when EwsEnabled is False (Error) or unset (Warning) in a tenant where apps hold EWS permissions (backup, email security, iOS Mail). Pin with ListEwsStatus Action=Pin."
+  },
+  {
+    "name": "PhishResistantAdmins",
+    "label": "Alert on admins without phishing-resistant MFA",
+    "recommendedRunInterval": "7d",
+    "description": "Weekly check of every holder of a privileged directory role (active and PIM-eligible, group assignments expanded): no passkey, FIDO2 key, Windows Hello for Business, Platform Credential or certificate (Error for Global, Privileged Role and Privileged Authentication Administrator); admin account also licensed or mail-enabled; Global Admin count outside 2-4; passkeys disabled or not self-service; AAGUID restrictions blocking Microsoft Authenticator passkeys. Report only; see ListPhishResistantMfa."
+  },
+  {
+    "name": "EntraEntitlementGap",
+    "label": "Alert when Entra ID P1/P2 seats do not cover the users in scope of Conditional Access",
+    "recommendedRunInterval": "7d"
+  },
+  {
+    "name": "SmsMfaReliance",
+    "label": "Alert on users and admins relying on SMS/voice MFA, and on Authenticator/passkey coverage regressing",
+    "recommendedRunInterval": "7d",
+    "requiresInput": true,
+    "multipleInput": true,
+    "inputs": [
+      {
+        "inputType": "number",
+        "inputLabel": "Alert when Authenticator/passkey coverage drops more than this many percentage points below its best (default: 5)",
+        "inputName": "SmsCoverageDropPercent"
+      },
+      {
+        "inputType": "number",
+        "inputLabel": "Alert when the next SMS/voice retirement date (1 Feb 2027, or 1 Jul 2027 for Global Admins and external users) is this many days away or less and users still rely only on SMS/voice (default: 90)",
+        "inputName": "SmsRetirementWarnDays"
+      }
+    ],
+    "description": "Weekly readiness check before disabling SMS/voice MFA (Entra ID P1 needed for the registration report). Raises admins whose only MFA is SMS/voice or who have none, admins defaulting to SMS/voice, one consolidated row for users relying only on SMS/voice and one for licensed users without MFA, and a drop in Authenticator/passkey coverage. Rows carry the user's Microsoft SMS/voice retirement date and days remaining, and one row per tenant is raised once the nearest retirement date with phone-only users is within the warning window. The first run records the coverage baseline. Report only; see ListSmsMfaReadiness."
+  },
+  {
+    "name": "StandingPrivilegedAccess",
+    "label": "Alert on standing Global Admins, privileged guests/apps, inactive admins and GDAP Global Admin",
+    "recommendedRunInterval": "7d",
+    "requiresInput": true,
+    "multipleInput": true,
+    "inputs": [
+      {
+        "inputType": "number",
+        "inputLabel": "Days without a successful sign-in before a privileged account counts as inactive (default: 45)",
+        "inputName": "StandingAccessInactiveDays"
+      },
+      {
+        "inputType": "textField",
+        "inputLabel": "Allow-list: comma-separated appIds or app names of service principals expected to hold roles (* wildcards allowed, e.g. CIPP-SAM, Huntress*). Supports custom variables.",
+        "inputName": "StandingAccessAllowedApps"
+      }
+    ],
+    "description": "Weekly least-privilege check of directory roles: permanent Global Administrators other than registered break-glass accounts (with a suggested smaller role from their Entra audit activity), non-Microsoft service principals and guests holding privileged roles, privileged accounts with no recent sign-in, and GDAP relationships with the customer that include Global Administrator. PIM needs Entra ID P2; without it active roles are treated as standing. Report only; see ListRoleAssignmentReport."
+  },
+  {
+    "name": "NewRoleDefinitions",
+    "label": "Alert on new directory role definitions (custom roles created)",
+    "recommendedRunInterval": "7d",
+    "requiresInput": true,
+    "multipleInput": true,
+    "inputs": [
+      {
+        "inputType": "switch",
+        "inputLabel": "Also alert (as Info) on new built-in roles Microsoft adds?",
+        "inputName": "RoleDefinitionsIncludeBuiltIn"
+      }
+    ],
+    "description": "Records each tenant's directory role definitions and raises one alert per definition that appears later: a new custom role is a Warning (check what it grants and who holds it). The first run seeds silently. Report only."
+  },
+  {
+    "name": "OAuthHighRiskGrant",
+    "label": "Alert on high-risk OAuth grants and AI connectors with mail or file access",
+    "recommendedRunInterval": "1d",
+    "requiresInput": true,
+    "multipleInput": true,
+    "inputs": [
+      {
+        "inputType": "textField",
+        "inputLabel": "Fleet-wide allow-list (every tenant): comma-separated appIds or app names (* wildcards allowed, e.g. Backup Application *). Supports custom variables like %oauthallowlist%.",
+        "inputName": "OAuthRiskAllowList"
+      },
+      {
+        "inputType": "textField",
+        "inputLabel": "Tenant-specific allow-list: entries written tenant|appId-or-name, separated by commas (e.g. aspendora.com|e0476654-c1d5-430b-ab80-70cbd947616a). Applies only to that tenant, so an app vetted for one client still alerts everywhere else.",
+        "inputName": "OAuthRiskTenantAllowList"
+      }
+    ],
+    "description": "Daily live scan of every app's OAuth grants (ListOAuthGrantRisk). Raises apps scored Critical (app-only mailbox, file or directory access with no user signed in) or High (tenant-wide risky delegated consent, unverified publisher), and any AI connector with mail, files or sites scopes, unless allow-listed. Each app notifies once per scope set and resolves when the grant is removed. Includes blast radius and a suggested action (disable the service principal first: it keeps the config)."
+  },
+  {
+    "name": "RiskyAppPermissions",
+    "label": "Alert on apps holding over-privileged API permissions (App Permission Exposure)",
+    "recommendedRunInterval": "1d",
+    "requiresInput": true,
+    "multipleInput": true,
+    "inputs": [
+      {
+        "inputType": "autoComplete",
+        "inputLabel": "Minimum level to alert on (default: High)",
+        "inputName": "MinimumRisk",
+        "creatable": false,
+        "multiple": false,
+        "options": [
+          { "label": "Critical", "value": "Critical" },
+          { "label": "High", "value": "High" },
+          { "label": "Medium", "value": "Medium" },
+          { "label": "Low", "value": "Low" }
+        ]
+      },
+      {
+        "inputType": "autoComplete",
+        "inputLabel": "What the minimum level applies to (default: Risk, the app's context-aware rating)",
+        "inputName": "RateBy",
+        "creatable": false,
+        "multiple": false,
+        "options": [
+          {
+            "label": "Risk (app rating, reports every permission it holds)",
+            "value": "Risk"
+          },
+          {
+            "label": "Impact (damage if the app is compromised, per permission)",
+            "value": "Impact"
+          },
+          {
+            "label": "Suspicion (how unusual the permission is, per permission)",
+            "value": "Suspicion"
+          }
+        ]
+      },
+      {
+        "inputType": "autoComplete",
+        "inputLabel": "Permission categories (default: all)",
+        "inputName": "Categories",
+        "creatable": false,
+        "multiple": true,
+        "options": [
+          { "label": "Privilege escalation", "value": "PrivilegeEscalation" },
+          { "label": "Data access", "value": "DataAccess" },
+          { "label": "Integrity", "value": "Integrity" },
+          { "label": "Availability", "value": "Availability" }
+        ]
+      },
+      {
+        "inputType": "switch",
+        "inputLabel": "Skip delegated grants (application permissions and roles only)",
+        "inputName": "ExcludeDelegated"
+      },
+      {
+        "inputType": "switch",
+        "inputLabel": "Include Microsoft first-party apps",
+        "inputName": "IncludeMicrosoftApps"
+      }
+    ],
+    "description": "Daily check of the App Permission Exposure report (CIPP's risky-permissions catalogue, from the reporting database): one alert row per app at or above the chosen level, with its permissions, owner and vendor. CIPP's own app is always skipped. Tenants whose app data has not been cached yet are skipped. Report only."
+  },
+  {
+    "name": "OIBDrift",
+    "label": "Alert on outdated or retired OpenIntuneBaseline (OIB) policies",
+    "recommendedRunInterval": "7d",
+    "description": "Weekly check of the tenant's \"Win - OIB -\" Intune policies against the latest OpenIntuneBaseline Windows release on GitHub. Alerts on policies older than the version in that release (Outdated) and on policies the release deprecated or dropped (Retired). OIB policies the tenant has not deployed are not alerted on, and tenants with no OIB policies produce nothing. Report only."
+  },
+  {
+    "name": "EnrollmentDiscovery",
+    "label": "Alert on tenants still relying on CNAME-based Intune enrollment",
+    "recommendedRunInterval": "7d",
+    "requiresInput": true,
+    "multipleInput": true,
+    "inputs": [
+      {
+        "inputType": "switch",
+        "inputLabel": "Include informational findings (legacy CNAME target, missing enterpriseregistration record, CNAME missing while the MDM scope is All)",
+        "inputName": "EnrollmentDiscoveryIncludeInfo"
+      }
+    ],
+    "description": "Weekly check of the enterpriseenrollment / enterpriseregistration CNAMEs on every custom verified domain against the Intune MDM user scope: CNAME published while the scope is None or a narrow group, Windows enrollment in use with no CNAME, CNAMEs pointing somewhere unexpected, and GPO / co-management enrolled hybrid devices that depend on the scope. Report only; see ListEnrollmentDiscovery."
+  },
+  {
+    "name": "IntuneStaleCheckIn",
+    "label": "Alert on Intune devices that have not checked in for X days",
+    "recommendedRunInterval": "1d",
+    "requiresInput": true,
+    "multipleInput": true,
+    "inputs": [
+      {
+        "inputType": "number",
+        "inputLabel": "Days since last Intune check-in (default: 14)",
+        "inputName": "IntuneStaleDays"
+      }
+    ],
+    "description": "Raises managed devices whose last Intune sync is older than the threshold. Retired, wiped and delete-pending devices are skipped. Each device notifies once and resolves when it checks in again. Entra sign-in staleness is the separate StaleEntraDevices alert."
+  },
+  {
+    "name": "IntuneEnrollmentFailures",
+    "label": "Alert on Intune enrollment failures",
+    "recommendedRunInterval": "4h",
+    "requiresInput": true,
+    "multipleInput": true,
+    "inputs": [
+      {
+        "inputType": "number",
+        "inputLabel": "Hours of enrollment failure history to scan each run (default: 24). Failures are de-duplicated, so overlap loses nothing.",
+        "inputName": "EnrollmentFailureLookbackHours"
+      }
+    ],
+    "description": "Reads the Intune enrollment troubleshooting log and raises each failure with Intune's reason and suggested remediation. Repeated attempts by the same device for the same reason on the same day are grouped and notify once."
+  },
+  {
+    "name": "IntuneNewDevices",
+    "label": "Daily digest of newly enrolled Intune devices",
+    "recommendedRunInterval": "1d",
+    "requiresInput": true,
+    "multipleInput": true,
+    "inputs": [
+      {
+        "inputType": "number",
+        "inputLabel": "Hours to look back for new enrollments (default: 24)",
+        "inputName": "NewDeviceLookbackHours"
+      }
+    ],
+    "description": "Lists the devices enrolled in Intune in the look-back window (name, user, OS, model, serial, ownership, enrollment type). Each enrollment is announced once."
+  },
+  {
+    "name": "IntuneDuplicateDevices",
+    "label": "Alert on duplicate Intune device records (same serial number)",
+    "recommendedRunInterval": "7d",
+    "requiresInput": true,
+    "multipleInput": true,
+    "inputs": [
+      {
+        "inputType": "number",
+        "inputLabel": "Minimum records sharing a serial number (default: 2)",
+        "inputName": "DuplicateMinRecords"
+      }
+    ],
+    "description": "Groups managed devices by serial number (placeholder serials such as \"Default string\" and retired devices ignored) and recommends keeping the most recently synced record. Report only: nothing is deleted."
+  },
+  {
+    "name": "IntuneNoCompliancePolicy",
+    "label": "Alert on Intune devices with no compliance policy assigned",
+    "recommendedRunInterval": "1d",
+    "requiresInput": true,
+    "multipleInput": true,
+    "inputs": [
+      {
+        "inputType": "number",
+        "inputLabel": "Skip devices enrolled in the last X days (default: 1)",
+        "inputName": "NoComplianceGraceDays"
+      },
+      {
+        "inputType": "switch",
+        "inputLabel": "Also raise devices Intune could not evaluate (error / conflict)",
+        "inputName": "NoComplianceIncludeErrors"
+      }
+    ],
+    "description": "Uses Intune's built-in \"Has a compliance policy assigned\" check to raise devices no compliance policy targets, whose compliance therefore comes only from the tenant default. Non-compliant devices are the separate DeviceCompliance alert."
+  },
+  {
+    "name": "BackupCoverage",
+    "label": "Alert when a tenant has no current CIPP backup of Conditional Access, users and groups",
+    "recommendedRunInterval": "7d",
+    "requiresInput": true,
+    "multipleInput": true,
+    "inputs": [
+      {
+        "inputType": "number",
+        "inputLabel": "Backup counts as stale after X days (default: 2)",
+        "inputName": "BackupCoverageMaxAgeDays"
+      }
+    ],
+    "description": "Raises tenants with no scheduled CIPP backup, a disabled backup task, no backup yet, a stale backup, or Conditional Access / users and groups left out. Entra's own Backup and Recovery keeps only about 5 days and cannot restore hard-deleted objects. See Tenant > Reports > Entra Recovery Coverage."
+  },
+  {
+    "name": "IntuneWindowsUpdateFailures",
+    "label": "Alert on Windows Update failures reported by Intune",
+    "recommendedRunInterval": "1d",
+    "requiresInput": true,
+    "multipleInput": true,
+    "inputs": [
+      {
+        "inputType": "switch",
+        "inputLabel": "Include expedited quality update profiles (not yet verified live)",
+        "inputName": "WUFailuresIncludeQuality"
+      },
+      {
+        "inputType": "switch",
+        "inputLabel": "Include driver update profiles (not yet verified live)",
+        "inputName": "WUFailuresIncludeDrivers"
+      }
+    ],
+    "description": "Reads the Intune Windows Update alert reports per feature update profile (and optionally expedited quality and driver profiles) and raises each device/alert pair. Needs Windows diagnostic data enabled for Intune. A run where a report could not be read does not report."
+  },
+  {
+    "name": "DriverUpdatesBlocked",
+    "label": "Alert when update rings or Settings Catalog policies block Windows drivers",
+    "recommendedRunInterval": "1d",
+    "requiresInput": true,
+    "multipleInput": true,
+    "inputs": [
+      {
+        "inputType": "switch",
+        "inputLabel": "Also raise unassigned policies that block drivers",
+        "inputName": "DriverBlockIncludeUnassigned"
+      }
+    ],
+    "description": "Raises update rings with Windows drivers set to Block and Settings Catalog policies setting \"Exclude WU Drivers In Quality Update\" to Exclude. Either stops devices receiving drivers and firmware regardless of the driver update profile. Report only."
+  },
+  {
+    "name": "ExoProvisioning",
+    "label": "Alert when Exchange Online did not provision correctly (new tenant or SKU)",
+    "recommendedRunInterval": "1d",
+    "requiresInput": true,
+    "multipleInput": true,
+    "inputs": [
+      {
+        "inputType": "number",
+        "inputLabel": "Hours a user must be licensed before a missing mailbox is raised (default: 24)",
+        "inputName": "ExoProvisioningGraceHours"
+      }
+    ],
+    "description": "Checks that Get-OrganizationConfig answers for a tenant licensed for Exchange, the built-in role groups and core management roles exist, Organization Management holds its roles, verified email domains are accepted domains, and users licensed for a mailbox have one. Tenants without an Exchange licence produce nothing. Report only: run the Exchange role repair from Email > Reports > Exchange Provisioning."
+  },
+  {
+    "name": "MessageCenterDigest",
+    "label": "Weekly Message Center digest: action required, retirements and security changes",
+    "recommendedRunInterval": "7d",
+    "requiresInput": true,
+    "multipleInput": true,
+    "inputs": [
+      {
+        "inputType": "number",
+        "inputLabel": "Mark deadlines within X days as due (default: 30)",
+        "inputName": "MCDigestDeadlineDays"
+      },
+      {
+        "inputType": "number",
+        "inputLabel": "Days to look back for new or updated posts (default: 7)",
+        "inputName": "MCDigestLookbackDays"
+      },
+      {
+        "inputType": "switch",
+        "inputLabel": "Digest all managed tenants even when not run on the partner tenant",
+        "inputName": "MCDigestAllTenants"
+      }
+    ],
+    "description": "Schedule on the partner tenant: reads every tenant's cached Message Center posts, deduplicates them by MC id and raises posts that need action (act-by date, high severity), retirements and security changes once each, listing the tenants affected and the admin center link. Deadline posts notify again when they come due. Informational posts never alert; see Tenant > Reports > Message Center Digest."
+  },
+  {
+    "name": "OooExposure",
+    "label": "Alert on out-of-office replies that expose colleagues, phone numbers or payment contacts to external senders",
+    "recommendedRunInterval": "4h",
+    "requiresInput": true,
+    "multipleInput": true,
+    "inputs": [
+      {
+        "inputType": "switch",
+        "inputLabel": "Also raise external (audience All) replies with no contact or payment cues (Medium)",
+        "inputName": "OooExposureIncludeMedium"
+      }
+    ],
+    "description": "Raises mailboxes whose automatic reply goes to every external sender and names a colleague's address, a phone number or a finance cue (invoices, payments, wires, payroll). Each out-of-office period notifies once; the alert carries flags and a masked snippet, never the message. Fix on Email > Reports > Out-of-office Exposure."
+  },
+  {
+    "name": "PersonalDevices",
+    "label": "Alert on personally owned devices enrolled in Intune (BYOD)",
+    "recommendedRunInterval": "7d",
+    "requiresInput": true,
+    "multipleInput": true,
+    "inputs": [
+      {
+        "inputType": "switch",
+        "inputLabel": "Only raise Windows and macOS devices (personal phones are allowed on purpose)",
+        "inputName": "PersonalDevicesComputersOnly"
+      }
+    ],
+    "description": "Raises each managed device whose owner type is personal, once, and clears when it is retired or changed to corporate. Says whether a Windows device was enrolled by adding a work account and which control would stop new ones (default platform restriction, Disable MDM enrollment when adding work or school account). See Endpoint > Reports > Personal Devices."
   }
 ]

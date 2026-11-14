@@ -19,6 +19,9 @@ BeforeAll {
     }
     function Write-LogMessage { param($headers, $API, $message, $Sev, $LogData) }
     function Get-CippException { param($Exception) @{ NormalizedError = "$Exception" } }
+    # Upstream 11.4.0 helpers: relationship-id validation and the multi-partner list (primary partner when empty).
+    function Test-CIPPGDAPRelationshipId { param($Id) $true }
+    function Get-CIPPPartnerTenantList { @() }
 
     . $FunctionPath
 }

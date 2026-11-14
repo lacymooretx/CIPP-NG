@@ -9,6 +9,8 @@ import { CippFormCondition } from './CippFormCondition'
 import { CippApiResults } from './CippApiResults'
 import { useSettings } from '../../hooks/use-settings'
 import { ApiPostCall } from '../../api/ApiCall'
+import { isMultiTenant } from '../../utils/tenant-selection'
+import { useTenantLabel } from '../../hooks/use-tenant-label'
 
 export const CippRestoreBackupDrawer = ({
   buttonText = 'Restore Backup',
@@ -21,6 +23,7 @@ export const CippRestoreBackupDrawer = ({
   const [drawerVisible, setDrawerVisible] = useState(false)
   const userSettingsDefaults = useSettings()
   const tenantFilter = userSettingsDefaults.currentTenant || ''
+  const tenantLabel = useTenantLabel(tenantFilter)
 
   const formControl = useForm({
     mode: 'onChange',
@@ -93,7 +96,7 @@ export const CippRestoreBackupDrawer = ({
 
     // If in AllTenants context, use the tenant from the backup data
     let tenantFilterValue = tenantFilter
-    if (tenantFilter === 'AllTenants' && backupData?.tenantSource) {
+    if (isMultiTenant(tenantFilter) && backupData?.tenantSource) {
       tenantFilterValue = backupData.tenantSource
     }
 
@@ -179,23 +182,26 @@ export const CippRestoreBackupDrawer = ({
         onClose={handleCloseDrawer}
         size="lg"
         footer={
-          <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-start' }}>
-            <Button
-              variant="contained"
-              color="primary"
-              onClick={formControl.handleSubmit(handleSubmit)}
-              disabled={restoreBackup.isPending || !isValid}
-            >
-              {restoreBackup.isPending
-                ? 'Creating Restore Task...'
-                : restoreBackup.isSuccess
-                  ? 'Create Another Restore Task'
-                  : 'Restore Backup'}
-            </Button>
-            <Button variant="outlined" onClick={handleCloseDrawer}>
-              Close
-            </Button>
-          </div>
+          <Stack spacing={2}>
+            <CippApiResults apiObject={restoreBackup} />
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-start' }}>
+              <Button
+                variant="contained"
+                color="primary"
+                onClick={formControl.handleSubmit(handleSubmit)}
+                disabled={restoreBackup.isPending || !isValid}
+              >
+                {restoreBackup.isPending
+                  ? 'Creating Restore Task...'
+                  : restoreBackup.isSuccess
+                    ? 'Create Another Restore Task'
+                    : 'Restore Backup'}
+              </Button>
+              <Button variant="outlined" onClick={handleCloseDrawer}>
+                Close
+              </Button>
+            </div>
+          </Stack>
         }
       >
         <Box sx={{ my: 2 }}>
@@ -209,7 +215,7 @@ export const CippRestoreBackupDrawer = ({
             <Grid size={{ xs: 12 }}>
               <CippFormComponent
                 type="autoComplete"
-                label={`Backups for ${tenantFilter}`}
+                label={`Backups for ${tenantLabel}`}
                 name="backup"
                 multiple={false}
                 api={{
@@ -221,7 +227,7 @@ export const CippRestoreBackupDrawer = ({
                       ? `${match[1]} @ ${match[2]}:${match[3]}`
                       : option.BackupName
                     const tenantDisplay =
-                      tenantFilter === 'AllTenants' ? ` (${option.TenantFilter})` : ''
+                      isMultiTenant(tenantFilter) ? ` (${option.TenantFilter})` : ''
                     return `${dateTime}${tenantDisplay}`
                   },
                   valueField: 'BackupName',
@@ -422,7 +428,6 @@ export const CippRestoreBackupDrawer = ({
             </Grid>
           </Grid>
         </Box>
-        <CippApiResults apiObject={restoreBackup} />
       </CippOffCanvas>
     </>
   );

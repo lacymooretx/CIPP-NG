@@ -5,7 +5,7 @@ function Get-CIPPAlertIntuneWindowsUpdateFailures {
     .DESCRIPTION
         Graph has no GET for per-device Windows Update state (windowsFeatureUpdateProfiles/{id}/deviceUpdateStates and
         the update-ring deviceUpdateStates segment both return "Resource not found", re-checked 2026-10-31). The
-        working route is the Intune reports API, as ListIntuneDeploymentStatus Type=FeatureUpdates already does:
+        working route is the Intune reports API, as ListIntuneDeploymentOutcomes Type=FeatureUpdates already does:
           - Feature update profiles -> POST reports/getWindowsUpdateAlertsPerPolicyPerDeviceReport with a
             mandatory (PolicyId eq '<id>') filter. Verified live (3endt.com, 2026-10-31).
           - Expedited quality update profiles -> reports/getWindowsQualityUpdateAlertsPerPolicyPerDeviceReport, and
