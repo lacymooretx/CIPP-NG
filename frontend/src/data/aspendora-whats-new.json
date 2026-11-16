@@ -3,6 +3,14 @@
   "areas": ["Identity", "Email", "Endpoint", "Teams & SharePoint", "Tenant", "Security", "Alerts", "Integrations", "Platform"],
   "entries": [
     {
+      "id": "asr-evidence-feed-live",
+      "date": "2026-11-15",
+      "title": "ASR readiness now has device evidence from ControlR",
+      "area": "Security",
+      "summary": "ControlR's daily Get-AsrEvents results are sent to CIPP every morning (07:00 Central) for the five Managed Clients, so ASR readiness can tell which Audit rules never fire. A monthly alert from 1 December lists rules ready for Block. Evidence rows older than 90 days are pruned by the nightly table cleanup.",
+      "ref": "CIPP-26"
+    },
+    {
       "id": "storage-history-collection",
       "date": "2026-11-15",
       "title": "Storage history is now collected every day for Managed Clients",

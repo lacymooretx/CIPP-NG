@@ -199,6 +199,17 @@ function Start-TableCleanup {
             }
         }
         @{
+            # ControlR ASR evidence (Aspendora fork, CIPP-26): one row per device per day; readiness reads 14 days.
+            FunctionName   = 'TableCleanupTask'
+            Type           = 'CleanupRule'
+            TableName      = 'AsrEvidence'
+            DataTableProps = @{
+                Filter   = "Timestamp lt datetime'$((Get-Date).AddDays(-90).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ'))'"
+                First    = 10000
+                Property = @('PartitionKey', 'RowKey', 'ETag')
+            }
+        }
+        @{
             FunctionName = 'TableCleanupTask'
             Type         = 'DeleteTable'
             Tables       = @('knownlocationdb', 'CacheExtensionSync', 'ExtensionSync', 'cachebpav2', 'CacheWebhookStats', 'FailedAuditLogDownloads', 'cachealertsandincidents', 'cachembxrules')

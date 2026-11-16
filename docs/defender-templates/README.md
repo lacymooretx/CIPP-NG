@@ -1,7 +1,7 @@
 # Device Control: removable storage, audit first (Vikunja CIPP-26)
 
 Two Graph bodies that build an **audit-only** Defender for Endpoint Device Control policy. Nothing here blocks a
-device. Nothing has been deployed: these are files for the operator.
+device. Live in Aspendora's pilot group since 2026-11-15; not deployed to client tenants.
 
 | File | What it is | Graph endpoint |
 |---|---|---|
@@ -10,7 +10,9 @@ device. Nothing has been deployed: these are files for the operator.
 
 Setting ids, option ids and template reference ids were read from Graph in aspendora.com on 2026-10-31
 (`configurationPolicyTemplates('0f2034c6-…_1')/settingTemplates`, `configurationSettings`, `reusableSettings`).
-The bodies themselves have **not** been posted, so treat the first deploy as the validation.
+First deployed to aspendora.com on 2026-11-15 (policy e1352272, reusable setting 0c9d74a7, assigned to the
+Hardening Pilot device group). That deploy found one schema error, now fixed in file 02: `…_ruledata_entry_options`
+is a single choice (`ChoiceSettingInstance` + `choiceSettingValue`), not a collection.
 
 ## Why two objects
 
