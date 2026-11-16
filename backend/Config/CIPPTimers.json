@@ -356,5 +356,14 @@
     "Priority": 8,
     "RunOnProcessor": true,
     "IsSystem": true
+  },
+  {
+    "Id": "d49ceec4-00f0-487c-9037-ab89f6877468",
+    "Command": "Start-StorageSnapshotTimer",
+    "Description": "Daily M365 storage collection (trend + per-mailbox/site snapshot) for managed clients (Aspendora fork, CIPP-64)",
+    "Cron": "0 30 10 * * *",
+    "Priority": 9,
+    "RunOnProcessor": true,
+    "IsSystem": true
   }
 ]

@@ -20,7 +20,8 @@ function Get-CIPPOneDriveSharingDigestSettings {
     $Settings = [PSCustomObject]@{
         SenderMailbox    = if ($Saved.SenderMailbox) { [string]$Saved.SenderMailbox } else { 'help@aspendora.com' }
         SenderTenant     = if ($Saved.SenderTenant) { [string]$Saved.SenderTenant } else { 'aspendora.com' }
-        PreviewRecipient = if ($Saved.PreviewRecipient) { [string]$Saved.PreviewRecipient } else { 'lacy@aspendora.com' }
+        # Default: CIPP's notification email (CIPP-64; was a hard-coded person).
+        PreviewRecipient = if ($Saved.PreviewRecipient) { [string]$Saved.PreviewRecipient } else { Get-CIPPDefaultReportRecipient }
         Tenant           = $null
         Live             = $false
         ApprovedBy       = $null

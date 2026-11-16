@@ -3,7 +3,8 @@ function Send-CIPPVendorAccessReport {
     .SYNOPSIS
         Refreshes the Vendor Access snapshot for all tenants and emails the weekly summary.
     .DESCRIPTION
-        Recipient: -Recipient, else the Settings/Weekly row of the CippVendorAccess table, else lacy@aspendora.com.
+        Recipient: -Recipient, else the Settings/Weekly row of the CippVendorAccess table, else CIPP's notification email
+        (Get-CIPPDefaultReportRecipient). Throws when none of those is set.
         Sends through Send-CIPPAlert (CIPP's notification mail path, from the CIPP tenant). -SkipRefresh mails the
         saved snapshot without rebuilding it. Returns @{ Recipient; Subject; Summary; Sent }.
         Aspendora fork addition (Vendor Access).
@@ -20,8 +21,9 @@ function Send-CIPPVendorAccessReport {
     $Table = Get-CIPPTable -TableName 'CippVendorAccess'
     if (-not $Recipient) {
         $Settings = try { Get-CIPPAzDataTableEntity @Table -Filter "PartitionKey eq 'Settings' and RowKey eq 'Weekly'" } catch { $null }
-        $Recipient = if ($Settings.Recipient -like '*@*') { [string]$Settings.Recipient } else { 'lacy@aspendora.com' }
+        $Recipient = if ($Settings.Recipient -like '*@*') { [string]$Settings.Recipient } else { Get-CIPPDefaultReportRecipient }
     }
+    if (-not $Recipient) { throw 'No recipient: save one on the Vendor Access page or set an email in Settings > Notifications' }
     $Snapshot = if ($SkipRefresh) { Get-CIPPVendorAccessSnapshot -TenantFilter 'AllTenants' } else { Update-CIPPVendorAccessSnapshot -TenantFilter 'AllTenants' }
     $S = $Snapshot.Summary
     $Parts = @("$($S.ThirdPartyItems) outside parties")

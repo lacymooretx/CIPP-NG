@@ -27,13 +27,13 @@ const Page = () => {
       relatedQueryKeys: "PrinterCatalog",
     },
     {
-      label: "Document in IT Glue",
+      label: "Document in Hudu",
       type: "POST",
-      url: "/api/ExecPrinterCatalogToITGlue",
+      url: "/api/ExecPrinterCatalogToHudu",
       icon: <CippIcons.Share />,
       data: {},
       confirmText:
-        "Write this tenant's whole printer catalogue to IT Glue as the document 'Printers (CIPP-managed)'? Re-running updates the same document.",
+        "Write this tenant's whole printer catalogue to its Hudu company as the article 'Printers (CIPP-managed)'? Re-running updates the same article.",
       multiPost: true,
       hideBulk: false,
     },

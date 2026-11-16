@@ -8,8 +8,15 @@ import {
   Alert,
   Button,
   Container,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  FormControlLabel,
   Grid,
   Stack,
+  Switch,
+  TextField,
   Typography,
 } from '@mui/material'
 import { Layout as DashboardLayout } from '../../../../layouts/index'
@@ -104,6 +111,19 @@ const Page = () => {
     queryKey: 'VendorAccessSettings',
   })
   const sendNow = ApiPostCall({ relatedQueryKeys: ['VendorAccessSettings'] })
+  // Weekly email settings (CIPP-64): blank recipient = CIPP's notification address.
+  const saveSettings = ApiPostCall({ relatedQueryKeys: ['VendorAccessSettings'] })
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [draftRecipient, setDraftRecipient] = useState('')
+  const [draftEnabled, setDraftEnabled] = useState(true)
+  const openSettings = () => {
+    setDraftRecipient(settings.data?.SavedRecipient ?? '')
+    setDraftEnabled(settings.data?.Enabled !== false)
+    saveSettings.reset()
+    setSettingsOpen(true)
+  }
+  const recipientValid =
+    draftRecipient.trim() === '' || /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(draftRecipient.trim())
 
   const summary = report.data?.Summary
   const tenants = Array.isArray(report.data?.Tenants) ? report.data.Tenants : []
@@ -393,6 +413,15 @@ const Page = () => {
                     {sendNow.isPending ? 'Sending...' : 'Email it now'}
                   </Button>
                 )}
+                {canWriteApplication && (
+                  <Button
+                    startIcon={<CippIcons.Settings />}
+                    disabled={!settings.data}
+                    onClick={openSettings}
+                  >
+                    Weekly email
+                  </Button>
+                )}
               </Stack>
             }
           />
@@ -409,6 +438,75 @@ const Page = () => {
           )}
         </Grid>
       </Grid>
+      <Dialog
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        fullWidth
+        maxWidth="sm"
+      >
+        <DialogTitle>Weekly vendor access email</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            <Typography variant="body2" color="text.secondary">
+              Sent {settings.data?.Schedule ?? 'Mondays 07:00 US Central'}. Leave the
+              recipient blank to use CIPP&apos;s notification address
+              {settings.data?.DefaultRecipient
+                ? ` (${settings.data.DefaultRecipient})`
+                : ' (none is set in Settings > Notifications)'}
+              .
+            </Typography>
+            <TextField
+              label="Recipient"
+              value={draftRecipient}
+              onChange={(e) => setDraftRecipient(e.target.value)}
+              error={!recipientValid}
+              helperText={recipientValid ? ' ' : 'Enter one email address'}
+              fullWidth
+            />
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={draftEnabled}
+                  onChange={(e) => setDraftEnabled(e.target.checked)}
+                />
+              }
+              label="Send the weekly email"
+            />
+            {saveSettings.isSuccess && (
+              <Alert severity="success">
+                {saveSettings.data?.data?.Results ?? 'Saved'}
+              </Alert>
+            )}
+            {saveSettings.isError && (
+              <Alert severity="error">
+                {saveSettings.error?.response?.data?.Results ??
+                  'The settings could not be saved'}
+              </Alert>
+            )}
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setSettingsOpen(false)}>Close</Button>
+          <Button
+            variant="contained"
+            disabled={!recipientValid || saveSettings.isPending}
+            onClick={() =>
+              saveSettings.mutate({
+                url: '/api/ExecVendorAccessReport',
+                data: {
+                  Action: 'Settings',
+                  Enabled: draftEnabled,
+                  ...(draftRecipient.trim()
+                    ? { Recipient: draftRecipient.trim() }
+                    : { ClearRecipient: true }),
+                },
+              })
+            }
+          >
+            {saveSettings.isPending ? 'Saving...' : 'Save'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Container>
   )
 }

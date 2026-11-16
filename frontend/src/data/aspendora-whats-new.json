@@ -3,6 +3,33 @@
   "areas": ["Identity", "Email", "Endpoint", "Teams & SharePoint", "Tenant", "Security", "Alerts", "Integrations", "Platform"],
   "entries": [
     {
+      "id": "storage-history-collection",
+      "date": "2026-11-15",
+      "title": "Storage history is now collected every day for Managed Clients",
+      "area": "Tenant",
+      "summary": "A daily job (04:30 Central) records each Managed Client's mailbox, OneDrive and SharePoint storage, so the Storage & Usage report's history and growth figures fill in. The first run backfills up to 180 days of totals; per-mailbox and per-site growth builds up from then on.",
+      "path": "/tenant/reports/storage-usage",
+      "ref": "CIPP-64"
+    },
+    {
+      "id": "printer-catalog-to-hudu",
+      "date": "2026-11-15",
+      "title": "Printer catalogue documents to Hudu instead of IT Glue",
+      "area": "Endpoint",
+      "summary": "The printer catalogue's document action now writes the article 'Printers (CIPP-managed)' to the client's Hudu company and reads it back. IT Glue is a read-only archive.",
+      "path": "/endpoint/printers/catalog",
+      "ref": "CIPP-64"
+    },
+    {
+      "id": "vendor-access-email-settings",
+      "date": "2026-11-15",
+      "title": "Vendor Access weekly email settings on the page",
+      "area": "Security",
+      "summary": "A Weekly email button on the Vendor Access page sets the recipient and turns the Monday email on or off. With no recipient saved it goes to CIPP's notification address (Settings > Notifications); the OneDrive sharing digest preview uses the same default.",
+      "path": "/tenant/reports/vendor-access",
+      "ref": "CIPP-64"
+    },
+    {
       "id": "break-glass-controlr-approval",
       "date": "2026-11-12",
       "title": "Break-glass plans are approved in ControlR's Change Requests queue",

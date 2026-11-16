@@ -128,6 +128,13 @@ Describe 'Get-CIPPGDAPHealthFindings' {
 }
 
 Describe 'Invoke-CIPPGDAPHealthCheck alerting and state' {
+    BeforeAll {
+        # Invoke-CIPPGDAPHealthCheck reads the real clock, so relationship end dates here must be relative to it
+        # (a fixed date made these tests fail once 2026-11-12 passed and r1 read as expired).
+        $script:FixedNow = $script:Now
+        $script:Now = (Get-Date).ToUniversalTime()
+    }
+    AfterAll { $script:Now = $script:FixedNow }
     BeforeEach {
         $script:Store = @{}
         $script:Sent = [System.Collections.Generic.List[object]]::new()

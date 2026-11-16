@@ -263,6 +263,9 @@ Describe 'Get-CIPPStorageUsageReportData (integration)' {
     }
 
     It 'excludes system sites and personal OneDrives from archival candidates' {
+        # Idle days are measured from today; pin today to the fixture's report date (2026-08-14) so
+        # 'Active Site' stays active once real time moves 90+ days past it.
+        Mock Get-Date { [datetime]::new(2026, 8, 15, 12, 0, 0) } -ParameterFilter { -not $Format -and -not $UFormat -and -not $Date }
         $Model = Get-CIPPStorageUsageReportData -TenantFilter 'managed.com'
         $ByKey = @{}; foreach ($S in $Model.Sections) { $ByKey[$S.Key] = $S }
         $Names = @($ByKey['ArchivalCandidates'].Rows | ForEach-Object { $_[0] })

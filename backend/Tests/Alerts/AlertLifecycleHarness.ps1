@@ -13,6 +13,8 @@ $HarnessRoot = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $PSCom
 . (Join-Path $HarnessRoot 'Modules/CIPPCore/Public/GraphHelper/Get-CIPPAlertLifecycleKey.ps1')
 . (Join-Path $HarnessRoot 'Modules/CIPPCore/Public/GraphHelper/Write-AlertTrace.ps1')
 . (Join-Path $HarnessRoot 'Modules/CIPPCore/Public/GraphHelper/Initialize-CIPPAlertLifecycleBaseline.ps1')
+# Fork alerts log failures at the severity this picks (Warning for throttling/transient errors).
+. (Join-Path $HarnessRoot 'Modules/CIPPCore/Public/Alerts/Get-CIPPAlertFailureSeverity.ps1')
 
 function Reset-AlertStore {
     $script:Store = @{}
@@ -44,6 +46,19 @@ function Add-CIPPAzDataTableEntity {
         $Pairs = if ($E -is [hashtable]) { $E.GetEnumerator() } else { $E.PSObject.Properties | ForEach-Object { [pscustomobject]@{ Key = $_.Name; Value = $_.Value } } }
         foreach ($P in $Pairs) { $Row | Add-Member -NotePropertyName $P.Key -NotePropertyValue $P.Value -Force }
         $script:Store[$TableName]["$($Row.PartitionKey)|$($Row.RowKey)"] = $Row
+    }
+}
+
+# Upstream 11.x resolves lifecycle rows with Update-CIPPAzDataTableEntity (merge into rows that exist; never
+# create). Mirror that: merge each entity's properties into the stored row, skip rows that are gone.
+function Update-CIPPAzDataTableEntity {
+    param($TableName, $Entity, $OperationType = 'UpdateMerge', [switch]$Force)
+    foreach ($E in @($Entity)) {
+        $Key = "$($E.PartitionKey)|$($E.RowKey)"
+        if (-not $script:Store.ContainsKey($TableName) -or -not $script:Store[$TableName].ContainsKey($Key)) { continue }
+        $Row = $script:Store[$TableName][$Key]
+        $Pairs = if ($E -is [hashtable]) { $E.GetEnumerator() } else { $E.PSObject.Properties | ForEach-Object { [pscustomobject]@{ Key = $_.Name; Value = $_.Value } } }
+        foreach ($P in $Pairs) { $Row | Add-Member -NotePropertyName $P.Key -NotePropertyValue $P.Value -Force }
     }
 }
 

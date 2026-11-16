@@ -25,6 +25,8 @@ function Invoke-ExecVendorAccessReport {
     $Recipient = [string]($Request.Body.Recipient ?? $Request.Query.Recipient)
     # Settings only: whether the weekly email is sent.
     $Enabled = $Request.Body.Enabled
+    # Settings only: drop the saved recipient so the email follows CIPP's notification address.
+    $ClearRecipient = $Request.Body.ClearRecipient -eq $true
     # Send only: mail the saved snapshot instead of rebuilding it first.
     $SkipRefresh = $Request.Body.SkipRefresh -eq $true
     $Table = Get-CIPPTable -TableName 'CippVendorAccess'
@@ -47,12 +49,14 @@ function Invoke-ExecVendorAccessReport {
                 $Entity = @{
                     PartitionKey = 'Settings'
                     RowKey       = 'Weekly'
-                    Recipient    = if ($Recipient) { $Recipient } elseif ($Current.Recipient) { [string]$Current.Recipient } else { 'lacy@aspendora.com' }
+                    # ClearRecipient goes back to CIPP's notification address (no saved recipient).
+                    Recipient    = if ($ClearRecipient) { '' } elseif ($Recipient) { $Recipient } elseif ($Current.Recipient) { [string]$Current.Recipient } else { '' }
                     Enabled      = if ($null -ne $Enabled) { [bool]($Enabled -eq $true) } elseif ($null -ne $Current.Enabled) { [bool]$Current.Enabled } else { $true }
                 }
                 Add-CIPPAzDataTableEntity @Table -Entity $Entity -Force | Out-Null
                 Write-LogMessage -headers $Headers -API $APIName -tenant 'Global' -message "Vendor access weekly email: recipient $($Entity.Recipient), enabled $($Entity.Enabled)" -Sev 'Info'
-                $Body = @{ Results = "Saved: weekly email to $($Entity.Recipient) is $(if ($Entity.Enabled) { 'on' } else { 'off' })" }
+                $To = if ($Entity.Recipient) { $Entity.Recipient } else { "CIPP's notification address ($(Get-CIPPDefaultReportRecipient))" }
+                $Body = @{ Results = "Saved: weekly email to $To is $(if ($Entity.Enabled) { 'on' } else { 'off' })" }
             }
             'Reset' {
                 $Rows = @(Get-CIPPAzDataTableEntity @Table | Where-Object { $_.PartitionKey -notin @('Settings', 'Weekly') })
@@ -65,8 +69,12 @@ function Invoke-ExecVendorAccessReport {
                 $Sends = @(try { Get-CIPPAzDataTableEntity @Table -Filter "PartitionKey eq 'Weekly'" } catch { @() }) | Sort-Object RowKey -Descending | Select-Object -First 8 | ForEach-Object {
                     [pscustomobject]@{ Day = $_.RowKey; Status = $_.Status; SentAt = $_.SentAt; Recipient = $_.Recipient; Error = $_.Error }
                 }
+                $Default = Get-CIPPDefaultReportRecipient
                 $Body = @{
-                    Recipient = if ($Current.Recipient) { [string]$Current.Recipient } else { 'lacy@aspendora.com' }
+                    # Recipient is what the email actually goes to; SavedRecipient is '' when it follows the default.
+                    Recipient        = if ($Current.Recipient -like '*@*') { [string]$Current.Recipient } else { $Default }
+                    SavedRecipient   = if ($Current.Recipient -like '*@*') { [string]$Current.Recipient } else { '' }
+                    DefaultRecipient = $Default
                     Enabled   = if ($null -ne $Current.Enabled) { [bool]$Current.Enabled } else { $true }
                     Schedule  = 'Mondays 07:00 US Central'
                     Sends     = @($Sends)

@@ -38258,14 +38258,14 @@
         "x-cipp-role": "CIPP.ReportBuilder.ReadWrite"
       }
     },
-    "/api/ExecPrinterCatalogToITGlue": {
+    "/api/ExecPrinterCatalogToHudu": {
       "post": {
-        "summary": "ExecPrinterCatalogToITGlue",
-        "operationId": "ExecPrinterCatalogToITGlue",
+        "summary": "ExecPrinterCatalogToHudu",
+        "operationId": "ExecPrinterCatalogToHudu",
         "tags": [
           "Endpoint > Printers"
         ],
-        "description": "Writes a tenant's CIPP printer catalogue into IT Glue as a document, so the printers a client has are documented where the service desk already looks. Re-running updates the same document rather than creating another.",
+        "description": "Writes a tenant's CIPP printer catalogue into Hudu as the article 'Printers (CIPP-managed)' in the mapped company, so the printers a client has are documented where the service desk already looks. Re-running updates the same article (matched by exact name) and reads it back. Replaces ExecPrinterCatalogToITGlue: IT Glue has been a read-only archive since 2026-10-11 (Aspendora fork, CIPP-64).",
         "requestBody": {
           "required": true,
           "content": {
@@ -49974,6 +49974,10 @@
                   "Action": {
                     "type": "string",
                     "description": "Preview, Send, Settings, GetSettings or Reset."
+                  },
+                  "ClearRecipient": {
+                    "type": "boolean",
+                    "description": "Settings only: drop the saved recipient so the email follows CIPP's notification address."
                   },
                   "Enabled": {
                     "type": "string",

@@ -41,6 +41,11 @@ function Push-ExecOneDriveSharingDigest {
     $Settings = Get-CIPPOneDriveSharingDigestSettings -TenantFilter $TenantFilter
     $Live = $Settings.Live -and [string]::IsNullOrWhiteSpace($PreviewRecipient)
     $PreviewTo = if ($PreviewRecipient) { $PreviewRecipient } else { $Settings.PreviewRecipient }
+    if (-not $Live -and -not $PreviewTo) {
+        $Message = "OneDrive sharing digest not sent for $TenantFilter`: the tenant is in preview and there is no preview recipient (save one, or set an email in Settings > Notifications)."
+        Write-LogMessage -API 'OneDriveSharingDigest' -tenant $TenantFilter -message $Message -sev Warning
+        return [PSCustomObject]@{ Results = $Message; Sent = 0; Skipped = @(); Failed = @() }
+    }
 
     $Digest = Get-CIPPOneDriveSharingDigest -TenantFilter $TenantFilter
     $Tenant = @(Get-Tenants -TenantFilter $TenantFilter -IncludeErrors)[0]

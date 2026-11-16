@@ -114,6 +114,8 @@ BeforeAll {
     }
     function Remove-CIPPAzDataTableEntity { param($TableName, $Entity, [switch]$Force) $script:Tables[$TableName].Remove("$($Entity.PartitionKey)|$($Entity.RowKey)") }
     $script:Sent = [System.Collections.Generic.List[object]]::new()
+    # CIPP-64: with no saved recipient the email follows CIPP's notification address.
+    function Get-CIPPDefaultReportRecipient { 'alerts@msp.example' }
     function Send-CIPPAlert { param($Type, $Title, $HTMLContent, $altEmail, $TenantFilter, $APIName) $script:Sent.Add([pscustomobject]@{ To = $altEmail; Title = $Title; Html = $HTMLContent }) }
 }
 
@@ -252,7 +254,7 @@ Describe 'Weekly Monday 07:00 Central guard' {
         Invoke-CIPPVendorAccessWeekly -Now ((U '2026-11-09T13:05:00')) | Should -Be 'Sent'
         Invoke-CIPPVendorAccessWeekly -Now ((U '2026-11-09T14:05:00')) | Should -Be 'Already sent'
         $script:Sent.Count | Should -Be 1
-        $script:Sent[0].To | Should -Be 'lacy@aspendora.com'
+        $script:Sent[0].To | Should -Be 'alerts@msp.example' -Because 'no saved recipient: CIPP notification address'
     }
 
     It 'sends at 07:05 CDT (12:05 UTC) in July and not at 06:05 CDT' {

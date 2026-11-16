@@ -31,7 +31,7 @@ For a direct IP printer, **Driver source** says where the driver comes from:
 | Action | What it does |
 | --- | --- |
 | Deploy to Intune | Creates or updates the policy or script for the printer, and assigns it to a group if one is given. Leave the group blank to use the one stored on the entry. A group can be a display name or an object ID. Deploying again updates the same policy or script, matched by name, rather than adding another. Sets **Last deployed**. |
-| Document in IT Glue | Writes the tenant's whole catalogue to IT Glue as the document **Printers (CIPP-managed)**. Running it again updates the same document. Needs the IT Glue extension enabled and the tenant mapped to an IT Glue organisation; otherwise it says which is missing. |
+| Document in Hudu | Writes the tenant's whole catalogue to its Hudu company as the article **Printers (CIPP-managed)**, then reads it back. Running it again updates the same article. Needs the Hudu extension enabled and the tenant mapped to a Hudu company; otherwise it says which is missing. (Replaced the IT Glue action on 2026-11-15: IT Glue is a read-only archive.) |
 | Edit | Opens the entry in the form. |
 | Remove from catalogue | Deletes the CIPP record only. Printers already installed on devices, and the Intune policy or script, are left alone. |
 
@@ -41,7 +41,7 @@ The **Deploy the tenant's printer catalogue** standard (`PrinterCatalog`) compar
 
 ## Permissions
 
-Viewing needs `Endpoint.Printer.Read`. Adding, editing, removing, deploying and writing to IT Glue need `Endpoint.Printer.ReadWrite`.
+Viewing needs `Endpoint.Printer.Read`. Adding, editing, removing, deploying and writing to Hudu need `Endpoint.Printer.ReadWrite`.
 
 ## API
 
