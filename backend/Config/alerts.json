@@ -1180,6 +1180,27 @@
     "recommendedRunInterval": "7d"
   },
   {
+    "name": "CopilotLicenseChange",
+    "label": "Alert when a Copilot or Copilot-credit licence appears in a tenant or its seat count changes",
+    "recommendedRunInterval": "1d",
+    "description": "Daily subscribedSkus check for Copilot SKUs (part number with COPILOT, AGENT, CCIBOTS or CREDIT, or an M365_COPILOT service plan). The first run records what exists silently. A new SKU or more seats raises a Warning; fewer seats or a removed SKU raises Info. Each row says whether we sell it (Pax8/Sherweb Copilot subscription) or it was bought elsewhere. Copilot Business moves to usage-based billing on 2026-12-01. Report only."
+  },
+  {
+    "name": "AzureElevatedAccess",
+    "label": "Alert when a Global Admin uses 'elevate access' (Access management for Azure resources) or holds root-scope Azure access",
+    "recommendedRunInterval": "4h",
+    "requiresInput": true,
+    "multipleInput": true,
+    "inputs": [
+      {
+        "inputType": "textField",
+        "inputLabel": "Allowed accounts (comma-separated UPNs or object ids) whose elevation is kept on purpose. Supports custom variables.",
+        "inputName": "AllowedElevationActors"
+      }
+    ],
+    "description": "Reads Entra audit category AzureRBACRoleManagementElevateAccess (last 25 hours): an elevation raises a Warning once, a removal Info. Also lists User Access Administrator or other role assignments at Azure root scope '/' through any subscription CIPP-SAM can read (Reader is enough); each raises a Warning once and resolves when removed. GDAP partner admins cannot elevate, so only native tenant accounts trigger it. Report only."
+  },
+  {
     "name": "SmsMfaReliance",
     "label": "Alert on users and admins relying on SMS/voice MFA, and on Authenticator/passkey coverage regressing",
     "recommendedRunInterval": "7d",

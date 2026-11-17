@@ -3,6 +3,22 @@
   "areas": ["Identity", "Email", "Endpoint", "Teams & SharePoint", "Tenant", "Security", "Alerts", "Integrations", "Platform"],
   "entries": [
     {
+      "id": "azure-elevate-access-alert",
+      "date": "2026-11-17",
+      "title": "Alert when someone uses 'elevate access' to Azure",
+      "area": "Alerts",
+      "summary": "Every 4 hours CIPP checks Managed Clients for a Global Admin using 'Access management for Azure resources', which gives them control of every Azure subscription. It also flags anyone left with root-scope Azure access, where CIPP can read a subscription. Accounts kept elevated on purpose can be allowed.",
+      "ref": "CIPP-45"
+    },
+    {
+      "id": "copilot-licence-alert",
+      "date": "2026-11-17",
+      "title": "Daily alert when a Copilot licence appears or changes",
+      "area": "Alerts",
+      "summary": "Every morning CIPP checks Managed Clients and Aspendora for Copilot and Copilot-credit licences. A new licence or a seat change is emailed and ticketed once, labelled as bought through us or bought elsewhere, ahead of Copilot Business usage-based billing on 1 December.",
+      "ref": "CIPP-42"
+    },
+    {
       "id": "asr-evidence-feed-live",
       "date": "2026-11-15",
       "title": "ASR readiness now has device evidence from ControlR",
